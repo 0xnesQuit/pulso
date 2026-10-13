@@ -28,7 +28,7 @@ describe("authentication failures", () => {
 
   it("rejects malformed, unknown and wrong-scheme tokens", async () => {
     const { token } = await createAccount();
-    const unknown = "ob_" + "A".repeat(43);
+    const unknown = "fb_" + "A".repeat(43);
     const headers = [
       "Bearer",
       "Bearer ",
@@ -60,7 +60,7 @@ describe("authentication failures", () => {
   it("does not fall back to the cookie when an Authorization header is invalid", async () => {
     const { token } = await createAccount();
     const cookie = await login(token);
-    const res = await call("/v1/me", { headers: { Cookie: cookie, Authorization: "Bearer ob_wrong" } });
+    const res = await call("/v1/me", { headers: { Cookie: cookie, Authorization: "Bearer fb_wrong" } });
     expect(res.status).toBe(401);
     const viaCookie = await call("/v1/me", { headers: { Cookie: cookie } });
     expect(viaCookie.status).toBe(200);
@@ -68,10 +68,10 @@ describe("authentication failures", () => {
 
   it("rejects forged or malformed session cookies", async () => {
     for (const cookie of [
-      "__Host-ob_session=" + "A".repeat(43),
-      "__Host-ob_session=short",
-      "__Host-ob_session=" + "A".repeat(43) + "';--",
-      "ob_session=" + "A".repeat(43),
+      "__Host-fb_session=" + "A".repeat(43),
+      "__Host-fb_session=short",
+      "__Host-fb_session=" + "A".repeat(43) + "';--",
+      "fb_session=" + "A".repeat(43),
     ]) {
       const res = await call("/v1/me", { headers: { Cookie: cookie } });
       expect(res.status, cookie).toBe(401);
@@ -80,7 +80,7 @@ describe("authentication failures", () => {
 
   it("keeps working with a valid token after failures", async () => {
     const { token } = await createAccount();
-    await call("/v1/me", { headers: bearer("ob_" + "B".repeat(43)) });
+    await call("/v1/me", { headers: bearer("fb_" + "B".repeat(43)) });
     expect((await call("/v1/me", { headers: bearer(token) })).status).toBe(200);
   });
 });

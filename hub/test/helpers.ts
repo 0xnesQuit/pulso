@@ -3,7 +3,7 @@ import { env } from "cloudflare:workers";
 import { expect } from "vitest";
 import worker from "../src/index";
 
-export const ORIGIN = "https://openband.cobanov.dev";
+export const ORIGIN = "https://freeband.cobanov.dev";
 export const DEV_A = "5B0E2C9A-4C7D-4F57-9A39-2D2B1D9E8A10";
 export const DEV_B = "0F1E2D3C-4B5A-4978-8695-A4B3C2D1E0F9";
 
@@ -56,7 +56,7 @@ export function battery(ts: string, level: number) {
 
 export function syncBody(samples: unknown[], device: Partial<Record<string, unknown>> = {}) {
   return {
-    schema: "openband.v1",
+    schema: "freeband.v1",
     event: "sync.completed",
     device: {
       id: DEV_A,
@@ -82,7 +82,7 @@ export async function login(token: string): Promise<string> {
   expect(res.status).toBe(200);
   const sc = res.headers.get("set-cookie") ?? "";
   const pair = sc.split(";")[0] ?? "";
-  expect(pair.startsWith("__Host-ob_session=")).toBe(true);
+  expect(pair.startsWith("__Host-fb_session=")).toBe(true);
   return pair;
 }
 

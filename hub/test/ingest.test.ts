@@ -72,7 +72,7 @@ describe("POST /v1/ingest", () => {
     const base = () => syncBody([live("2026-10-13T10:00:00Z", 100, 70)]);
     const future = iso(Date.now() + 3 * 86_400_000);
     const mutations: Array<[string, (b: ReturnType<typeof base>) => void]> = [
-      ["schema", (b) => ((b as Record<string, unknown>).schema = "openband.v2")],
+      ["schema", (b) => ((b as Record<string, unknown>).schema = "freeband.v2")],
       ["event", (b) => ((b as Record<string, unknown>).event = "ping")],
       ["device missing", (b) => delete (b as Record<string, unknown>).device],
       ["device.id", (b) => (b.device.id = "AA:BB:CC:DD:EE:FF")],

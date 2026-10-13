@@ -86,7 +86,7 @@ private struct HistoryContent: View {
                     }
                 }
             }
-            Text("Günlük toplamlar OpenBand'in o gün yaptığı senkronlardan gelir. Bandın kendi kaydettiği dakikalık geçmişi ve uykuyu okumak bir sonraki sürümde ekleniyor.")
+            Text("Günlük toplamlar Freeband'in o gün yaptığı senkronlardan gelir. Bandın kendi kaydettiği dakikalık geçmişi ve uykuyu okumak bir sonraki sürümde ekleniyor.")
                 .font(.footnote)
                 .foregroundStyle(Theme.secondary)
         }
@@ -158,7 +158,7 @@ struct SleepView: View {
                     .accessibilityHidden(true)
                 Text("Gecen burada evreleriyle görünecek: derin, hafif, REM ve uyanık süreler.")
                     .foregroundStyle(Theme.ink)
-                Text("Bant uykunu kendi içinde kaydediyor. OpenBand'in bu kaydı okuması üzerinde çalışılıyor; hazır olduğunda senkron uykuyu da getirecek.")
+                Text("Bant uykunu kendi içinde kaydediyor. Freeband'in bu kaydı okuması üzerinde çalışılıyor; hazır olduğunda senkron uykuyu da getirecek.")
                     .font(.callout)
                     .foregroundStyle(Theme.secondary)
                 Spacer()

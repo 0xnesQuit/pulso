@@ -21,7 +21,7 @@ describe("POST /v1/session", () => {
     expect(res.status).toBe(200);
     const sc = res.headers.get("set-cookie") ?? "";
     const c = attrs(sc);
-    expect(c.name).toBe("__Host-ob_session");
+    expect(c.name).toBe("__Host-fb_session");
     expect(c.value).toMatch(/^[A-Za-z0-9_-]{43}$/);
     expect(c.attrs.has("httponly")).toBe(true);
     expect(c.attrs.has("secure")).toBe(true);
@@ -41,7 +41,7 @@ describe("POST /v1/session", () => {
   });
 
   it("rejects a wrong token without setting a cookie", async () => {
-    for (const token of ["ob_" + "Z".repeat(43), "nope", "", 42]) {
+    for (const token of ["fb_" + "Z".repeat(43), "nope", "", 42]) {
       const res = await call("/v1/session", json({ token }, { Origin: ORIGIN }));
       expect(res.status).toBe(401);
       expect(res.headers.get("set-cookie")).toBeNull();
@@ -76,10 +76,10 @@ describe("POST /v1/session", () => {
   it("rate limits sign-in attempts per IP", async () => {
     const ip = freshIp();
     for (let i = 0; i < 20; i++) {
-      const res = await call("/v1/session", { ...json({ token: "ob_" + "Q".repeat(43) }, { Origin: ORIGIN }), ip });
+      const res = await call("/v1/session", { ...json({ token: "fb_" + "Q".repeat(43) }, { Origin: ORIGIN }), ip });
       expect(res.status).toBe(401);
     }
-    const blocked = await call("/v1/session", { ...json({ token: "ob_" + "Q".repeat(43) }, { Origin: ORIGIN }), ip });
+    const blocked = await call("/v1/session", { ...json({ token: "fb_" + "Q".repeat(43) }, { Origin: ORIGIN }), ip });
     expect(blocked.status).toBe(429);
   });
 });
@@ -91,7 +91,7 @@ describe("DELETE /v1/session", () => {
     const res = await call("/v1/session", { method: "DELETE", headers: { Cookie: cookie, Origin: ORIGIN } });
     expect(res.status).toBe(200);
     const c = attrs(res.headers.get("set-cookie") ?? "");
-    expect(c.name).toBe("__Host-ob_session");
+    expect(c.name).toBe("__Host-fb_session");
     expect(c.value).toBe("");
     expect(c.attrs.get("max-age")).toBe("0");
     expect((await call("/v1/me", { headers: { Cookie: cookie } })).status).toBe(401);

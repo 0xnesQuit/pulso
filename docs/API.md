@@ -1,4 +1,4 @@
-# OpenBand veri sözleşmesi (v1)
+# Freeband veri sözleşmesi (v1)
 
 Uygulama, webhook'lar ve Cloudflare hub aynı JSON biçimini kullanır. Zamanlar ISO 8601 UTC (`2026-10-13T20:59:41Z`).
 
@@ -17,7 +17,7 @@ Bir kullanıcının birden fazla bandı olabilir (ör. Band 10 ve Band 10 Pro). 
 
 ```json
 {
-  "schema": "openband.v1",
+  "schema": "freeband.v1",
   "event": "sync.completed",
   "device": {
     "id": "5B0E2C9A-4C7D-4F57-9A39-2D2B1D9E8A10",
@@ -53,15 +53,15 @@ Her istek şu başlıklarla gelir:
 | Başlık | Değer |
 |---|---|
 | `Content-Type` | `application/json` |
-| `X-OpenBand-Event` | `sync.completed` ya da `ping` |
-| `X-OpenBand-Delivery` | rastgele UUID |
-| `X-OpenBand-Signature` | `sha256=<hex>`: gövdenin HMAC-SHA256'sı, anahtar webhook'un gizli değeri |
+| `X-Freeband-Event` | `sync.completed` ya da `ping` |
+| `X-Freeband-Delivery` | rastgele UUID |
+| `X-Freeband-Signature` | `sha256=<hex>`: gövdenin HMAC-SHA256'sı, anahtar webhook'un gizli değeri |
 
 Alıcı imzayı ham gövde üzerinden doğrulamalı. Uygulama webhook'ları yalnız `https://` adreslere gönderir.
 
 ## Hub API
 
-Taban adres: `https://openband.cobanov.dev` (geliştirmede `http://localhost:8787`). Kimlik doğrulama `Authorization: Bearer ob_<token>`.
+Taban adres: `https://freeband.cobanov.dev` (geliştirmede `http://localhost:8787`). Kimlik doğrulama `Authorization: Bearer fb_<token>`.
 
 | Yöntem | Yol | Açıklama |
 |---|---|---|
@@ -80,7 +80,7 @@ Web sayfaları: `/` (tanıtım ve giriş), `/login#token=...` (uygulamadaki "Web
 
 ## Güvenlik kuralları
 
-- Token: `ob_` + 32 rastgele baytın base64url'i. D1'de yalnız SHA-256 özeti tutulur.
+- Token: `fb_` + 32 rastgele baytın base64url'i. D1'de yalnız SHA-256 özeti tutulur.
 - Hesaplar birbirinin verisini göremez; her sorgu `account_id` ile sınırlı.
 - Oturum çerezi `HttpOnly; Secure; SameSite=Strict`, 30 gün.
 - Gövde boyutu, örnek sayısı, alan aralıkları doğrulanır (ör. `heart_rate` 0–250, `level` 0–100, `ts` ±2 gün geleceğe kadar).

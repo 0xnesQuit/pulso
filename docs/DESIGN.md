@@ -1,4 +1,4 @@
-# OpenBand tasarım sistemi
+# Freeband tasarım sistemi
 
 Konu: bilekteki banttan veriyi Xiaomi'siz okuyan yerel sağlık uygulaması.
 Kitle: kullanıcı ve davet ettiği, çoğu teknik olmayan arkadaşları.
@@ -66,7 +66,7 @@ Sekmeler: Bugün · Ayarlar (Geçmiş, bir sonraki görevde gelecek).
 
 ## İlk kurulum (sıralı akış, numara kullanılabilir)
 
-1. **Bandın, sadece senin.** OpenBand ne yapar: veri telefonda kalır, Mi Fitness silinmez, eşleşme bozulmaz. Uyarı: bandı Mi Fitness'tan kaldırma, fabrika ayarına döndürme, anahtar değişir.
+1. **Bandın, sadece senin.** Freeband ne yapar: veri telefonda kalır, Mi Fitness silinmez, eşleşme bozulmaz. Uyarı: bandı Mi Fitness'tan kaldırma, fabrika ayarına döndürme, anahtar değişir.
 2. **Bandın anahtarını al.** Dosyalar'dan Mi Fitness klasörünü seçme adımları. Başarıda bant adı ve maskeli anahtar görünür.
 3. **Bağlan.** "Mi Fitness'ı kapat" hatırlatması, "Bandı bağla" düğmesi. Başarıda pil ve bugünkü adım görünür, "Başla" ile Bugün ekranına geçilir.
 

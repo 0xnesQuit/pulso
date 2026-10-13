@@ -1,5 +1,5 @@
-// Renders the OpenBand app icon (1024×1024, opaque) from the 24-hour dial motif.
-// Run: swift tools/render_icon.swift OpenBand/Resources/Assets.xcassets/AppIcon.appiconset/AppIcon.png
+// Renders the Freeband app icon (1024×1024, opaque) from the 24-hour dial motif.
+// Run: swift tools/render_icon.swift Freeband/Resources/Assets.xcassets/AppIcon.appiconset/AppIcon.png
 import AppKit
 import CoreGraphics
 

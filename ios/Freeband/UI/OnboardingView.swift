@@ -2,7 +2,7 @@ import SwiftData
 import SwiftUI
 import UniformTypeIdentifiers
 
-/// First run, three real steps (docs/DESIGN.md): what OpenBand is, get the band key, connect.
+/// First run, three real steps (docs/DESIGN.md): what Freeband is, get the band key, connect.
 struct OnboardingView: View {
     @AppStorage("onboarded") private var onboarded = false
     @State private var step = 1
@@ -58,11 +58,11 @@ private struct WelcomeStep: View {
                 .accessibilityHidden(true)
 
             StepTitle(text: "Bandın, sadece senin.")
-            Text("OpenBand, Xiaomi Smart Band 10 ve 10 Pro ile doğrudan konuşur. Hesap gerekmez; verilerin bu telefonda kalır ve sen açmadıkça hiçbir yere gitmez.")
+            Text("Freeband, Xiaomi Smart Band 10 ve 10 Pro ile doğrudan konuşur. Hesap gerekmez; verilerin bu telefonda kalır ve sen açmadıkça hiçbir yere gitmez.")
                 .foregroundStyle(Theme.ink)
             Text("Mi Fitness'ı silme. Bandın anahtarını ondan okuyacağız ve bant güncellemeleri için arada bir gerekecek.")
                 .foregroundStyle(Theme.secondary)
-            Text("Bandı Mi Fitness'tan kaldırma ve fabrika ayarlarına döndürme. Anahtar değişir, OpenBand bağlanamaz.")
+            Text("Bandı Mi Fitness'tan kaldırma ve fabrika ayarlarına döndürme. Anahtar değişir, Freeband bağlanamaz.")
                 .font(.callout)
                 .foregroundStyle(Theme.pomegranate)
 
@@ -88,7 +88,7 @@ struct KeyStep: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
             StepTitle(text: title)
-            Text("Bant yalnızca kendi anahtarını bilen uygulamayla konuşur. Bu anahtar telefonundaki Mi Fitness klasöründe duruyor; OpenBand onu oradan okur ve yalnızca bu telefonun anahtar zincirinde saklar.")
+            Text("Bant yalnızca kendi anahtarını bilen uygulamayla konuşur. Bu anahtar telefonundaki Mi Fitness klasöründe duruyor; Freeband onu oradan okur ve yalnızca bu telefonun anahtar zincirinde saklar.")
                 .foregroundStyle(Theme.ink)
 
             if found.isEmpty {
@@ -113,7 +113,7 @@ struct KeyStep: View {
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(Band.displayName(name: BandKey.bestName(group), mac: lead.mac))
                                     .foregroundStyle(Theme.ink)
-                                Text(group.count == 1 ? "Anahtar \(lead.masked)" : "\(group.count) anahtar bulundu; çalışanı OpenBand seçer")
+                                Text(group.count == 1 ? "Anahtar \(lead.masked)" : "\(group.count) anahtar bulundu; çalışanı Freeband seçer")
                                     .font(.footnote)
                                     .foregroundStyle(Theme.secondary)
                             }

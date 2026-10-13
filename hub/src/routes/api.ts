@@ -373,7 +373,7 @@ api.get("/export.csv", anyAuth, async (c) => {
   return new Response(textStream(lines()), {
     headers: {
       "Content-Type": "text/csv; charset=utf-8",
-      "Content-Disposition": `attachment; filename="openband-${stamp}.csv"`,
+      "Content-Disposition": `attachment; filename="freeband-${stamp}.csv"`,
     },
   });
 });
@@ -404,7 +404,7 @@ api.get("/export.json", anyAuth, async (c) => {
   return new Response(textStream(parts()), {
     headers: {
       "Content-Type": "application/json; charset=utf-8",
-      "Content-Disposition": `attachment; filename="openband-${stamp}.json"`,
+      "Content-Disposition": `attachment; filename="freeband-${stamp}.json"`,
     },
   });
 });
@@ -532,7 +532,7 @@ api.post("/webhooks/:id/test", anyAuth, async (c) => {
 
 api.post("/session", async (c) => {
   if (!isSameOrigin(c.req.raw)) {
-    throw new HttpError(403, "cross_origin", "Giriş yalnız OpenBand sayfasından yapılabilir.");
+    throw new HttpError(403, "cross_origin", "Giriş yalnız Freeband sayfasından yapılabilir.");
   }
   const db = c.env.DB;
   await enforce(db, RATE_LIMITS.sessionPerIp, await ipKey(c.env, clientIp(c.req.raw)));
@@ -561,7 +561,7 @@ api.post("/session", async (c) => {
 
 api.delete("/session", async (c) => {
   if (!isSameOrigin(c.req.raw)) {
-    throw new HttpError(403, "cross_origin", "Çıkış yalnız OpenBand sayfasından yapılabilir.");
+    throw new HttpError(403, "cross_origin", "Çıkış yalnız Freeband sayfasından yapılabilir.");
   }
   const sid = getCookie(c.req.raw, SESSION_COOKIE);
   if (sid && SESSION_RE.test(sid)) {

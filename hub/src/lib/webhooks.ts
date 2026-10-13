@@ -5,7 +5,7 @@ import { decryptSecret, hmacSha256Hex } from "./crypto";
 export const MAX_WEBHOOKS = 5;
 export const DELIVERY_TIMEOUT_MS = 5000;
 const MAX_URL_LEN = 2048;
-const USER_AGENT = "OpenBand-Hub/1";
+const USER_AGENT = "Freeband-Hub/1";
 
 export interface HookRow {
   id: string;
@@ -83,9 +83,9 @@ export async function deliver(
       headers: {
         "Content-Type": "application/json",
         "User-Agent": USER_AGENT,
-        "X-OpenBand-Event": event,
-        "X-OpenBand-Delivery": crypto.randomUUID(),
-        "X-OpenBand-Signature": await signature(secret, body),
+        "X-Freeband-Event": event,
+        "X-Freeband-Delivery": crypto.randomUUID(),
+        "X-Freeband-Signature": await signature(secret, body),
       },
       body,
       redirect: "manual",

@@ -1,4 +1,4 @@
--- OpenBand hub schema v1.
+-- Freeband hub schema v1.
 -- Every row that holds user data carries account_id; every query filters by it.
 -- Times are unix epoch milliseconds (UTC).
 

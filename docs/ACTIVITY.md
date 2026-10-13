@@ -1,6 +1,6 @@
 # Aktivite geçmişi: bileklik kayıtlı veriyi nasıl teslim ediyor
 
-Xiaomi Smart Band 10 / 10 Pro (BLE V2 / SPP V2 paket katmanı) için, OpenBand'in Swift tarafında uygulanacak aktivite dosyası akışının bayt düzeyinde tarifi. Kaynak: `vendor/Gadgetbridge`, commit `d4bd8367`. Arka plan için `findings.md` bölüm 4–6.
+Xiaomi Smart Band 10 / 10 Pro (BLE V2 / SPP V2 paket katmanı) için, Freeband'in Swift tarafında uygulanacak aktivite dosyası akışının bayt düzeyinde tarifi. Kaynak: `vendor/Gadgetbridge`, commit `d4bd8367`. Arka plan için `findings.md` bölüm 4–6.
 
 Referans uygulama ve test vektörleri: `ios/tests/activity/activity_ref.py` ve `ios/tests/activity/fixtures/` (bölüm 11).
 
@@ -17,7 +17,7 @@ Referans uygulama ve test vektörleri: `ios/tests/activity/activity_ref.py` ve `
 - **[KOD]**: Gadgetbridge kaynağında doğrudan görülen davranış, `dosya:satır` ile.
 - **[TEST]**: Gadgetbridge test dosyasında assert edilen değer.
 - **[TAHMİN]**: Kaynaktan çıkarım; kodda açıkça yazmıyor.
-- **[ÖNERİ]**: OpenBand için tasarım tavsiyesi; Gadgetbridge'in yaptığı şey değil.
+- **[ÖNERİ]**: Freeband için tasarım tavsiyesi; Gadgetbridge'in yaptığı şey değil.
 
 Bütün çok baytlı alanlar aksi yazılmadıkça **little-endian**. Tek istisna, uyku detay dosyasındaki evre paketlerinin uzunluk alanı ve içerikleri (bölüm 6.3.3): onlar **big-endian**.
 
@@ -34,7 +34,7 @@ telefon (kanal 1, protobuf, şifreli)                bileklik
                                                    ← kanal 5 (Activity) veri paketleri:
                                                      [total u16][num u16][parça]  ×total
                                                      birleşik dosya = id(7) | pad(1) | gövde | CRC32(4)
-  (Gadgetbridge burada Command{8,5} ile ACK atar ve dosya bileklikten silinir. OpenBand ATMAYACAK.)
+  (Gadgetbridge burada Command{8,5} ile ACK atar ve dosya bileklikten silinir. Freeband ATMAYACAK.)
 ```
 
 - Liste istekleri ve dosya isteği protobuf kanalında (kanal 1) gider; dosyanın kendisi protobuf değildir, **kanal 5** üzerinden ikili parçalar hâlinde gelir. [KOD] `X/XiaomiBleProtocolV2.java:58-60`, `X/services/XiaomiHealthService.java:907-955`
@@ -72,7 +72,7 @@ Aşağıdaki baytlar şifrelemeden önceki protobuf gövdesi. Örnek id: `00 F1 
 | 3 | tek dosya iste | `Command{type:8, subtype:3, health{activityRequestFileIds: id}}` | `08 08 10 03 52 09 12 07 <id 7 bayt>` | [KOD] `:931-942` |
 | 5 | ACK, dosyayı sil | `Command{type:8, subtype:5, health{activitySyncAckFileIds: id}}` | `08 08 10 05 52 09 1A 07 <id 7 bayt>` | [KOD] `:944-955` |
 
-- `ActivitySyncRequestToday.unknown1`: Gadgetbridge yorumu "official app sends 0, but sometimes 1?" [KOD] `X/services/XiaomiHealthService.java:914-915`; proto yorumu bunu "0=normal sync, 1=force/full sync" olabilir diye tahmin ediyor. [KOD] `P/xiaomi/wear_fitness.proto:66`. Anlamı doğrulanmamış; OpenBand `0` göndermeli. [ÖNERİ]
+- `ActivitySyncRequestToday.unknown1`: Gadgetbridge yorumu "official app sends 0, but sometimes 1?" [KOD] `X/services/XiaomiHealthService.java:914-915`; proto yorumu bunu "0=normal sync, 1=force/full sync" olabilir diye tahmin ediyor. [KOD] `P/xiaomi/wear_fitness.proto:66`. Anlamı doğrulanmamış; Freeband `0` göndermeli. [ÖNERİ]
 - **Subtype 5 gönderilmeyecek.** Gadgetbridge her dosyayı CRC doğrulandıktan hemen sonra, parse etmeden önce ACK'liyor, yeter ki `keep_activity_data_on_device` kapalı olsun (varsayılan kapalı). [KOD] `X/activity/XiaomiActivityFileFetcher.java:147-151`, `X/XiaomiPreferences.java:93-96`. Ayarın açıklaması: "Do not mark activities as synced on the device. Useful if Gadgetbridge is used together with other apps. This may cause the watch to run out of space and/or stop syncing properly." [KOD] `app/src/main/res/values/strings.xml:1276-1277`
 
 ### 2.3 Cevaplar
@@ -89,9 +89,9 @@ Aşağıdaki baytlar şifrelemeden önceki protobuf gövdesi. Örnek id: `00 F1 
 - Telefon tarafından gönderimde `Activity` kanalı `OPCODE_SEND_ENCRYPTED` alır. [KOD] `X/XiaomiSppPacketV2.java:362-374`
 - **Alımda çözme, paketin kendi opcode'una göre yapılır**: opcode 2 ise `decryptV2`, değilse ham gövde. Bu, protobuf kanalıyla aynı fonksiyon: AES-128-CTR, anahtar = IV = `decryptionKey`, sayaç her pakette baştan. [KOD] `X/XiaomiSppPacketV2.java:409-415`, `X/XiaomiAuthService.java:385-402`. Yani evet, kanal 5 de protobuf'la **aynı AES-CTR** ile şifreli; her kanal-5 veri paketi bağımsız çözülür.
 - Çözülen her kanal-5 paketinin gövdesi **tam olarak bir parçadır** (bölüm 4); doğrudan `XiaomiActivityFileFetcher.addChunk`'a verilir. [KOD] `X/XiaomiBleProtocolV2.java:60`, `:178-185`, `:321-327`
-- Taşıma katmanı ACK'i (çerçeve tipi 1) kanal ayırt etmeden her gelen veri paketine gönderilir; bu, dosya silen subtype-5 ACK'iyle **aynı şey değil** ve gönderilmesi gerekir. [KOD] `X/XiaomiBleProtocolV2.java:328-329`. OpenBand bunu zaten yapıyor: `ios/OpenBand/Band/BandLink.swift:340-342`.
-- OpenBand şu an kanal 1 dışındaki paketleri atıyor (`guard channel == 1`), `ios/OpenBand/Band/BandLink.swift:351-362`. Kanal 5 için ayrı bir dal gerekiyor; çözme kısmı (`opcode == 2` → `MiCrypto.ctr`) aynen kullanılabilir.
-- Gadgetbridge Band 10 / 10 Pro'yu SPP V2 (BT Classic) üzerinden konuşturuyor [KOD] `XD/watches/MiBand10Coordinator.java:46-49`, `XD/watches/MiBand10ProCoordinator.java:45-48`. BLE V2 yolu da aynı `XiaomiSppPacketV2` paket sınıfını kullandığından [KOD] `X/XiaomiBleProtocolV2.java:313`, çerçevenin üstündeki akış (kanal 5, opcode, parça formatı) iki taşımada aynı. OpenBand'in BLE V2 üzerinde auth ve şifreli protobuf'u bu bileklikte zaten çalışıyor (findings bölüm 6.1).
+- Taşıma katmanı ACK'i (çerçeve tipi 1) kanal ayırt etmeden her gelen veri paketine gönderilir; bu, dosya silen subtype-5 ACK'iyle **aynı şey değil** ve gönderilmesi gerekir. [KOD] `X/XiaomiBleProtocolV2.java:328-329`. Freeband bunu zaten yapıyor: `ios/Freeband/Band/BandLink.swift:340-342`.
+- Freeband şu an kanal 1 dışındaki paketleri atıyor (`guard channel == 1`), `ios/Freeband/Band/BandLink.swift:351-362`. Kanal 5 için ayrı bir dal gerekiyor; çözme kısmı (`opcode == 2` → `MiCrypto.ctr`) aynen kullanılabilir.
+- Gadgetbridge Band 10 / 10 Pro'yu SPP V2 (BT Classic) üzerinden konuşturuyor [KOD] `XD/watches/MiBand10Coordinator.java:46-49`, `XD/watches/MiBand10ProCoordinator.java:45-48`. BLE V2 yolu da aynı `XiaomiSppPacketV2` paket sınıfını kullandığından [KOD] `X/XiaomiBleProtocolV2.java:313`, çerçevenin üstündeki akış (kanal 5, opcode, parça formatı) iki taşımada aynı. Freeband'in BLE V2 üzerinde auth ve şifreli protobuf'u bu bileklikte zaten çalışıyor (findings bölüm 6.1).
 
 ### 2.5 Sıralama, zamanlama, tamamlanma
 
@@ -107,7 +107,7 @@ Gadgetbridge'in yaptığı [KOD]:
 8. Zaman aşımında tamponu atıp sıradakine geçer; tekrar denemez. `:84-88`
 9. Kuyruk boş ve geçmiş cevabı beklenmiyorsa senkron biter. `:228-236`, `:181-192`
 
-OpenBand için [ÖNERİ]:
+Freeband için [ÖNERİ]:
 
 - Gadgetbridge'in 2. adımdaki paralelliği (dosya aktarımı sürerken subtype 2 göndermek) gereksiz risk. Önce subtype 1, cevap; sonra subtype 2, cevap; sonra listeyi birleştir, tekilleştir, sırala ve dosyaları tek tek iste.
 - 5 sn zaman aşımını koru, ama bir kez yeniden dene; ikinci zaman aşımında o dosyayı bu senkron için atla.
@@ -117,7 +117,7 @@ OpenBand için [ÖNERİ]:
 
 - Dosyalar bileklikte kalır; her senkronda aynı id'ler yine listelenir. Daha önce alınmış ve CRC'si doğru saklanmış id'ler için subtype 3'ü tekrar göndermemek gerekir. [TAHMİN, ACK'in silme anlamından çıkarım; `strings.xml:1276-1277`]
 - "Bugün" listesindeki günlük detay dosyası gün içinde büyüyor olabilir: id aynı kalıp içerik uzayabilir. Bugünün listesindeki dosyalar her senkronda yeniden çekilmeli ve eski kopyanın yerine yazılmalı. [TAHMİN; Gadgetbridge her seferinde ACK'leyip sildiği için bu durumu hiç görmüyor]
-- Mi Fitness aynı dosyaları ACK'leyip silebilir; OpenBand'in listesi ile isteği arasında dosya kaybolursa istek zaman aşımına düşer. Bu normal akış sayılmalı. [TAHMİN]
+- Mi Fitness aynı dosyaları ACK'leyip silebilir; Freeband'in listesi ile isteği arasında dosya kaybolursa istek zaman aşımına düşer. Bu normal akış sayılmalı. [TAHMİN]
 - Bileklik dolarsa senkron bozulabilir (Gadgetbridge uyarısı). Mi Fitness'ın periyodik çalışması bu riski azaltır. [KOD] `strings.xml:1277`, [TAHMİN]
 
 ## 3. Dosya kimliği (7 bayt)
@@ -206,7 +206,7 @@ Kurallar [KOD]:
 - `num == 1` tamponu sıfırlar (`:97-100`).
 - Veri, başlık atılarak tampona eklenir (`:104`).
 - `num == total` dosyayı kapatır (`:106-112`).
-- Gadgetbridge sıra atlamayı, tekrarı ya da `total` değişimini **kontrol etmiyor**. [KOD] `:91-112`. OpenBand bunları hata saymalı: beklenen `num` gelmezse tamponu at, dosyayı başarısız say. [ÖNERİ; referans parser bunu yapıyor]
+- Gadgetbridge sıra atlamayı, tekrarı ya da `total` değişimini **kontrol etmiyor**. [KOD] `:91-112`. Freeband bunları hata saymalı: beklenen `num` gelmezse tamponu at, dosyayı başarısız say. [ÖNERİ; referans parser bunu yapıyor]
 - Parça boyutu hakkında kaynakta sabit yok. Çerçevenin üst sınırı SessionConfig'teki `0xFC00` [KOD, findings 4.2]; parçalar BLE bildirimlerine bölünüp çerçeve katmanında birleşiyor, yani parça = bir çerçeve. [KOD] `X/XiaomiBleProtocolV2.java:111-176`
 
 ### 4.2 Birleşik dosya ve CRC
@@ -221,7 +221,7 @@ Kurallar [KOD]:
 - Algoritma `java.util.zip.CRC32`, yani standart CRC-32 (ISO-HDLC / IEEE 802.3 / zlib): polinom `0x04C11DB7`, yansıtılmış hâli `0xEDB88320`, başlangıç `0xFFFFFFFF`, giriş ve çıkış yansıtılmış, son XOR `0xFFFFFFFF`. Kontrol değeri: `"123456789"` → `CBF43926`. [KOD] `GB/util/CheckSums.java:36`, `:105-109`
 - 13 gerçek antrenman dosyası ve 3 gerçek manuel ölçüm paketi bu tanımla doğrulandı (bölüm 11). [TEST]
 - `data[7]` (pad) 0 değilse Gadgetbridge yalnızca uyarır, parse etmeye devam eder. [KOD] `:135-140`
-- Dosyanın ilk 7 baytı id'dir; Gadgetbridge parser'ı bu baytlardan seçer, istenen id ile karşılaştırmaz. [KOD] `:142-153`. OpenBand gelen id'yi istenen id ile karşılaştırmalı; farklıysa dosyayı yine sakla ama uyar. [ÖNERİ]
+- Dosyanın ilk 7 baytı id'dir; Gadgetbridge parser'ı bu baytlardan seçer, istenen id ile karşılaştırmaz. [KOD] `:142-153`. Freeband gelen id'yi istenen id ile karşılaştırmalı; farklıysa dosyayı yine sakla ama uyar. [ÖNERİ]
 - `fixAndWrap` ve 13 baytlık GPS "placeholder" mantığı Gadgetbridge'in kendi eski disk kayıtları ve iç mekân antrenmanları için; kablodaki biçimle ilgisi yok. [KOD] `X/activity/XiaomiActivityParser.java:143-171`, `X/activity/XiaomiActivityFileFetcher.java:163-166`
 
 ## 5. Ortak gövde araçları
@@ -283,7 +283,7 @@ Kayıt (her biri bir dakika) — grupları sırayla, yalnız nibble'ında `0x8` 
 - Geçersiz alan Gadgetbridge'de `NOT_MEASURED` (−1) ya da null kalır (`:93-95`).
 - Değer filtreleri (okumada, parse'ta değil): nabız grafikte 10–250 arası geçerli [KOD] `GB/activities/HeartRateUtils.java:24-25`, `:66-68`; SpO2 ve stres `0` ise yok sayılır [KOD] `XD/XiaomiSpo2SampleProvider.java:62`, `XD/XiaomiStressSampleProvider.java:62`; energy `<= 0` yok sayılır [KOD] `XD/XiaomiBodyEnergySampleProvider.java:36`.
 - Aktif kalori okunurken ×1000 ile çarpılıyor, yani ham değer kcal, gösterilen birim cal. [KOD] `XD/XiaomiSampleProvider.java:116-120`, birim [TAHMİN]
-- Gövde ortasında bir kayıt yarım kalırsa Gadgetbridge'de `BufferUnderflowException` olur ve dosyanın hiçbir kaydı kaydedilmez (`addChunk`'taki `catch`, `X/activity/XiaomiActivityFileFetcher.java:170-172`). OpenBand tam kayıtları tutup kalan baytı raporlamalı. [ÖNERİ]
+- Gövde ortasında bir kayıt yarım kalırsa Gadgetbridge'de `BufferUnderflowException` olur ve dosyanın hiçbir kaydı kaydedilmez (`addChunk`'taki `catch`, `X/activity/XiaomiActivityFileFetcher.java:170-172`). Freeband tam kayıtları tutup kalan baytı raporlamalı. [ÖNERİ]
 
 ### 6.2 Günlük özet (ACTIVITY / DAILY 0x00 / SUMMARY)
 
@@ -369,7 +369,7 @@ v5'te bilinmeyen 9 bayt + iki u32 için indeks 5 ilerler (`:127`).
 | `firstRecordTime` | u32 | yalnız `count > 0` **ve** v≥2 ise; v1'de `bedTime` kabul edilir |
 | örnekler | `count` × u8 (nabız, SpO2) ya da `count` × float32 LE (horlama) | örnek `i` zamanı = `firstRecordTime + unit·i` |
 
-Gadgetbridge nabız/SpO2/horlama örneklerini atlıyor, kaydetmiyor (`:142-144`, `:161-163`, `:181-183`). OpenBand bunları uyku sırasındaki nabız/SpO2 için kullanabilir. [ÖNERİ]
+Gadgetbridge nabız/SpO2/horlama örneklerini atlıyor, kaydetmiyor (`:142-144`, `:161-163`, `:181-183`). Freeband bunları uyku sırasındaki nabız/SpO2 için kullanabilir. [ÖNERİ]
 
 #### 6.3.2 Evre paketleri
 
@@ -482,7 +482,7 @@ Küçük değil: `X/activity/impl/WorkoutSummaryParser.java` 1122 satır, 13 ant
 - Dosya id'sindeki `ts` ve dosya içindeki bütün u32 zaman damgaları **Unix saniye, UTC**. Gadgetbridge bunları doğrudan `new Date(ts * 1000L)` ile kullanıyor, saat dilimi eklemiyor. [KOD] `X/activity/XiaomiActivityFileId.java:123`, `X/activity/impl/SleepDetailsParser.java:119-120`, `X/activity/impl/SleepStagesParser.java:100-101`, `:120`, `X/activity/impl/ManualSamplesParser.java:113`, `:187`
 - Doğrulama: 12 gerçek antrenman dosyasında `ts + tz·15 dk` ile bulunan yerel tarih, Gadgetbridge testindeki sabit adında yazan tarihle aynı (ör. `OUTDOOR_RUN_V5_30SEP`: UTC 23:14, tz −12 → yerel 30 Eylül 20:14). [TEST] `T/impl/WorkoutSummaryParserTest.java:299-301`; kontrol fikstürde.
 - `tz`: işaretli i8, 15 dakikalık birim. [KOD] `X/activity/XiaomiActivityFileId.java:111`. Aynı birim, yaz saati dahil, antrenman protobuf'ında da var. [KOD] `P/xiaomi/wear_fitness.proto:154-158`
-- Gadgetbridge `tz`'yi örnek zamanlarına **uygulamıyor**; yalnız günlük özette saklıyor. [KOD] `X/activity/impl/DailySummaryParser.java:180`. OpenBand de zamanları UTC olarak saklamalı, gün sınırını `tz` ile hesaplamalı. [ÖNERİ]
+- Gadgetbridge `tz`'yi örnek zamanlarına **uygulamıyor**; yalnız günlük özette saklıyor. [KOD] `X/activity/impl/DailySummaryParser.java:180`. Freeband de zamanları UTC olarak saklamalı, gün sınırını `tz` ile hesaplamalı. [ÖNERİ]
 - Günlük detay kayıtları `ts + 60·i`. [KOD] `X/activity/impl/DailyDetailsParser.java:177`
 - Günlük detay ve günlük özet dosyalarının `ts`'si büyük olasılıkla yerel gün başı (ya da dosyanın başladığı dakika). Kaynakta yazmıyor. [TAHMİN] Swift kodu bunu varsaymamalı; kayıt zamanı her zaman `ts + 60·i`.
 - Uyku evre paketlerinde `ts` i64; tip 16/17 saniye, tip 1 milisaniye gibi işleniyor (bölüm 6.3.2).
@@ -538,7 +538,7 @@ Not: "Mi Band 9 Active", Band 9 / 10'dan farklı bir platform; v1 manuel ölçü
 
 ## 10. Swift uygulamasının savunmacı ele alması gerekenler
 
-1. **Kanal 5 yönlendirmesi.** `BandLink.decode` şu an `channel == 1` dışını atıyor (`ios/OpenBand/Band/BandLink.swift:360`). Kanal 5'i opcode'a göre çözüp parça birleştiriciye verin; taşıma ACK'ini her pakete göndermeye devam edin.
+1. **Kanal 5 yönlendirmesi.** `BandLink.decode` şu an `channel == 1` dışını atıyor (`ios/Freeband/Band/BandLink.swift:360`). Kanal 5'i opcode'a göre çözüp parça birleştiriciye verin; taşıma ACK'ini her pakete göndermeye devam edin.
 2. **Subtype 5 asla gönderilmesin.** Kodda bu subtype için yardımcı bile olmasın ki yanlışlıkla çağrılmasın. [ÖNERİ]
 3. **Ham dosyayı önce saklayın.** CRC doğruysa id + tüm bayt diske, sonra parse. Gadgetbridge de parse'tan önce yazıyor (`X/activity/XiaomiActivityFileFetcher.java:145`). Parser sonradan düzelirse yeniden işlenebilir.
 4. **Parça sırası.** `num` 1'den başlar; beklenmeyen `num` / `total` gelirse dosyayı at. 5 sn sessizlikte zaman aşımı, bir yeniden deneme.

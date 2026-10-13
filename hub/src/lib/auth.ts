@@ -8,7 +8,7 @@ import { SESSION_RE, TOKEN_RE, sha256Hex, timingSafeEqualStr } from "./crypto";
 import { HttpError, getCookie, isSameOrigin } from "./http";
 
 /** `__Host-` prefix: browser enforces Secure, Path=/ and no Domain attribute. */
-export const SESSION_COOKIE = "__Host-ob_session";
+export const SESSION_COOKIE = "__Host-fb_session";
 export const SESSION_TTL_SEC = 30 * 86_400;
 export const MAX_SESSIONS_PER_ACCOUNT = 20;
 
@@ -86,7 +86,7 @@ export function requireAuth(opts: { session: boolean }): MiddlewareHandler<AppEn
       const sid = getCookie(c.req.raw, SESSION_COOKIE);
       if (sid) {
         if (!SAFE_METHODS.has(c.req.method) && !isSameOrigin(c.req.raw)) {
-          throw new HttpError(403, "cross_origin", "Bu istek yalnız OpenBand panelinden yapılabilir.");
+          throw new HttpError(403, "cross_origin", "Bu istek yalnız Freeband panelinden yapılabilir.");
         }
         const s = await accountForSession(c.env.DB, sid);
         if (s) {
@@ -103,6 +103,6 @@ export function requireAuth(opts: { session: boolean }): MiddlewareHandler<AppEn
 
 function unauthorized(): HttpError {
   return new HttpError(401, "unauthorized", "Geçerli bir anahtar gerekli.", {
-    "WWW-Authenticate": 'Bearer realm="openband"',
+    "WWW-Authenticate": 'Bearer realm="freeband"',
   });
 }

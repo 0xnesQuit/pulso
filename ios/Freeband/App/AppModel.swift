@@ -195,7 +195,7 @@ final class AppModel: ObservableObject {
     func ping(_ hook: Webhook) async {
         guard let url = URL(string: hook.url) else { return }
         let bands = (try? context.fetch(FetchDescriptor<Band>())) ?? []
-        let device = bands.first.map { Payload.Device($0) } ?? Payload.Device(id: UUID(), name: "OpenBand", model: "band10")
+        let device = bands.first.map { Payload.Device($0) } ?? Payload.Device(id: UUID(), name: "Freeband", model: "band10")
         let body = Payload.body(event: "ping", device: device, samples: [])
         hook.lastStatus = await WebhookSender.deliver(body, event: "ping", to: url, secret: hook.secret)
         hook.lastAt = Date()
@@ -204,9 +204,9 @@ final class AppModel: ObservableObject {
 
     // MARK: invites
 
-    /// `openband://join?invite=OB-XXXX-XXXX&hub=https://…`; only https hubs are accepted.
+    /// `freeband://join?invite=OB-XXXX-XXXX&hub=https://…`; only https hubs are accepted.
     func handle(_ url: URL) {
-        guard url.scheme == "openband", url.host == "join",
+        guard url.scheme == "freeband", url.host == "join",
               let items = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems else { return }
         let code = (items.first { $0.name == "invite" }?.value ?? "").trimmingCharacters(in: .whitespaces)
         guard !code.isEmpty, code.count <= 64 else { return }
@@ -226,7 +226,7 @@ final class AppModel: ObservableObject {
     func enableWebAccess(invite: String) async {
         hubBusy = true
         defer { hubBusy = false }
-        let name = ((try? context.fetch(FetchDescriptor<Band>())) ?? []).first?.name ?? "OpenBand"
+        let name = ((try? context.fetch(FetchDescriptor<Band>())) ?? []).first?.name ?? "Freeband"
         do {
             let account = try await HubClient(baseURL: hubURL).createAccount(deviceName: name, invite: invite)
             Vault.hubToken = account.token

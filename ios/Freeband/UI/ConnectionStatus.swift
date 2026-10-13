@@ -1,7 +1,7 @@
 import CoreBluetooth
 import SwiftUI
 
-/// Answers two questions at a glance: is the band with the phone, and is OpenBand talking to
+/// Answers two questions at a glance: is the band with the phone, and is Freeband talking to
 /// it right now (searching, reading, live, failed)?
 struct ConnectionStatus: View {
     let band: Band
@@ -84,7 +84,7 @@ struct ConnectionStatus: View {
     private var detail: String? {
         switch link.bluetooth {
         case .poweredOff: return "Denetim Merkezi'nden Bluetooth'u aç."
-        case .unauthorized: return "Ayarlar > OpenBand'den Bluetooth'a izin ver."
+        case .unauthorized: return "Ayarlar > Freeband'den Bluetooth'a izin ver."
         default: break
         }
         if mine, case .failed(let message) = link.phase { return message }

@@ -1,11 +1,11 @@
-// Validation of the openband.v1 ingest body (docs/API.md).
+// Validation of the freeband.v1 ingest body (docs/API.md).
 // Everything is checked; unknown fields are dropped from the normalized result.
 
 import { HttpError, LIMITS } from "./http";
 import { UUID_RE } from "./crypto";
 import { isDate, isValidTz, parseIsoUtc } from "./time";
 
-export const SCHEMA = "openband.v1";
+export const SCHEMA = "freeband.v1";
 export const MODELS = ["band10", "band10pro"] as const;
 export type Model = (typeof MODELS)[number];
 

@@ -11,7 +11,7 @@
   // assume a single public hostname.
   "workers_dev": false,
   "preview_urls": false,
-  "routes": [{ "pattern": "openband.cobanov.dev", "custom_domain": true }],
+  "routes": [{ "pattern": "freeband.cobanov.dev", "custom_domain": true }],
 
   "d1_databases": [
     {
@@ -30,7 +30,7 @@
 
   "vars": {
     // Hostname the hub is served on. Webhooks may not point here.
-    "PUBLIC_HOSTNAME": "openband.cobanov.dev",
+    "PUBLIC_HOSTNAME": "freeband.cobanov.dev",
     // Public TestFlight link shown on /join; empty until the app is in TestFlight.
     "TESTFLIGHT_URL": ""
   },

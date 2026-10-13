@@ -23,7 +23,7 @@ struct JoinSheet: View {
                 Text("Web erişimin zaten açık (\(model.hubURL.host ?? "")). Başka bir sunucuya geçmek için önce Ayarlar > Web erişimi'nden kapat.")
                     .foregroundStyle(Theme.ink)
             } else {
-                Text("Katılınca OpenBand verilerini telefonun yanında bu sunucuya da gönderir; tarayıcıdan panelini görür, API ile verine ulaşırsın. İstediğin an kapatıp sunucudaki verini silebilirsin.")
+                Text("Katılınca Freeband verilerini telefonun yanında bu sunucuya da gönderir; tarayıcıdan panelini görür, API ile verine ulaşırsın. İstediğin an kapatıp sunucudaki verini silebilirsin.")
                     .foregroundStyle(Theme.ink)
                 VStack(alignment: .leading, spacing: 4) {
                     Text(invite.hub.host ?? invite.hub.absoluteString)
@@ -34,7 +34,7 @@ struct JoinSheet: View {
                         .foregroundStyle(Theme.secondary)
                 }
                 if !invite.isDefaultHub {
-                    Text("Bu, OpenBand'in varsayılan sunucusu değil. Sağlık verin buraya gidecek; yalnızca güvendiğin birinden geldiyse katıl.")
+                    Text("Bu, Freeband'in varsayılan sunucusu değil. Sağlık verin buraya gidecek; yalnızca güvendiğin birinden geldiyse katıl.")
                         .font(.callout)
                         .foregroundStyle(Theme.pomegranate)
                 }

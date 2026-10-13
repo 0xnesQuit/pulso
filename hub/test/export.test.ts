@@ -13,7 +13,7 @@ describe("exports", () => {
     const csvRes = await call("/v1/export.csv", { headers: bearer(token) });
     expect(csvRes.status).toBe(200);
     expect(csvRes.headers.get("content-type")).toContain("text/csv");
-    expect(csvRes.headers.get("content-disposition")).toMatch(/^attachment; filename="openband-\d{4}-\d{2}-\d{2}\.csv"$/);
+    expect(csvRes.headers.get("content-disposition")).toMatch(/^attachment; filename="freeband-\d{4}-\d{2}-\d{2}\.csv"$/);
     const lines = (await csvRes.text()).trim().split("\n");
     expect(lines).toEqual([
       "device_id,type,ts,steps,calories,heart_rate,standing_hours,level",
@@ -32,7 +32,7 @@ describe("exports", () => {
       devices: Array<{ id: string }>;
       samples: Array<{ device_id: string; type: string }>;
     };
-    expect(doc.schema).toBe("openband.v1");
+    expect(doc.schema).toBe("freeband.v1");
     expect(doc.tz).toBe("Europe/Istanbul");
     expect(doc.devices.map((d) => d.id).sort()).toEqual([DEV_A, DEV_B].sort());
     expect(doc.samples).toHaveLength(3);

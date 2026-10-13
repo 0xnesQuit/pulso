@@ -1,5 +1,5 @@
 // Checks KeyLoader against synthetic Mi Fitness caches.
-// Build: swiftc ../../OpenBand/Band/KeyStore.swift main.swift -o /tmp/kstest
+// Build: swiftc ../../Freeband/Band/KeyStore.swift main.swift -o /tmp/kstest
 import Foundation
 import SQLite3
 

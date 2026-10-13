@@ -235,7 +235,7 @@ final class BandLink: NSObject, ObservableObject {
             guard let target, keyIndex < target.keys.count else { return }
             guard let result = MiAuth.confirmCommand(authKey: target.keys[keyIndex], phoneNonce: phoneNonce,
                                                      watchNonce: watchNonce, watchHmac: watchHmac,
-                                                     deviceName: "OpenBand") else {
+                                                     deviceName: "Freeband") else {
                 if keyIndex + 1 < target.keys.count {
                     retryWithNextKey()
                 } else {
@@ -407,7 +407,7 @@ final class BandLink: NSObject, ObservableObject {
     static func message(for state: CBManagerState) -> String {
         switch state {
         case .poweredOff: return "Bluetooth kapalı. Denetim Merkezi'nden aç."
-        case .unauthorized: return "OpenBand'in Bluetooth izni yok. Ayarlar > OpenBand'den izin ver."
+        case .unauthorized: return "Freeband'in Bluetooth izni yok. Ayarlar > Freeband'den izin ver."
         case .unsupported: return "Bu cihaz Bluetooth LE desteklemiyor."
         default: return "Bluetooth hazır değil. Biraz sonra tekrar dene."
         }
@@ -461,7 +461,7 @@ extension BandLink: CBPeripheralDelegate {
     func peripheral(_ peripheral: CBPeripheral, didDiscoverServices error: Error?) {
         guard active else { return }
         guard let service = peripheral.services?.first(where: { $0.uuid == Self.fe95 }) else {
-            fail("Bu bant OpenBand'in kullandığı BLE kanalını açmıyor.")
+            fail("Bu bant Freeband'in kullandığı BLE kanalını açmıyor.")
             return
         }
         peripheral.discoverCharacteristics([Self.rxUUID, Self.txUUID], for: service)
@@ -472,7 +472,7 @@ extension BandLink: CBPeripheralDelegate {
         rx = service.characteristics?.first { $0.uuid == Self.rxUUID }
         tx = service.characteristics?.first { $0.uuid == Self.txUUID }
         guard let rx, tx != nil else {
-            fail("Bu bant OpenBand'in kullandığı BLE kanalını açmıyor.")
+            fail("Bu bant Freeband'in kullandığı BLE kanalını açmıyor.")
             return
         }
         peripheral.setNotifyValue(true, for: rx)

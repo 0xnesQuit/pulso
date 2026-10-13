@@ -121,7 +121,7 @@ export function page(o: PageOpts): string {
 <body>
 <div class="wrap">
 <header class="top">
-  <a class="brand" href="${o.signedIn ? "/app" : "/"}">OpenBand</a>
+  <a class="brand" href="${o.signedIn ? "/app" : "/"}">Freeband</a>
   <nav>${o.actions ?? ""}</nav>
 </header>
 <main>

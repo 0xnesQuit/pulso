@@ -3,9 +3,9 @@
 const enc = new TextEncoder();
 const dec = new TextDecoder();
 
-export const TOKEN_PREFIX = "ob_";
-/** `ob_` + base64url(32 random bytes) = 3 + 43 characters. */
-export const TOKEN_RE = /^ob_[A-Za-z0-9_-]{43}$/;
+export const TOKEN_PREFIX = "fb_";
+/** `fb_` + base64url(32 random bytes) = 3 + 43 characters. */
+export const TOKEN_RE = /^fb_[A-Za-z0-9_-]{43}$/;
 /** Session cookie values: base64url(32 random bytes). */
 export const SESSION_RE = /^[A-Za-z0-9_-]{43}$/;
 export const UUID_RE = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
@@ -51,7 +51,7 @@ export function newSessionId(): string {
 
 /** New webhook signing secret, shown to the user exactly once. */
 export function newWebhookSecret(): string {
-  return "obwh_" + b64url(randomBytes(32));
+  return "fbwh_" + b64url(randomBytes(32));
 }
 
 export async function sha256Hex(input: string): Promise<string> {

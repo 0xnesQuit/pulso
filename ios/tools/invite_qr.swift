@@ -1,11 +1,11 @@
-// Renders an OpenBand invite QR code (opens the hub's /join page with the code in the fragment).
+// Renders an Freeband invite QR code (opens the hub's /join page with the code in the fragment).
 // Run: swift tools/invite_qr.swift <invite code> <output.png> [hub URL]
 import AppKit
 import CoreImage
 
 let args = CommandLine.arguments
 guard args.count >= 3 else { print("usage: invite_qr.swift <code> <out.png> [hub]"); exit(1) }
-let hub = args.count > 3 ? args[3] : "https://openband.cobanov.dev"
+let hub = args.count > 3 ? args[3] : "https://freeband.cobanov.dev"
 let link = "\(hub)/join#invite=\(args[1])"
 
 let filter = CIFilter(name: "CIQRCodeGenerator")!

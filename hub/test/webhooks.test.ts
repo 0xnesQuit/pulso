@@ -44,9 +44,9 @@ describe("webhook signing", () => {
 describe("webhook CRUD", () => {
   it("returns the secret once and stores it encrypted", async () => {
     const { token, account_id } = await createAccount();
-    const hook = await addHook(token, "https://hooks.example.org/openband");
-    expect(hook.secret).toMatch(/^obwh_[A-Za-z0-9_-]{43}$/);
-    expect(hook.url).toBe("https://hooks.example.org/openband");
+    const hook = await addHook(token, "https://hooks.example.org/freeband");
+    expect(hook.secret).toMatch(/^fbwh_[A-Za-z0-9_-]{43}$/);
+    expect(hook.url).toBe("https://hooks.example.org/freeband");
 
     const list = await (await call("/v1/webhooks", { headers: bearer(token) })).text();
     expect(list).not.toContain(hook.secret);
@@ -68,9 +68,9 @@ describe("webhook CRUD", () => {
     const bad = [
       "http://hooks.example.org/x",
       "ftp://hooks.example.org/x",
-      "https://openband.cobanov.dev/v1/ingest",
-      "https://OPENBAND.cobanov.dev./x",
-      "https://sub.openband.cobanov.dev/x",
+      "https://freeband.cobanov.dev/v1/ingest",
+      "https://FREEBAND.cobanov.dev./x",
+      "https://sub.freeband.cobanov.dev/x",
       "https://127.0.0.1/x",
       "https://2130706433/x",
       "https://[::1]/x",
@@ -127,14 +127,14 @@ describe("webhook delivery", () => {
     expect(c.init.redirect).toBe("manual");
     expect(c.init.signal).toBeInstanceOf(AbortSignal);
     expect(c.headers.get("content-type")).toBe("application/json");
-    expect(c.headers.get("x-openband-event")).toBe("sync.completed");
-    expect(c.headers.get("x-openband-delivery")).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+    expect(c.headers.get("x-freeband-event")).toBe("sync.completed");
+    expect(c.headers.get("x-freeband-delivery")).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
 
     // Verify the HMAC independently over the exact bytes that were sent.
     const expected = "sha256=" + (await hmacHex(hook.secret, c.body));
-    expect(c.headers.get("x-openband-signature")).toBe(expected);
+    expect(c.headers.get("x-freeband-signature")).toBe(expected);
     // A different secret does not verify.
-    expect(c.headers.get("x-openband-signature")).not.toBe("sha256=" + (await hmacHex(hook.secret + "x", c.body)));
+    expect(c.headers.get("x-freeband-signature")).not.toBe("sha256=" + (await hmacHex(hook.secret + "x", c.body)));
 
     const sent = JSON.parse(new TextDecoder().decode(c.body)) as Record<string, unknown>;
     expect(sent).toEqual(body);
@@ -153,9 +153,9 @@ describe("webhook delivery", () => {
     const byUrl = new Map(calls.map((c) => [c.url, c]));
     for (const h of [h1, h2]) {
       const c = byUrl.get(h.url) as Captured;
-      expect(c.headers.get("x-openband-signature")).toBe("sha256=" + (await hmacHex(h.secret, c.body)));
+      expect(c.headers.get("x-freeband-signature")).toBe("sha256=" + (await hmacHex(h.secret, c.body)));
     }
-    expect(calls[0]?.headers.get("x-openband-delivery")).not.toBe(calls[1]?.headers.get("x-openband-delivery"));
+    expect(calls[0]?.headers.get("x-freeband-delivery")).not.toBe(calls[1]?.headers.get("x-freeband-delivery"));
   });
 
   it("does not forward an ingest that only had duplicates", async () => {
@@ -190,10 +190,10 @@ describe("webhook delivery", () => {
     const ok = await call(`/v1/webhooks/${hook.id}/test`, { method: "POST", headers: bearer(token) });
     expect(await ok.json()).toEqual({ delivered: true, status: 200, error: null });
     const c = captured(fetchSpy)[0] as Captured;
-    expect(c.headers.get("x-openband-event")).toBe("ping");
-    expect(c.headers.get("x-openband-signature")).toBe("sha256=" + (await hmacHex(hook.secret, c.body)));
+    expect(c.headers.get("x-freeband-event")).toBe("ping");
+    expect(c.headers.get("x-freeband-signature")).toBe("sha256=" + (await hmacHex(hook.secret, c.body)));
     const body = JSON.parse(new TextDecoder().decode(c.body)) as Record<string, unknown>;
-    expect(body).toMatchObject({ schema: "openband.v1", event: "ping", webhook_id: hook.id });
+    expect(body).toMatchObject({ schema: "freeband.v1", event: "ping", webhook_id: hook.id });
 
     fetchSpy.mockImplementation(async () => new Response("nope", { status: 500 }));
     const fail = await call(`/v1/webhooks/${hook.id}/test`, { method: "POST", headers: bearer(token) });

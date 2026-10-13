@@ -219,7 +219,7 @@ enum KeyLoader {
 /// Secrets live only in this app's Keychain on the phone: one auth key per band and the hub
 /// token. Items are device-only and never sync to iCloud.
 enum Vault {
-    private static let service = "dev.cobanov.openband"
+    private static let service = "dev.cobanov.freeband"
 
     private static func query(_ account: String) -> [String: Any] {
         [kSecClass as String: kSecClassGenericPassword,

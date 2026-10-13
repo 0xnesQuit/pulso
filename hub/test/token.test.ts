@@ -7,7 +7,7 @@ describe("POST /v1/token/rotate", () => {
     const res = await call("/v1/token/rotate", { method: "POST", headers: bearer(token) });
     expect(res.status).toBe(200);
     const { token: fresh } = (await res.json()) as { token: string };
-    expect(fresh).toMatch(/^ob_[A-Za-z0-9_-]{43}$/);
+    expect(fresh).toMatch(/^fb_[A-Za-z0-9_-]{43}$/);
     expect(fresh).not.toBe(token);
 
     expect((await call("/v1/me", { headers: bearer(token) })).status).toBe(401);

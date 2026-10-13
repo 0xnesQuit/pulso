@@ -114,7 +114,7 @@ private struct BandDetailView: View {
                 Button("Anahtarı yeniden oku") { rereading = true }
                 Button("Bandı kaldır", role: .destructive) { confirmRemove = true }
             } footer: {
-                Text("Kaldırmak bandı yalnızca OpenBand'den siler; Mi Fitness'taki eşleşme etkilenmez.")
+                Text("Kaldırmak bandı yalnızca Freeband'den siler; Mi Fitness'taki eşleşme etkilenmez.")
             }
         }
         .navigationTitle(band.displayName)
@@ -143,7 +143,7 @@ private struct WebhooksView: View {
     var body: some View {
         Form {
             Section {
-                Text("Her senkronizasyondan sonra OpenBand o senkronda okunan veriyi bu adreslere JSON olarak gönderir. İstekler imzalıdır; alıcı tarafta gizli anahtarla doğrulayabilirsin.")
+                Text("Her senkronizasyondan sonra Freeband o senkronda okunan veriyi bu adreslere JSON olarak gönderir. İstekler imzalıdır; alıcı tarafta gizli anahtarla doğrulayabilirsin.")
                     .font(.callout)
                     .foregroundStyle(Theme.secondary)
             }
@@ -204,7 +204,7 @@ private struct WebAccessView: View {
     var body: some View {
         Form {
             Section {
-                Text("Web erişimi açıkken OpenBand her senkrondan sonra verilerini aşağıdaki sunucuya da gönderir. Böylece tarayıcıdan panelini görebilir, API ile verine ulaşabilir, sunucu tarafında webhook kurabilirsin. Kapattığında sunucudaki tüm verin silinir.")
+                Text("Web erişimi açıkken Freeband her senkrondan sonra verilerini aşağıdaki sunucuya da gönderir. Böylece tarayıcıdan panelini görebilir, API ile verine ulaşabilir, sunucu tarafında webhook kurabilirsin. Kapattığında sunucudaki tüm verin silinir.")
                     .font(.callout)
                     .foregroundStyle(Theme.secondary)
             }
@@ -302,7 +302,7 @@ private struct AboutView: View {
                 Button("İlk kurulumu yeniden göster") { onboarded = false }
             }
             Section {
-                Text("OpenBand bağımsız bir projedir ve Xiaomi ile bağlantılı değildir. Xiaomi, Mi Band ve Mi Fitness, Xiaomi Inc.'in markalarıdır.")
+                Text("Freeband bağımsız bir projedir ve Xiaomi ile bağlantılı değildir. Xiaomi, Mi Band ve Mi Fitness, Xiaomi Inc.'in markalarıdır.")
                     .font(.footnote)
                     .foregroundStyle(Theme.secondary)
             }

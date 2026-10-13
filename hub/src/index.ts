@@ -1,4 +1,4 @@
-// OpenBand hub: Worker entry point.
+// Freeband hub: Worker entry point.
 
 import { Hono, type MiddlewareHandler } from "hono";
 import type { AppEnv } from "./types";

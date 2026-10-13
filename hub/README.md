@@ -1,8 +1,8 @@
-# OpenBand hub
+# Freeband hub
 
-A Cloudflare Worker with a D1 database that gives OpenBand users an opt-in REST API, server-side webhooks and a small web panel for their band data. The contract is [`../docs/API.md`](../docs/API.md) and the visual system is [`../docs/DESIGN.md`](../docs/DESIGN.md).
+A Cloudflare Worker with a D1 database that gives Freeband users an opt-in REST API, server-side webhooks and a small web panel for their band data. The contract is [`../docs/API.md`](../docs/API.md) and the visual system is [`../docs/DESIGN.md`](../docs/DESIGN.md).
 
-The hub is meant to run at `https://openband.cobanov.dev` for the owner and invited friends. It stores health data, so keep this repository private until the open items in [Security notes](#security-notes) are settled.
+The hub is meant to run at `https://freeband.cobanov.dev` for the owner and invited friends. It stores health data, so keep this repository private until the open items in [Security notes](#security-notes) are settled.
 
 ## Layout
 
@@ -20,7 +20,7 @@ hub/
     lib/crypto.ts           Tokens, hashing, HMAC, AES-GCM for webhook secrets, keyed IP hashes
     lib/http.ts             Bounded JSON body reader, cookies, same-origin check
     lib/ratelimit.ts        Fixed-window limits in D1
-    lib/validate.ts         openband.v1 ingest validation
+    lib/validate.ts         freeband.v1 ingest validation
     lib/queries.ts          Account-scoped read queries (samples, daily summaries, devices)
     lib/time.ts             Time-zone math on Intl (DST-safe local days)
     lib/webhooks.ts         URL policy, signing, delivery with a 5 s timeout
@@ -58,7 +58,7 @@ curl -s -X POST http://localhost:8787/v1/accounts \
 Notes:
 
 - `wrangler.jsonc` sets `dev.host` to `localhost:8787` so that `request.url` matches what the browser sends in `Origin`; without it wrangler rewrites the URL to the custom-domain route and the same-origin check rejects panel requests. If you run on another port, change `dev.host` too.
-- The session cookie is `__Host-ob_session; Secure`. Chrome and Firefox accept Secure cookies on `http://localhost`; Safari does not, so use Chrome or Firefox for the panel in local dev.
+- The session cookie is `__Host-fb_session; Secure`. Chrome and Firefox accept Secure cookies on `http://localhost`; Safari does not, so use Chrome or Firefox for the panel in local dev.
 - Cron triggers do not fire locally. Run the cleanup by hand with `curl "http://localhost:8787/cdn-cgi/local/scheduled"` (wrangler prints the exact URL on start).
 - Local D1 data lives in `.wrangler/state` (gitignored). Delete that folder to start over.
 
@@ -86,7 +86,7 @@ npx wrangler d1 migrations apply  openband-hub --remote
 
 Migrations are append-only. Never edit `0001_init.sql` after it has been applied remotely; add a new file instead.
 
-## Deploying to openband.cobanov.dev
+## Deploying to freeband.cobanov.dev
 
 Do this only when the owner approves. It needs the `cobanov.dev` zone in the same Cloudflare account and a Wrangler login (`npx wrangler login`) or an API token with Workers Scripts, D1 and Workers Routes edit rights for that account.
 
@@ -114,11 +114,11 @@ rm -P "$TMPDIR/openband-hub.secrets"
 npx wrangler deploy
 ```
 
-`routes` uses `custom_domain: true`, so the first deploy creates the DNS record and certificate for `openband.cobanov.dev`. `workers_dev` and `preview_urls` are off, so the Worker is reachable only on that hostname.
+`routes` uses `custom_domain: true`, so the first deploy creates the DNS record and certificate for `freeband.cobanov.dev`. `workers_dev` and `preview_urls` are off, so the Worker is reachable only on that hostname.
 
 Keep a copy of `HUB_SECRET` somewhere safe (for example a password manager). If it changes, the stored webhook secrets can no longer be decrypted and every webhook has to be recreated. To set it again without redeploying code: `npx wrangler secret put HUB_SECRET` (this creates a new deployment).
 
-After deploying, check: `curl -sI https://openband.cobanov.dev/ | grep -i content-security-policy`, create an account from the app, open the panel, add a webhook to a receiver you control and press "Test et".
+After deploying, check: `curl -sI https://freeband.cobanov.dev/ | grep -i content-security-policy`, create an account from the app, open the panel, add a webhook to a receiver you control and press "Test et".
 
 ## Configuration and limits
 
@@ -141,11 +141,11 @@ After deploying, check: `curl -sI https://openband.cobanov.dev/ | grep -i conten
 
 ### Done
 
-- **Tokens**: `ob_` + base64url of 32 bytes from `crypto.getRandomValues`. Only the SHA-256 is stored (`accounts.token_hash`); the token is returned once. Lookup by hash, then a constant-time comparison.
+- **Tokens**: `fb_` + base64url of 32 bytes from `crypto.getRandomValues`. Only the SHA-256 is stored (`accounts.token_hash`); the token is returned once. Lookup by hash, then a constant-time comparison.
 - **Account scoping**: every query binds `account_id` (or the account's own id) as a parameter; device ids are namespaced per account (`PRIMARY KEY (account_id, id)`), so the same band UUID in two accounts never mixes. Tests cover reads, exports, webhooks and the panel across accounts.
 - **Input validation**: strict JSON content type, 512 KB cap enforced while streaming (not only via `Content-Length`), 5000 samples, fatal UTF-8 decoding, field types and ranges (`heart_rate` 0–250, `level` 0–100, `ts` at most 2 days ahead and not before 2020), UUID device ids, model enum, IANA time zones, control characters refused. Unknown fields are dropped.
-- **Webhooks**: `https://` only, port 443, no credentials in the URL, no IP literals, single-label or reserved names, never the hub's own hostname or its subdomains; at most 5 per account (enforced atomically in SQL). Secrets are 32 random bytes, returned once, stored with AES-256-GCM (key derived by HKDF from `HUB_SECRET`, row-bound AAD). Deliveries carry `X-OpenBand-Event`, `X-OpenBand-Delivery` (random UUID) and `X-OpenBand-Signature: sha256=<hex>` over the exact bytes sent, do not follow redirects and time out after 5 s, all inside `ctx.waitUntil`.
-- **Sessions**: `__Host-ob_session`, `HttpOnly; Secure; SameSite=Strict; Path=/`, 30 days, random 32 bytes, only the SHA-256 stored. Token rotation and account deletion end sessions. The login token travels in the URL fragment, is removed from the address bar with `history.replaceState`, and is exchanged for the cookie by `POST /v1/session`.
+- **Webhooks**: `https://` only, port 443, no credentials in the URL, no IP literals, single-label or reserved names, never the hub's own hostname or its subdomains; at most 5 per account (enforced atomically in SQL). Secrets are 32 random bytes, returned once, stored with AES-256-GCM (key derived by HKDF from `HUB_SECRET`, row-bound AAD). Deliveries carry `X-Freeband-Event`, `X-Freeband-Delivery` (random UUID) and `X-Freeband-Signature: sha256=<hex>` over the exact bytes sent, do not follow redirects and time out after 5 s, all inside `ctx.waitUntil`.
+- **Sessions**: `__Host-fb_session`, `HttpOnly; Secure; SameSite=Strict; Path=/`, 30 days, random 32 bytes, only the SHA-256 stored. Token rotation and account deletion end sessions. The login token travels in the URL fragment, is removed from the address bar with `history.replaceState`, and is exchanged for the cookie by `POST /v1/session`.
 - **CSRF**: cookie-authenticated `POST`/`DELETE` requests must carry `Origin` equal to the hub's origin (or `Sec-Fetch-Site: same-origin` when `Origin` is absent), on top of `SameSite=Strict`. `POST`/`DELETE /v1/session` require the same, which also blocks login CSRF. Bearer requests need no Origin. The ingest endpoint does not accept cookies at all.
 - **Headers**: HTML gets a per-response nonce CSP (`default-src 'none'; script-src 'nonce-…'; style-src 'nonce-…'; font-src 'self'; connect-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'`), no `unsafe-inline` or `unsafe-eval`, no inline handlers or style attributes. All responses get `X-Content-Type-Options: nosniff`, `Referrer-Policy: no-referrer`, `X-Frame-Options: DENY`, COOP/CORP `same-origin`, HSTS and `Cache-Control: no-store`. JSON gets `default-src 'none'`. No CORS headers. Static assets get headers from `public/_headers`.
 - **XSS**: HTML is built with an auto-escaping template tag; inline scripts are constants and set user-visible strings with `textContent`.
@@ -156,7 +156,7 @@ After deploying, check: `curl -sI https://openband.cobanov.dev/ | grep -i conten
 ### Open
 
 - **Open sign-up.** Anyone who finds the hub can create an account (within the rate limits) and store up to 200 000 samples a day. An invite code would need a contract change because the app creates accounts itself.
-- **No replay protection on webhooks.** The contract signs only the body; a captured delivery can be replayed. Suggest a signed `X-OpenBand-Timestamp` in a future contract version. Receivers should dedupe on `(device.id, type, ts)` and `X-OpenBand-Delivery`.
+- **No replay protection on webhooks.** The contract signs only the body; a captured delivery can be replayed. Suggest a signed `X-Freeband-Timestamp` in a future contract version. Receivers should dedupe on `(device.id, type, ts)` and `X-Freeband-Delivery`.
 - **No delivery retries.** A failed delivery is recorded (`last_status`, `last_error`) but not retried. Cloudflare Queues would add retries with backoff.
 - **DNS-level SSRF is not checked.** Host names are filtered syntactically; a public name that resolves to a private address is not detected (Workers cannot resolve DNS themselves). Cloudflare's egress does not reach private networks, but webhooks can POST to any public host, bounded by the ingest and test rate limits.
 - **`HUB_SECRET` has no rotation path.** Changing it orphans every stored webhook secret. The ciphertext carries a `v1.` prefix so a keyed rotation can be added later.

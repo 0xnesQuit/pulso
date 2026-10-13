@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Reference parser for Xiaomi band activity files (OpenBand, BLE V2 / SPP V2).
+"""Reference parser for Xiaomi band activity files (Freeband, BLE V2 / SPP V2).
 
 Standard library only. It implements the layouts written down in
 docs/ACTIVITY.md: the 7-byte file id, reassembly of the chunks the band sends on

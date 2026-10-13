@@ -4,7 +4,7 @@ import { ORIGIN, bearer, call, createAccount, env, freshIp, json, sha256Hex } fr
 describe("POST /v1/accounts", () => {
   it("creates an account and returns the token exactly once", async () => {
     const acct = await createAccount({ tz: "Europe/Istanbul", name: "Band 10 Pro D9B9" });
-    expect(acct.token).toMatch(/^ob_[A-Za-z0-9_-]{43}$/);
+    expect(acct.token).toMatch(/^fb_[A-Za-z0-9_-]{43}$/);
     expect(acct.account_id).toMatch(/^[0-9a-f-]{36}$/);
     expect(acct.web_url).toBe(`${ORIGIN}/login`);
 

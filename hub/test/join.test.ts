@@ -6,7 +6,7 @@ describe("/join", () => {
     const res = await call("/join");
     expect(res.status).toBe(200);
     const page = await res.text();
-    for (const s of ["OpenBand'e katıl", "Mi Fitness", "openband://join?invite=", "join-code"]) expect(page).toContain(s);
+    for (const s of ["Freeband'e katıl", "Mi Fitness", "freeband://join?invite=", "join-code"]) expect(page).toContain(s);
     // Without a TestFlight link configured, it asks the inviter for one.
     expect(page).toContain("TestFlight bağlantısını iste");
   });

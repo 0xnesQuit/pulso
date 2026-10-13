@@ -2,7 +2,7 @@
 import Foundation
 import SwiftData
 
-/// Debug-only sample day for simulator screenshots: launch with `-openband-demo`.
+/// Debug-only sample day for simulator screenshots: launch with `-freeband-demo`.
 enum DemoData {
     @MainActor
     static func seed(_ context: ModelContext) {

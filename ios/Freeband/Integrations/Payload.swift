@@ -1,7 +1,7 @@
 import CryptoKit
 import Foundation
 
-/// JSON bodies from docs/API.md (schema openband.v1), shared by webhooks, the hub and export.
+/// JSON bodies from docs/API.md (schema freeband.v1), shared by webhooks, the hub and export.
 enum Payload {
     static let iso: ISO8601DateFormatter = {
         let f = ISO8601DateFormatter()
@@ -68,7 +68,7 @@ enum Payload {
         if let battery { summary["battery"] = battery.level }
 
         let body: [String: Any] = [
-            "schema": "openband.v1",
+            "schema": "freeband.v1",
             "event": event,
             "device": ["id": device.id.uuidString, "name": device.name, "model": device.model,
                        "app_version": appVersion, "tz": TimeZone.current.identifier],
@@ -99,9 +99,9 @@ enum WebhookSender {
         request.httpMethod = "POST"
         request.httpBody = body
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.setValue(event, forHTTPHeaderField: "X-OpenBand-Event")
-        request.setValue(UUID().uuidString, forHTTPHeaderField: "X-OpenBand-Delivery")
-        request.setValue(signature(body, secret: secret), forHTTPHeaderField: "X-OpenBand-Signature")
+        request.setValue(event, forHTTPHeaderField: "X-Freeband-Event")
+        request.setValue(UUID().uuidString, forHTTPHeaderField: "X-Freeband-Delivery")
+        request.setValue(signature(body, secret: secret), forHTTPHeaderField: "X-Freeband-Signature")
         do {
             let (_, response) = try await URLSession.shared.data(for: request)
             return "\((response as? HTTPURLResponse)?.statusCode ?? 0)"
@@ -111,9 +111,9 @@ enum WebhookSender {
     }
 }
 
-/// Client for the OpenBand hub (docs/API.md). The token lives in the Keychain.
+/// Client for the Freeband hub (docs/API.md). The token lives in the Keychain.
 struct HubClient {
-    static let defaultURL = URL(string: "https://openband.cobanov.dev")!
+    static let defaultURL = URL(string: "https://freeband.cobanov.dev")!
 
     var baseURL: URL
     var token: String?
@@ -194,7 +194,7 @@ enum Exporter {
 
     static func write(json samples: [Sample], bands: [Band]) throws -> URL {
         let body: [String: Any] = [
-            "schema": "openband.v1",
+            "schema": "freeband.v1",
             "exported_at": Payload.iso.string(from: Date()),
             "devices": bands.map { ["id": $0.id.uuidString, "name": $0.name, "model": $0.model] },
             "samples": samples.sorted { $0.ts < $1.ts }.map { s -> [String: Any] in
@@ -208,7 +208,7 @@ enum Exporter {
 
     private static func save(_ data: Data, ext: String) throws -> URL {
         let day = Date().formatted(.iso8601.year().month().day())
-        let url = FileManager.default.temporaryDirectory.appendingPathComponent("openband-\(day).\(ext)")
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("freeband-\(day).\(ext)")
         try data.write(to: url, options: .completeFileProtection)
         return url
     }

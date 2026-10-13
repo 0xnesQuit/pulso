@@ -62,7 +62,7 @@ describe("pages", () => {
     expect(home).toContain('lang="tr"');
     expect(home).toContain("Web erişimi");
     const docs = await (await call("/docs")).text();
-    expect(docs).toContain("X-OpenBand-Signature");
+    expect(docs).toContain("X-Freeband-Signature");
     expect(docs).toContain("createHmac");
     expect(docs).toContain("hmac.new");
     expect(docs).toContain("curl");

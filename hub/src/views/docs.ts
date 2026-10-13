@@ -5,7 +5,7 @@ import { html, type Safe } from "./html";
 const NODE_VERIFY = `import { createHmac, timingSafeEqual } from "node:crypto";
 import http from "node:http";
 
-const SECRET = process.env.OPENBAND_WEBHOOK_SECRET; // obwh_...
+const SECRET = process.env.FREEBAND_WEBHOOK_SECRET; // fbwh_...
 
 http.createServer((req, res) => {
   const chunks = [];
@@ -15,7 +15,7 @@ http.createServer((req, res) => {
     const expected = Buffer.from(
       "sha256=" + createHmac("sha256", SECRET).update(raw).digest("hex"),
     );
-    const got = Buffer.from(req.headers["x-openband-signature"] ?? "");
+    const got = Buffer.from(req.headers["x-freeband-signature"] ?? "");
     if (got.length !== expected.length || !timingSafeEqual(got, expected)) {
       res.writeHead(401).end();
       return;
@@ -31,13 +31,13 @@ http.createServer((req, res) => {
 const PY_VERIFY = `import hashlib, hmac, json, os
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
-SECRET = os.environ["OPENBAND_WEBHOOK_SECRET"].encode()  # obwh_...
+SECRET = os.environ["FREEBAND_WEBHOOK_SECRET"].encode()  # fbwh_...
 
 class Hook(BaseHTTPRequestHandler):
     def do_POST(self):
         raw = self.rfile.read(int(self.headers.get("Content-Length", 0)))
         expected = "sha256=" + hmac.new(SECRET, raw, hashlib.sha256).hexdigest()
-        got = self.headers.get("X-OpenBand-Signature", "")
+        got = self.headers.get("X-Freeband-Signature", "")
         if not hmac.compare_digest(got, expected):
             self.send_response(401)
             self.end_headers()
@@ -51,7 +51,7 @@ class Hook(BaseHTTPRequestHandler):
 HTTPServer(("", 8080), Hook).serve_forever()`;
 
 const INGEST_BODY = `{
-  "schema": "openband.v1",
+  "schema": "freeband.v1",
   "event": "sync.completed",
   "device": {
     "id": "5B0E2C9A-4C7D-4F57-9A39-2D2B1D9E8A10",
@@ -69,15 +69,15 @@ const INGEST_BODY = `{
 }`;
 
 export function docsBody(origin: string): Safe {
-  const H = `-H "Authorization: Bearer $OPENBAND_TOKEN"`;
+  const H = `-H "Authorization: Bearer $FREEBAND_TOKEN"`;
   return html`
 <h1>API belgesi</h1>
-<p>OpenBand hub'ı verine bir REST API ve imzalı webhook'larla açar. Bu sayfa sözleşmenin (openband.v1) hub tarafını anlatır. Tüm zamanlar ISO 8601 UTC'dir, örneğin <code>2026-10-13T20:59:41Z</code>.</p>
+<p>Freeband hub'ı verine bir REST API ve imzalı webhook'larla açar. Bu sayfa sözleşmenin (freeband.v1) hub tarafını anlatır. Tüm zamanlar ISO 8601 UTC'dir, örneğin <code>2026-10-13T20:59:41Z</code>.</p>
 <p>Taban adres: <code>${origin}</code></p>
 
 <h2 id="kimlik">Kimlik doğrulama</h2>
-<p>Her istek kişisel anahtarınla gelir: <code>Authorization: Bearer ob_...</code>. Anahtarı uygulama, Web erişimini açtığında oluşturur. Sunucuda anahtarın kendisi değil, yalnız SHA-256 özeti tutulur; anahtarı kaybedersen yenisini oluşturman gerekir.</p>
-<pre>export OPENBAND_TOKEN=ob_...
+<p>Her istek kişisel anahtarınla gelir: <code>Authorization: Bearer fb_...</code>. Anahtarı uygulama, Web erişimini açtığında oluşturur. Sunucuda anahtarın kendisi değil, yalnız SHA-256 özeti tutulur; anahtarı kaybedersen yenisini oluşturman gerekir.</p>
+<pre>export FREEBAND_TOKEN=fb_...
 curl ${origin}/v1/me ${H}</pre>
 <p>Hata cevapları hep aynı biçimdedir: <code>{"error": "kod", "message": "açıklama"}</code>. Sık görülen kodlar: 400 <code>invalid_body</code> ya da <code>invalid_query</code>, 401 <code>unauthorized</code>, 403 <code>cross_origin</code>, 404 <code>not_found</code>, 409, 413, 415, 429 <code>rate_limited</code> (<code>Retry-After</code> başlığıyla).</p>
 <p>API tarayıcıdan başka sitelerin çağırması için açık değildir (CORS başlığı yok). Kendi sunucundan, betiklerinden ya da komut satırından çağır.</p>
@@ -89,7 +89,7 @@ curl ${origin}/v1/me ${H}</pre>
   -H "Content-Type: application/json" \\
   -d '{"device_name": "Xiaomi Smart Band 10 Pro D9B9", "tz": "Europe/Istanbul"}'
 
-{"account_id": "…", "token": "ob_…", "web_url": "${origin}/login"}</pre>
+{"account_id": "…", "token": "fb_…", "web_url": "${origin}/login"}</pre>
 <p>Web paneline doğrudan girmek için <code>web_url</code> adresinin sonuna <code>#token=</code> ve anahtarı ekle. Anahtar URL parçasında (#) kaldığı için sunucuya gitmez; sayfa onu oturum çerezine çevirir ve adres çubuğundan siler.</p>
 
 <h3>Hesap bilgisi</h3>
@@ -116,7 +116,7 @@ curl ${origin}/v1/me ${H}</pre>
 
 {"accepted": 2, "duplicates": 0}</pre>
 <pre>${INGEST_BODY}</pre>
-<p>Doğrulanan alanlar: <code>schema</code> <code>openband.v1</code>, <code>event</code> <code>sync.completed</code>, <code>device.id</code> UUID, <code>device.model</code> <code>band10</code> ya da <code>band10pro</code>, <code>heart_rate</code> 0–250, <code>level</code> 0–100, <code>steps</code> 0–200 000, <code>calories</code> 0–50 000, <code>standing_hours</code> 0–24, <code>ts</code> en fazla 2 gün ileride. Bir hesapta en fazla 10 bant olabilir. <code>device.tz</code> gelirse hesabın saat dilimi ona göre güncellenir.</p>
+<p>Doğrulanan alanlar: <code>schema</code> <code>freeband.v1</code>, <code>event</code> <code>sync.completed</code>, <code>device.id</code> UUID, <code>device.model</code> <code>band10</code> ya da <code>band10pro</code>, <code>heart_rate</code> 0–250, <code>level</code> 0–100, <code>steps</code> 0–200 000, <code>calories</code> 0–50 000, <code>standing_hours</code> 0–24, <code>ts</code> en fazla 2 gün ileride. Bir hesapta en fazla 10 bant olabilir. <code>device.tz</code> gelirse hesabın saat dilimi ona göre güncellenir.</p>
 
 <h2 id="okuma">Veriyi okuma</h2>
 <h3>Ham örnekler</h3>
@@ -137,7 +137,7 @@ curl ${origin}/v1/me ${H}</pre>
 
 <h3>Dışa aktarma</h3>
 <p><code>GET /v1/export.csv</code> ve <code>GET /v1/export.json</code>, <code>/v1/samples</code> ile aynı <code>from</code>, <code>to</code>, <code>device</code>, <code>type</code> parametrelerini alır. Parametresiz çağrı tüm veriyi verir. Her satır <code>device_id</code> taşır. Tek seferde en fazla 200 000 örnek; daha fazlası için aralığı böl.</p>
-<pre>curl -o openband.csv "${origin}/v1/export.csv?from=2026-10-01" ${H}
+<pre>curl -o freeband.csv "${origin}/v1/export.csv?from=2026-10-01" ${H}
 
 device_id,type,ts,steps,calories,heart_rate,standing_hours,level
 5B0E2C9A-…,battery,2026-10-13T20:59:40Z,,,,,46
@@ -147,23 +147,23 @@ device_id,type,ts,steps,calories,heart_rate,standing_hours,level
 <p>Hub, her başarılı gönderimden sonra (en az bir yeni örnek varsa) aynı gövdeyi hesabın webhook'larına POST eder. Adres yalnız <code>https://</code> olabilir, hub'ın kendi alan adı, IP adresleri ve yerel adlar kabul edilmez. Hesap başına en fazla 5 webhook. Yönlendirmeler izlenmez, zaman aşımı 5 saniyedir, şimdilik yeniden deneme yoktur. Aynı örnek iki kez gelebilir; alıcı <code>(device.id, type, ts)</code> ile tekilleştirmeli.</p>
 <pre>curl -X POST ${origin}/v1/webhooks ${H} \\
   -H "Content-Type: application/json" \\
-  -d '{"url": "https://ornek.com/openband"}'
+  -d '{"url": "https://ornek.com/freeband"}'
 
-{"id": "…", "url": "https://ornek.com/openband", "secret": "obwh_…", "created_at": "…"}</pre>
+{"id": "…", "url": "https://ornek.com/freeband", "secret": "fbwh_…", "created_at": "…"}</pre>
 <p>Gizli değer yalnız bu cevapta bir kez döner; sunucuda şifreli tutulur ve bir daha gösterilmez.</p>
 <pre>curl ${origin}/v1/webhooks ${H}
 curl ${origin}/v1/webhooks/ID ${H}
 curl -X POST ${origin}/v1/webhooks/ID/test ${H}
 curl -X DELETE ${origin}/v1/webhooks/ID ${H}</pre>
-<p>Test isteği <code>X-OpenBand-Event: ping</code> ile şu gövdeyi gönderir: <code>{"schema": "openband.v1", "event": "ping", "sent_at": "…", "webhook_id": "…"}</code>. Cevap <code>{"delivered", "status", "error"}</code> olur.</p>
+<p>Test isteği <code>X-Freeband-Event: ping</code> ile şu gövdeyi gönderir: <code>{"schema": "freeband.v1", "event": "ping", "sent_at": "…", "webhook_id": "…"}</code>. Cevap <code>{"delivered", "status", "error"}</code> olur.</p>
 
 <h3 id="imza">İmzayı doğrulama</h3>
 <p>Her istek şu başlıklarla gelir:</p>
 <ul>
   <li><code>Content-Type: application/json</code></li>
-  <li><code>X-OpenBand-Event</code>: <code>sync.completed</code> ya da <code>ping</code></li>
-  <li><code>X-OpenBand-Delivery</code>: her gönderim için rastgele bir UUID</li>
-  <li><code>X-OpenBand-Signature</code>: <code>sha256=</code> ve gövdenin HMAC-SHA256 özeti (küçük harf hex). Anahtar, gizli değerin UTF-8 baytlarıdır.</li>
+  <li><code>X-Freeband-Event</code>: <code>sync.completed</code> ya da <code>ping</code></li>
+  <li><code>X-Freeband-Delivery</code>: her gönderim için rastgele bir UUID</li>
+  <li><code>X-Freeband-Signature</code>: <code>sha256=</code> ve gövdenin HMAC-SHA256 özeti (küçük harf hex). Anahtar, gizli değerin UTF-8 baytlarıdır.</li>
 </ul>
 <p>İmzayı gövdeyi ayrıştırmadan önce, ham baytlar üzerinden ve sabit zamanlı karşılaştırmayla doğrula.</p>
 <p>Node.js:</p>
@@ -172,6 +172,6 @@ curl -X DELETE ${origin}/v1/webhooks/ID ${H}</pre>
 <pre>${PY_VERIFY}</pre>
 
 <h2 id="oturum">Web paneli oturumu</h2>
-<p><code>POST /v1/session</code> gövdesi <code>{"token": "ob_…"}</code> olan bir istekle 30 gün geçerli bir oturum çerezi verir (<code>HttpOnly; Secure; SameSite=Strict</code>). <code>DELETE /v1/session</code> çıkış yapar. Bu iki uç nokta yalnız panel sayfalarından çağrılabilir; çerezle yapılan veri değiştiren istekler de aynı kaynaktan gelmek zorundadır.</p>
+<p><code>POST /v1/session</code> gövdesi <code>{"token": "fb_…"}</code> olan bir istekle 30 gün geçerli bir oturum çerezi verir (<code>HttpOnly; Secure; SameSite=Strict</code>). <code>DELETE /v1/session</code> çıkış yapar. Bu iki uç nokta yalnız panel sayfalarından çağrılabilir; çerezle yapılan veri değiştiren istekler de aynı kaynaktan gelmek zorundadır.</p>
 `;
 }

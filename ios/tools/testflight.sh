@@ -1,5 +1,5 @@
 #!/bin/sh
-# Archives OpenBand, signs it for the App Store from the shared cobanov-signing keychain and
+# Archives Freeband, signs it for the App Store from the shared cobanov-signing keychain and
 # uploads it to TestFlight with an App Store Connect API key: no Apple ID, no password prompts.
 #
 #   sh tools/testflight.sh               # archive, export and upload
@@ -8,16 +8,16 @@
 # Signing: Apple Distribution 2632468C… in ~/Library/Keychains/cobanov-signing.keychain-db,
 # unlocked with ~/.cobanov-signing/.kcpass (Obsidian: 03_Resources/apple-app-signing.md). The
 # keychain is on the search list only while this runs, so a locked keychain never makes other
-# tools ask for its password. Profile "OpenBand App Store": swift tools/asc.swift profile <sha1>.
+# tools ask for its password. Profile "Freeband App Store": swift tools/asc.swift profile <sha1>.
 #
 # The build number is the repository's commit count and App Store Connect takes each number
 # once: commit before uploading again. The app record must exist (App Store Connect > Apps >
-# + > New App, bundle id dev.cobanov.openband); the API cannot create it.
+# + > New App, bundle id dev.cobanov.freeband); the API cannot create it.
 set -e
 
 IOS=$(cd "$(dirname "$0")/.." && pwd)
 CERT=${ASC_SIGNING_CERT:-2632468CDF18C5FAFC4A6C2CC26EC610EAE84922}
-PROFILE="OpenBand App Store"
+PROFILE="Freeband App Store"
 TEAM=6U58AKY6F8
 KEYCHAIN=${SIGNING_KEYCHAIN:-$HOME/Library/Keychains/cobanov-signing.keychain-db}
 KEYCHAIN_PASSWORD_FILE=${SIGNING_KEYCHAIN_PASSWORD_FILE:-$HOME/.cobanov-signing/.kcpass}
@@ -34,12 +34,12 @@ security list-keychains -d user -s $ORIGINAL_LIST "$KEYCHAIN"
 
 cd "$IOS"
 xcodegen generate --quiet
-rm -rf "$BUILD/OpenBand.xcarchive" "$BUILD/export"
+rm -rf "$BUILD/Freeband.xcarchive" "$BUILD/export"
 mkdir -p "$BUILD"
 
 xcodebuild archive -quiet \
-  -project OpenBand.xcodeproj -scheme OpenBand -configuration Release \
-  -destination 'generic/platform=iOS' -archivePath "$BUILD/OpenBand.xcarchive" \
+  -project Freeband.xcodeproj -scheme Freeband -configuration Release \
+  -destination 'generic/platform=iOS' -archivePath "$BUILD/Freeband.xcarchive" \
   CURRENT_PROJECT_VERSION="$BUILD_NUMBER" CODE_SIGN_STYLE=Manual CODE_SIGN_IDENTITY="$CERT" \
   PROVISIONING_PROFILE_SPECIFIER="$PROFILE" DEVELOPMENT_TEAM="$TEAM" \
   OTHER_CODE_SIGN_FLAGS="--keychain $KEYCHAIN" COMPILER_INDEX_STORE_ENABLE=NO
@@ -54,7 +54,7 @@ cat > "$BUILD/ExportOptions.plist" <<PLIST
   <key>signingStyle</key><string>manual</string>
   <key>signingCertificate</key><string>$CERT</string>
   <key>provisioningProfiles</key>
-  <dict><key>dev.cobanov.openband</key><string>$PROFILE</string></dict>
+  <dict><key>dev.cobanov.freeband</key><string>$PROFILE</string></dict>
   <key>destination</key><string>export</string>
   <key>uploadSymbols</key><true/>
   <key>manageAppVersionAndBuildNumber</key><false/>
@@ -63,14 +63,14 @@ cat > "$BUILD/ExportOptions.plist" <<PLIST
 PLIST
 # Xcode packages the .ipa with rsync and fails ("Copy failed") on Homebrew's rsync 3.x, so the
 # system tools go first on PATH for this step.
-PATH=/usr/bin:/bin:/usr/sbin:/sbin:$PATH xcodebuild -exportArchive -quiet -archivePath "$BUILD/OpenBand.xcarchive" \
+PATH=/usr/bin:/bin:/usr/sbin:/sbin:$PATH xcodebuild -exportArchive -quiet -archivePath "$BUILD/Freeband.xcarchive" \
   -exportPath "$BUILD/export" -exportOptionsPlist "$BUILD/ExportOptions.plist"
 restore_list
 
-IPA="$BUILD/export/OpenBand.ipa"
-INFO="$BUILD/OpenBand.xcarchive/Products/Applications/OpenBand.app/Info.plist"
-echo "OpenBand $(plutil -extract CFBundleShortVersionString raw "$INFO") ($(plutil -extract CFBundleVersion raw "$INFO")): $IPA"
-codesign -dvv "$BUILD/OpenBand.xcarchive/Products/Applications/OpenBand.app" 2>&1 | grep -E '^Authority=Apple Distribution'
+IPA="$BUILD/export/Freeband.ipa"
+INFO="$BUILD/Freeband.xcarchive/Products/Applications/Freeband.app/Info.plist"
+echo "Freeband $(plutil -extract CFBundleShortVersionString raw "$INFO") ($(plutil -extract CFBundleVersion raw "$INFO")): $IPA"
+codesign -dvv "$BUILD/Freeband.xcarchive/Products/Applications/Freeband.app" 2>&1 | grep -E '^Authority=Apple Distribution'
 
 [ "$1" = "--no-upload" ] && exit 0
 xcrun altool --upload-app -f "$IPA" -t ios --apiKey "$ASC_KEY_ID" --apiIssuer "$ASC_ISSUER_ID"

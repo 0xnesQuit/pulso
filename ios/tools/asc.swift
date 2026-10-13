@@ -1,4 +1,4 @@
-// A small App Store Connect API client for shipping OpenBand to TestFlight (adapted from pocketvibe/ios/scripts/asc.swift).
+// A small App Store Connect API client for shipping Freeband to TestFlight (adapted from pocketvibe/ios/scripts/asc.swift).
 // It signs in with an API key (.p8), so no Apple ID or 2FA is needed.
 //
 //   swift tools/asc.swift probe           what exists: app record, bundle id, certificates
@@ -18,9 +18,9 @@
 import CryptoKit
 import Foundation
 
-let bundleID = "dev.cobanov.openband"
-let appName = "OpenBand"
-let profileName = "OpenBand App Store"
+let bundleID = "dev.cobanov.freeband"
+let appName = "Freeband"
+let profileName = "Freeband App Store"
 let env = ProcessInfo.processInfo.environment
 let keyID = env["ASC_KEY_ID"] ?? ""
 let issuerID = env["ASC_ISSUER_ID"] ?? ""
@@ -115,16 +115,33 @@ func ensureApp() {
     if app() != nil { return print("app record already exists") }
     do {
         try call("POST", "/v1/apps", ["data": ["type": "apps", "attributes": [
-            "name": appName, "bundleId": bundleID, "primaryLocale": "tr", "sku": "openband",
+            "name": appName, "bundleId": bundleID, "primaryLocale": "tr", "sku": "freeband",
         ]]])
         print("app record created")
     } catch {
         die("""
         creating the app record failed: \(error)
         Create it once in App Store Connect: Apps > + > New App, iOS, name \(appName),
-        bundle id \(bundleID), SKU openband, primary language Turkish.
+        bundle id \(bundleID), SKU freeband, primary language Turkish.
         """)
     }
+}
+
+/// Points an existing app record at this bundle id (allowed until its first build is uploaded),
+/// registering the bundle id first if needed.
+func moveApp(_ appID: String) {
+    if bundle() == nil {
+        do {
+            try call("POST", "/v1/bundleIds", ["data": ["type": "bundleIds", "attributes": [
+                "identifier": bundleID, "name": appName, "platform": "IOS", "seedId": teamID,
+            ]]])
+            print("bundle id registered")
+        } catch { die("registering the bundle id failed: \(error)") }
+    }
+    do {
+        try call("PATCH", "/v1/apps/\(appID)", ["data": ["type": "apps", "id": appID, "attributes": ["bundleId": bundleID]]])
+        print("app \(appID) now uses \(bundleID)")
+    } catch { die("changing the bundle id failed: \(error)") }
 }
 
 func profile(certSHA1: String) {
@@ -149,7 +166,7 @@ func profile(certSHA1: String) {
               let file = Data(base64Encoded: content, options: .ignoreUnknownCharacters) else { die("the profile came back empty") }
         let dir = ("~/Library/MobileDevice/Provisioning Profiles" as NSString).expandingTildeInPath
         try FileManager.default.createDirectory(atPath: dir, withIntermediateDirectories: true)
-        let path = "\(dir)/OpenBand_AppStore.mobileprovision"
+        let path = "\(dir)/Freeband_AppStore.mobileprovision"
         try file.write(to: URL(fileURLWithPath: path))
         print("profile \"\(profileName)\" written to \(path)")
     } catch { die("creating the profile failed: \(error)") }
@@ -437,6 +454,9 @@ let args = CommandLine.arguments.dropFirst()
 switch args.first {
 case "probe": probe()
 case "ensure-app": ensureApp()
+case "move-app":
+    guard args.count == 2 else { die("usage: move-app <app id>") }
+    moveApp(args[args.startIndex + 1])
 case "profile":
     guard args.count == 2 else { die("usage: profile <certificate sha1>") }
     profile(certSHA1: args[args.startIndex + 1])

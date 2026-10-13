@@ -2,7 +2,7 @@ import SwiftData
 import SwiftUI
 
 @main
-struct OpenBandApp: App {
+struct FreebandApp: App {
     private let container: ModelContainer
     @StateObject private var model: AppModel
 
@@ -15,7 +15,7 @@ struct OpenBandApp: App {
         }
         self.container = container
         #if DEBUG
-        if ProcessInfo.processInfo.arguments.contains("-openband-demo") { DemoData.seed(container.mainContext) }
+        if ProcessInfo.processInfo.arguments.contains("-freeband-demo") { DemoData.seed(container.mainContext) }
         #endif
         _model = StateObject(wrappedValue: AppModel(context: container.mainContext))
     }

@@ -1,5 +1,5 @@
 // Prints MiProtocol outputs for fixed inputs; check_vectors.py recomputes them independently.
-// Build: swiftc ../../OpenBand/Band/MiProtocol.swift main.swift -o /tmp/mitest
+// Build: swiftc ../../Freeband/Band/MiProtocol.swift main.swift -o /tmp/mitest
 import Foundation
 
 func hex(_ d: Data) -> String { d.map { String(format: "%02x", $0) }.joined() }

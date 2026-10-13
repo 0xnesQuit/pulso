@@ -32,13 +32,13 @@ pages.get("/", async (c) => {
   const body = html`
 ${deleted ? html`<p class="small" role="status">Hesabın ve bu sunucudaki tüm verin silindi.</p>` : ""}
 <h1>Bandının verisi, istediğin yerde</h1>
-<p>OpenBand, Xiaomi Smart Band 10 ve 10 Pro'yu Mi Fitness ya da Xiaomi hesabı olmadan okuyan bir iPhone uygulaması. Veri telefonunda kalır.</p>
-<p>Bu sayfa OpenBand hub'ı. Uygulamada Web erişimini açarsan telefon verini buraya da gönderir. Günü tarayıcıdan görebilir, verini dışa aktarabilir ya da webhook ile kendi sunucuna aktarabilirsin. Açmazsan buraya hiçbir şey gelmez.</p>
+<p>Freeband, Xiaomi Smart Band 10 ve 10 Pro'yu Mi Fitness ya da Xiaomi hesabı olmadan okuyan bir iPhone uygulaması. Veri telefonunda kalır.</p>
+<p>Bu sayfa Freeband hub'ı. Uygulamada Web erişimini açarsan telefon verini buraya da gönderir. Günü tarayıcıdan görebilir, verini dışa aktarabilir ya da webhook ile kendi sunucuna aktarabilirsin. Açmazsan buraya hiçbir şey gelmez.</p>
 <p>${signedIn ? html`<a class="button" href="/app">Panele git</a>` : html`<a class="button" href="/login">Anahtarla giriş yap</a>`}</p>
 
 <h2>Nasıl giriş yapılır</h2>
 <ol>
-  <li>Telefonda OpenBand'i aç ve Ayarlar'a git.</li>
+  <li>Telefonda Freeband'i aç ve Ayarlar'a git.</li>
   <li>Web erişimini aç. Uygulama senin için bir hesap ve kişisel bir anahtar oluşturur.</li>
   <li>Web paneli aç'a dokun. Tarayıcı açılır ve seni doğrudan panele alır.</li>
 </ol>
@@ -47,7 +47,7 @@ ${deleted ? html`<p class="small" role="status">Hesabın ve bu sunucudaki tüm v
 <h2>Geliştiriciler için</h2>
 <p>Verine REST API ve imzalı webhook'larla da ulaşabilirsin. Ayrıntılar <a href="/docs">API belgesinde</a>.</p>
 <p>Neyin saklandığını ve nasıl silineceğini <a href="/privacy">gizlilik sayfası</a> anlatıyor.</p>`;
-  return render(c, "OpenBand", body, { signedIn });
+  return render(c, "Freeband", body, { signedIn });
 });
 
 // ---------------------------------------------------------------------------
@@ -60,7 +60,7 @@ pages.get("/login", (c) => {
 <form id="login-form" class="stack" hidden autocomplete="off">
   <div>
     <label for="token">Erişim anahtarı</label>
-    <input id="token" name="token" type="password" placeholder="ob_..." spellcheck="false" autocapitalize="off" required>
+    <input id="token" name="token" type="password" placeholder="fb_..." spellcheck="false" autocapitalize="off" required>
   </div>
   <button type="submit">Giriş yap</button>
 </form>
@@ -71,22 +71,22 @@ pages.get("/login", (c) => {
 pages.get("/join", (c) => {
   const testflight = c.env.TESTFLIGHT_URL;
   const install = testflight
-    ? html`<a href="${testflight}">OpenBand'i TestFlight'tan kur</a>. Önce App Store'dan TestFlight uygulamasını kurman istenebilir.`
-    : html`Seni davet edenden OpenBand'in TestFlight bağlantısını iste.`;
+    ? html`<a href="${testflight}">Freeband'i TestFlight'tan kur</a>. Önce App Store'dan TestFlight uygulamasını kurman istenebilir.`
+    : html`Seni davet edenden Freeband'in TestFlight bağlantısını iste.`;
   const body = html`
-<h1>OpenBand'e katıl</h1>
+<h1>Freeband'e katıl</h1>
 <p>Bileğindeki Xiaomi Smart Band 10 ya da 10 Pro'yu Xiaomi hesabı olmadan kullanırsın; verilerin telefonunda kalır. Web erişimi açınca bu sunucudan panelini görebilir, API ile verine ulaşabilirsin.</p>
 <ol class="stack">
   <li><strong>Uygulamayı kur.</strong> ${install}</li>
-  <li><strong>Bandını Mi Fitness'la bir kez eşle.</strong> OpenBand bandın anahtarını oradan okur. Mi Fitness'ı silme.</li>
-  <li><strong>OpenBand'i aç ve ilk kurulumu bitir.</strong></li>
-  <li><strong>Web erişimine katıl.</strong> Bu sayfa telefonunda açıksa düğmeye dokun; OpenBand davet kodu dolu açılır.
-    <p><a id="join-link" class="button" href="#">OpenBand'de aç</a></p>
+  <li><strong>Bandını Mi Fitness'la bir kez eşle.</strong> Freeband bandın anahtarını oradan okur. Mi Fitness'ı silme.</li>
+  <li><strong>Freeband'i aç ve ilk kurulumu bitir.</strong></li>
+  <li><strong>Web erişimine katıl.</strong> Bu sayfa telefonunda açıksa düğmeye dokun; Freeband davet kodu dolu açılır.
+    <p><a id="join-link" class="button" href="#">Freeband'de aç</a></p>
     <p class="small muted">Davet kodu: <code id="join-code">…</code></p>
   </li>
 </ol>
 <p class="small muted">Davet kodu bağlantının # sonrasında durur ve bu sayfadan sunucuya gönderilmez.</p>`;
-  return render(c, "OpenBand'e katıl", body, { script: JOIN_JS });
+  return render(c, "Freeband'e katıl", body, { script: JOIN_JS });
 });
 
 // ---------------------------------------------------------------------------
@@ -187,10 +187,10 @@ pages.get("/app", async (c) => {
   });
 
   const emptyText = !device
-    ? "Henüz veri gelmedi. Telefonda OpenBand'i açıp Senkronize et'e dokun."
+    ? "Henüz veri gelmedi. Telefonda Freeband'i açıp Senkronize et'e dokun."
     : !day?.hasData
       ? isToday
-        ? "Bugün için veri yok. Telefonda OpenBand'i açıp Senkronize et'e dokun."
+        ? "Bugün için veri yok. Telefonda Freeband'i açıp Senkronize et'e dokun."
         : "Bu gün için veri yok. Başka bir gün seç."
       : null;
 
@@ -282,7 +282,7 @@ ${device
 ${hookItems.length ? html`<ul id="wh-list" class="hooks">${hookItems}</ul>` : html`<p class="muted">Henüz webhook yok.</p>`}
 ${canAddHook
   ? html`<form id="wh-form" class="stack" autocomplete="off">
-  <div><label for="wh-url">Adres</label><input id="wh-url" name="url" type="url" placeholder="https://ornek.com/openband" required></div>
+  <div><label for="wh-url">Adres</label><input id="wh-url" name="url" type="url" placeholder="https://ornek.com/freeband" required></div>
   <button type="submit">Webhook ekle</button>
   <p id="wh-out" class="small" role="status"></p>
 </form>`

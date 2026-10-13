@@ -9,7 +9,7 @@ export function privacyBody(): Safe {
 <p>Bu hub'ı Mert Çobanov kendisi ve davet ettiği arkadaşları için işletiyor. Burası bir şirket hizmeti değil; sağlık verini taşıdığı için olabildiğince az şey tutacak şekilde yapıldı.</p>
 
 <h2>İsteğe bağlı</h2>
-<p>OpenBand uygulaması verini telefonda tutar. Uygulamada Web erişimini açmadıkça buraya hiçbir şey gelmez. Açtığında uygulama bir hesap oluşturur ve her senkronizasyonda bandının verisini buraya gönderir. Web erişimini kapatmak yeni gönderimi durdurur; buradaki veriyi silmek için hesabı silmen gerekir.</p>
+<p>Freeband uygulaması verini telefonda tutar. Uygulamada Web erişimini açmadıkça buraya hiçbir şey gelmez. Açtığında uygulama bir hesap oluşturur ve her senkronizasyonda bandının verisini buraya gönderir. Web erişimini kapatmak yeni gönderimi durdurur; buradaki veriyi silmek için hesabı silmen gerekir.</p>
 
 <h2>Ne saklanır</h2>
 <ul>
