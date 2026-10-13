@@ -22,6 +22,8 @@ targets:
       path: Freeband/Info.plist
       properties:
         CFBundleDisplayName: Freeband
+        UIUserInterfaceStyle: Dark
+        UIAppFonts: [DepartureMono-Regular.otf]
         CFBundleDevelopmentRegion: tr
         CFBundleLocalizations: [tr]
         CFBundleShortVersionString: $(MARKETING_VERSION)

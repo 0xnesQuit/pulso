@@ -19,7 +19,7 @@ struct HistoryView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 24) {
                     Text("Geçmiş")
-                        .font(.largeTitle.weight(.bold))
+                        .font(Theme.headline(34))
                         .foregroundStyle(Theme.ink)
                     SelectedBand { band in
                         if let band {
@@ -82,7 +82,7 @@ private struct HistoryContent: View {
                 VStack(spacing: 0) {
                     ForEach(days) { day in
                         row(day)
-                        if day.id != days.last?.id { Divider().overlay(Theme.dial) }
+                        if day.id != days.last?.id { Rectangle().fill(Theme.line).frame(height: 1) }
                     }
                 }
             }
@@ -105,12 +105,14 @@ private struct HistoryContent: View {
             }
             Chart(recent) { day in
                 BarMark(x: .value("Gün", day.day, unit: .day), y: .value("Adım", day.steps))
-                    .foregroundStyle(Theme.saffron)
-                    .cornerRadius(3)
+                    .foregroundStyle(Theme.phosphor)
+                    .cornerRadius(0)
             }
             .chartXAxis {
                 AxisMarks(values: .stride(by: .day, count: 2)) {
                     AxisValueLabel(format: .dateTime.day().month(.abbreviated))
+                        .font(Theme.mono(10))
+                        .foregroundStyle(Theme.secondary)
                 }
             }
             .environment(\.locale, Theme.locale)
@@ -127,14 +129,14 @@ private struct HistoryContent: View {
                 if let lo = day.heartMin, let hi = day.heartMax {
                     Text("nabız \(lo)–\(hi) bpm")
                         .font(.footnote)
-                        .foregroundStyle(Theme.pomegranate)
+                        .foregroundStyle(Theme.pulse)
                 }
             }
             Spacer()
             VStack(alignment: .trailing, spacing: 0) {
                 Text(day.steps.formatted(.number.locale(Theme.locale)))
-                    .font(Theme.figure(28))
-                    .foregroundStyle(Theme.saffron)
+                    .font(Theme.figure(24))
+                    .foregroundStyle(Theme.phosphor)
                 Text("\(day.calories.formatted(.number.locale(Theme.locale))) kalori")
                     .font(.footnote)
                     .foregroundStyle(Theme.secondary)
@@ -149,7 +151,7 @@ struct SleepView: View {
         NavigationStack {
             VStack(alignment: .leading, spacing: 18) {
                 Text("Uyku")
-                    .font(.largeTitle.weight(.bold))
+                    .font(Theme.headline(34))
                     .foregroundStyle(Theme.ink)
                 DayDial(hourlySteps: Array(repeating: 0, count: 24), heartRates: [], nowHour: 7,
                         centerValue: nil, centerCaption: "")

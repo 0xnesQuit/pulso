@@ -11,8 +11,7 @@ struct OnboardingView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             Text("\(step) / 3")
-                .font(.footnote.weight(.medium))
-                .monospacedDigit()
+                .font(Theme.mono(13))
                 .foregroundStyle(Theme.secondary)
                 .padding(.bottom, 20)
 
@@ -40,7 +39,7 @@ private struct StepTitle: View {
 
     var body: some View {
         Text(text)
-            .font(.largeTitle.weight(.bold))
+            .font(Theme.headline(34))
             .foregroundStyle(Theme.ink)
             .fixedSize(horizontal: false, vertical: true)
     }
@@ -51,8 +50,8 @@ private struct WelcomeStep: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
-            DayDial(hourlySteps: [0, 0, 0, 0, 0, 0, 120, 640, 980, 300, 280, 420, 760, 510, 300, 260, 410, 900, 1100, 600, 280, 90, 0, 0],
-                    heartRates: [], nowHour: 18.5, centerValue: nil, centerCaption: "")
+            OpeningDial(hourlySteps: [0, 0, 0, 0, 0, 0, 120, 640, 980, 300, 280, 420, 760, 510, 300, 260, 410, 900, 1100, 600, 280, 90, 0, 0],
+                        heartRates: [], nowHour: 18.5, centerValue: nil, centerCaption: "", showsHours: false)
                 .frame(width: 180)
                 .padding(.bottom, 8)
                 .accessibilityHidden(true)
@@ -64,7 +63,7 @@ private struct WelcomeStep: View {
                 .foregroundStyle(Theme.secondary)
             Text("Bandı Mi Fitness'tan kaldırma ve fabrika ayarlarına döndürme. Anahtar değişir, Freeband bağlanamaz.")
                 .font(.callout)
-                .foregroundStyle(Theme.pomegranate)
+                .foregroundStyle(Theme.pulse)
 
             Spacer()
             Button("Başlayalım", action: next)
@@ -125,7 +124,7 @@ struct KeyStep: View {
             if let error {
                 Text(error)
                     .font(.callout)
-                    .foregroundStyle(Theme.pomegranate)
+                    .foregroundStyle(Theme.pulse)
                 Text("Mi Fitness klasörü görünmüyorsa Mi Fitness'ı bir kez açıp bandın senkronize olmasını bekle.")
                     .font(.footnote)
                     .foregroundStyle(Theme.secondary)
@@ -162,7 +161,7 @@ struct KeyStep: View {
         HStack(alignment: .firstTextBaseline, spacing: 12) {
             Text("\(number)")
                 .font(Theme.figure(22))
-                .foregroundStyle(Theme.saffron)
+                .foregroundStyle(Theme.phosphor)
                 .frame(width: 18, alignment: .leading)
             Text(text)
                 .foregroundStyle(Theme.ink)
@@ -187,7 +186,7 @@ private struct ConnectStep: View {
 
             if succeeded {
                 Text(summary)
-                    .font(.title3)
+                    .font(Theme.headline(22))
                     .foregroundStyle(Theme.ink)
                 if bands.count > 1 {
                     Text("Diğer bantlar ilk senkronda bağlanacak.")
@@ -199,7 +198,7 @@ private struct ConnectStep: View {
                 if link.phase.isBusy {
                     Text(link.phase.label).foregroundStyle(Theme.secondary)
                 } else if case .failed(let message) = link.phase, tried {
-                    Text(message).foregroundStyle(Theme.pomegranate)
+                    Text(message).foregroundStyle(Theme.pulse)
                 }
             }
 

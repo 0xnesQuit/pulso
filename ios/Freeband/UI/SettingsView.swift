@@ -52,6 +52,8 @@ struct SettingsView: View {
                     NavigationLink("Hakkında") { AboutView() }
                 }
             }
+            .scrollContentBackground(.hidden)
+            .background(Theme.ground)
             .navigationTitle("Ayarlar")
             .navigationDestination(for: Band.self) { BandDetailView(band: $0) }
             .sheet(isPresented: $addingBand) {
@@ -117,6 +119,8 @@ private struct BandDetailView: View {
                 Text("Kaldırmak bandı yalnızca Freeband'den siler; Mi Fitness'taki eşleşme etkilenmez.")
             }
         }
+        .scrollContentBackground(.hidden)
+        .background(Theme.ground)
         .navigationTitle(band.displayName)
         .sheet(isPresented: $rereading) {
             KeyStep(title: "Anahtarı yeniden oku") { _ in rereading = false }
@@ -178,6 +182,8 @@ private struct WebhooksView: View {
                 Text(urlError ?? "En fazla 5 adres. Yalnızca https:// kabul edilir. İmza biçimi Web erişimi > API belgesi'nde.")
             }
         }
+        .scrollContentBackground(.hidden)
+        .background(Theme.ground)
         .navigationTitle("Webhook'lar")
     }
 
@@ -252,6 +258,8 @@ private struct WebAccessView: View {
                 if let status = model.hubStatus { Text(status) }
             }
         }
+        .scrollContentBackground(.hidden)
+        .background(Theme.ground)
         .navigationTitle("Web erişimi")
         .overlay { if model.hubBusy { ProgressView() } }
         .onAppear { serverText = model.hubURL.absoluteString }
@@ -280,6 +288,8 @@ private struct DiagnosticsView: View {
                 }
             }
         }
+        .scrollContentBackground(.hidden)
+        .background(Theme.ground)
         .navigationTitle("Tanılama")
         .toolbar {
             if !link.log.isEmpty {
@@ -307,6 +317,8 @@ private struct AboutView: View {
                     .foregroundStyle(Theme.secondary)
             }
         }
+        .scrollContentBackground(.hidden)
+        .background(Theme.ground)
         .navigationTitle("Hakkında")
     }
 }

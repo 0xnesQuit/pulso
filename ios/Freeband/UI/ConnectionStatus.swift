@@ -18,20 +18,20 @@ struct ConnectionStatus: View {
             VStack(alignment: .leading, spacing: 1) {
                 HStack(alignment: .firstTextBaseline) {
                     Text(title)
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(tone == .alert ? Theme.pomegranate : Theme.ink)
+                        .font(Theme.mono(13))
+                        .foregroundStyle(tone == .alert ? Theme.pulse : Theme.ink)
                         .lineLimit(1)
                     Spacer(minLength: 8)
                     if let trailing {
                         Text(trailing)
-                            .font(.footnote)
+                            .font(Theme.mono(12))
                             .foregroundStyle(Theme.secondary)
                             .lineLimit(1)
                     }
                 }
                 if let detail {
                     Text(detail)
-                        .font(.footnote)
+                        .font(Theme.mono(12))
                         .foregroundStyle(Theme.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
@@ -39,7 +39,8 @@ struct ConnectionStatus: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
-        .background(background, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .background(background)
+        .overlay(Rectangle().stroke(tone == .alert || tone == .live ? Theme.pulse.opacity(0.5) : Theme.line, lineWidth: 1))
         .animation(.easeInOut(duration: 0.2), value: title)
         .accessibilityElement(children: .combine)
     }
@@ -105,9 +106,9 @@ struct ConnectionStatus: View {
         case .busy:
             ProgressView().controlSize(.small).tint(Theme.ink)
         case .live:
-            Circle()
-                .fill(Theme.pomegranate)
-                .frame(width: 10, height: 10)
+            Rectangle()
+                .fill(Theme.pulse)
+                .frame(width: 8, height: 8)
                 .scaleEffect(pulse ? 1.25 : 0.85)
                 .opacity(pulse ? 1 : 0.6)
                 .onAppear {
@@ -116,20 +117,20 @@ struct ConnectionStatus: View {
                 }
                 .onDisappear { pulse = false }
         case .alert:
-            Image(systemName: "exclamationmark.circle.fill").foregroundStyle(Theme.pomegranate)
+            Image(systemName: "exclamationmark.circle.fill").foregroundStyle(Theme.pulse)
         case .quiet:
             if link.nearby.contains(band.id) {
-                Circle().fill(Theme.ink).frame(width: 10, height: 10)
+                Rectangle().fill(Theme.phosphor).frame(width: 8, height: 8)
             } else {
-                Circle().strokeBorder(Theme.secondary, lineWidth: 1.5).frame(width: 10, height: 10)
+                Rectangle().stroke(Theme.secondary, lineWidth: 1).frame(width: 8, height: 8)
             }
         }
     }
 
     private var background: Color {
         switch tone {
-        case .live, .alert: return Theme.pomegranate.opacity(0.10)
-        default: return Theme.dial.opacity(0.55)
+        case .live, .alert: return Theme.pulse.opacity(0.08)
+        default: return Theme.surface
         }
     }
 }

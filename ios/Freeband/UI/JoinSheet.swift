@@ -13,7 +13,7 @@ struct JoinSheet: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
             Text(joined ? "Katıldın." : "Web erişimine katıl")
-                .font(.largeTitle.weight(.bold))
+                .font(Theme.headline(34))
                 .foregroundStyle(Theme.ink)
 
             if joined {
@@ -27,7 +27,7 @@ struct JoinSheet: View {
                     .foregroundStyle(Theme.ink)
                 VStack(alignment: .leading, spacing: 4) {
                     Text(invite.hub.host ?? invite.hub.absoluteString)
-                        .font(.title3.weight(.semibold))
+                        .font(Theme.mono(18))
                         .foregroundStyle(Theme.ink)
                     Text("Davet kodu \(invite.code)")
                         .font(.subheadline)
@@ -36,10 +36,10 @@ struct JoinSheet: View {
                 if !invite.isDefaultHub {
                     Text("Bu, Freeband'in varsayılan sunucusu değil. Sağlık verin buraya gidecek; yalnızca güvendiğin birinden geldiyse katıl.")
                         .font(.callout)
-                        .foregroundStyle(Theme.pomegranate)
+                        .foregroundStyle(Theme.pulse)
                 }
                 if tried, let status = model.hubStatus {
-                    Text(status).font(.callout).foregroundStyle(Theme.pomegranate)
+                    Text(status).font(.callout).foregroundStyle(Theme.pulse)
                 }
             }
 
