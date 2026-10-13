@@ -25,7 +25,7 @@
     }
   ],
 
-  // Self-hosted Archivo font files (SIL OFL). No third-party requests.
+  // Self-hosted Open Sauce Sans font files (SIL OFL) and the favicon. No third-party requests.
   "assets": { "directory": "./public" },
 
   "vars": {

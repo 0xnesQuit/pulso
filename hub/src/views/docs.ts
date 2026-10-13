@@ -71,9 +71,16 @@ const INGEST_BODY = `{
 export function docsBody(origin: string): Safe {
   const H = `-H "Authorization: Bearer $FREEBAND_TOKEN"`;
   return html`
+<div class="doc">
+<nav class="toc" aria-label="Bölümler">
+  <span class="label">bölümler</span>
+  <a href="#kimlik">Kimlik doğrulama</a><a href="#hesap">Hesap</a><a href="#gonderim">Veri gönderme</a><a href="#okuma">Veriyi okuma</a><a href="#webhook">Webhook'lar</a><a href="#imza">İmza doğrulama</a><a href="#oturum">Panel oturumu</a>
+</nav>
+<article class="prose">
+<p class="label">freeband.v1</p>
 <h1>API belgesi</h1>
-<p>Freeband hub'ı verine bir REST API ve imzalı webhook'larla açar. Bu sayfa sözleşmenin (freeband.v1) hub tarafını anlatır. Tüm zamanlar ISO 8601 UTC'dir, örneğin <code>2026-10-13T20:59:41Z</code>.</p>
-<p>Taban adres: <code>${origin}</code></p>
+<p class="lede">Freeband hub'ı verine bir REST API ve imzalı webhook'larla açar. Bu sayfa sözleşmenin (freeband.v1) hub tarafını anlatır.</p>
+<p>Tüm zamanlar ISO 8601 UTC'dir, örneğin <code>2026-10-13T20:59:41Z</code>. Taban adres: <code>${origin}</code></p>
 
 <h2 id="kimlik">Kimlik doğrulama</h2>
 <p>Her istek kişisel anahtarınla gelir: <code>Authorization: Bearer fb_...</code>. Anahtarı uygulama, Web erişimini açtığında oluşturur. Sunucuda anahtarın kendisi değil, yalnız SHA-256 özeti tutulur; anahtarı kaybedersen yenisini oluşturman gerekir.</p>
@@ -173,5 +180,7 @@ curl -X DELETE ${origin}/v1/webhooks/ID ${H}</pre>
 
 <h2 id="oturum">Web paneli oturumu</h2>
 <p><code>POST /v1/session</code> gövdesi <code>{"token": "fb_…"}</code> olan bir istekle 30 gün geçerli bir oturum çerezi verir (<code>HttpOnly; Secure; SameSite=Strict</code>). <code>DELETE /v1/session</code> çıkış yapar. Bu iki uç nokta yalnız panel sayfalarından çağrılabilir; çerezle yapılan veri değiştiren istekler de aynı kaynaktan gelmek zorundadır.</p>
+</article>
+</div>
 `;
 }

@@ -50,6 +50,11 @@ let out: [String: Any] = [
     "notify_cmd": hex(MiAuth.notificationCommand(id: 42, appName: "Freeband", title: "Başlık", body: "Merhaba", date: Date(timeIntervalSince1970: 1_760_000_000))),
     "find_start": hex(MiAuth.findBandCommand(start: true)),
     "find_stop": hex(MiAuth.findBandCommand(start: false)),
+    "activity_today": hex(MiAuth.activityListCommand(today: true)),
+    "activity_past": hex(MiAuth.activityListCommand(today: false)),
+    "activity_fetch": hex(MiAuth.activityFetchCommand(Data([0x00, 0xF1, 0x53, 0x65, 0x04, 0x00, 0x01]))),
+    "clock_istanbul": hex(MiAuth.clockCommand(now: Date(timeIntervalSince1970: 1_760_000_000), timeZone: TimeZone(identifier: "Europe/Istanbul")!, is24Hour: true)),
+    "clock_newyork_12h": hex(MiAuth.clockCommand(now: Date(timeIntervalSince1970: 1_760_000_000), timeZone: TimeZone(identifier: "America/New_York")!, is24Hour: false)),
     "live_parsed": "\(live.steps)/\(live.calories)/\(live.heartRate)/\(live.standingHours)",
 ]
 print(String(data: try! JSONSerialization.data(withJSONObject: out, options: [.sortedKeys, .prettyPrinted]), encoding: .utf8)!)

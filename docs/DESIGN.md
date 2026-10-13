@@ -33,9 +33,9 @@ Vurgular veriye aittir. Düğmeler monokrom: birincil düğme Metin zemin + Zemi
 
 ## Yazı
 
-- **Departure Mono** (MIT lisanslı piksel monospace): rakamlar, etiketler, düğmeler, kadran yazıları. Büyük metrikler 40–48 pt.
-- **SF Pro** (iOS) / sistem sans (web), ince ağırlık (light): başlıklar ve uzun metin. Başlıklar 28–34 pt light.
-- Etiketler küçük harf ya da cümle düzeni, mono, Soluk renkte (ör. `adım`, `nabız aralığı`).
+- **Open Sauce Sans** (SIL OFL), tek aile, dört ağırlık: başlıklar Light (300), metin Regular (400), etiketler ve düğmeler Medium (500), büyük rakamlar SemiBold (600) ve tabular rakamlar. Büyük metrikler 40–48 pt, başlıklar 24–34 pt. (İlk v2 taslağındaki Departure Mono kullanıcı isteğiyle kaldırıldı.)
+- Kod blokları (web belgeleri) sistem monospace'inde kalır.
+- Etiketler küçük harf ya da cümle düzeni, Soluk renkte (ör. `adım`, `nabız aralığı`).
 
 ## Yerleşim
 
@@ -54,4 +54,4 @@ Değişmedi: kullanıcının bakışından, sade Türkçe, etken çatı, eylem a
 
 ## Not
 
-Genel kalıplar listesinde "koyu zemin + tek parlak vurgu" ve "küçük etiketlerde monospace" var; burada bunlar kullanıcının açıkça istediği yön olduğu için seçildi. Farkı dither kadran ve piksel font taşıyor.
+Genel kalıplar listesinde "koyu zemin + tek parlak vurgu" ve "küçük etiketlerde monospace" var; burada bunlar kullanıcının açıkça istediği yön olduğu için seçildi. Farkı dither kadran ve piksel wordmark taşıyor.

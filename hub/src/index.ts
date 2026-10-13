@@ -57,7 +57,7 @@ function errorPage(nonce: string, title: string, text: string): string {
   return page({
     title,
     nonce,
-    body: html`<h1>${title}</h1><p>${text}</p><p><a href="/">Ana sayfaya dön</a></p>`,
+    body: html`<section class="narrow"><p class="label">hata</p><h1>${title}</h1><p class="lede">${text}</p><a class="btn ghost" href="/">Ana sayfaya dön</a></section>`,
   });
 }
 

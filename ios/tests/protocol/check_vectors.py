@@ -27,6 +27,19 @@ confirm = f_bytes(1, hmac.new(enc_key, phone + watch, hashlib.sha256).digest()) 
         + f_bytes(2, AESCCM(enc_key, tag_length=4).encrypt(enc_nonce + bytes(8), companion, None))
 confirm_cmd = f_varint(1, 1) + f_varint(2, 27) + f_bytes(3, f_bytes(32, confirm))
 
+def f_sint(n, v): return f_varint(n, ((v << 1) ^ (v >> 63)) & ((1 << 64) - 1))
+
+def clock(ts, tzname, h24):
+    from datetime import datetime, timezone
+    from zoneinfo import ZoneInfo
+    d = datetime.fromtimestamp(ts, ZoneInfo(tzname))
+    dst = int(d.dst().total_seconds()); std = int(d.utcoffset().total_seconds()) - dst
+    date = f_varint(1, d.year) + f_varint(2, d.month) + f_varint(3, d.day)
+    time = f_varint(1, d.hour) + f_varint(2, d.minute) + f_varint(3, d.second) + f_varint(4, d.microsecond // 1000)
+    zone = f_sint(1, std // 900) + f_sint(2, dst // 900) + f_bytes(3, tzname.encode())
+    clk = f_bytes(1, date) + f_bytes(2, time) + f_bytes(3, zone) + f_varint(4, 0 if h24 else 1)
+    return (f_varint(1, 2) + f_varint(2, 3) + f_bytes(4, f_bytes(4, clk))).hex()
+
 def crc16arc(data):
     crc = 0
     for b in data:
@@ -58,6 +71,13 @@ want = {
     "realtime_start": (f_varint(1, 8) + f_varint(2, 45)).hex(),
     "realtime_stop": (f_varint(1, 8) + f_varint(2, 46)).hex(),
     "live_parsed": "8421/312/74/9",
+    # Gadgetbridge setCurrentTime: local date/time, sint32 (zigzag) 15-min offsets, name, isNot24hour
+    "clock_istanbul": clock(1760000000, "Europe/Istanbul", True),
+    "clock_newyork_12h": clock(1760000000, "America/New_York", False),
+    # docs/ACTIVITY.md section 2.2
+    "activity_today": "0808100152042a020800",
+    "activity_past": "08081002",
+    "activity_fetch": "080810035209120700f15365040001",
     "notify_cmd": (f_varint(1, 7) + f_varint(2, 0) + f_bytes(9, f_bytes(3, f_bytes(1,
         f_bytes(1, b"dev.cobanov.freeband") + f_bytes(2, b"Freeband") + f_bytes(3, "Başlık".encode()) + f_bytes(4, b"")
         + f_bytes(5, b"Merhaba") + f_bytes(6, __import__("datetime").datetime.fromtimestamp(1760000000, __import__("datetime").timezone.utc).strftime("%Y%m%dT%H%M%S").encode())

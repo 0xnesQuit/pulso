@@ -10,7 +10,7 @@ The hub is meant to run at `https://freeband.cobanov.dev` for the owner and invi
 hub/
   wrangler.jsonc            Worker config (custom domain, D1 binding with a PLACEHOLDER id, cron, observability)
   migrations/0001_init.sql  D1 schema: accounts, devices, samples, webhooks, sessions, rate_limits
-  public/                   Static assets: self-hosted Archivo (SIL OFL), favicon, _headers
+  public/                   Static assets: self-hosted Open Sauce Sans (SIL OFL), favicon, _headers
   src/
     index.ts                Entry: security headers + CSP nonce, error handling, scheduled cleanup
     types.ts                Hono context types
@@ -24,7 +24,7 @@ hub/
     lib/queries.ts          Account-scoped read queries (samples, daily summaries, devices)
     lib/time.ts             Time-zone math on Intl (DST-safe local days)
     lib/webhooks.ts         URL policy, signing, delivery with a 5 s timeout
-    views/                  HTML templates (auto-escaping), layout + CSS, the 24-hour dial, docs, privacy, inline JS
+    views/                  HTML templates (auto-escaping), layout + CSS, the 24-hour pixel dial, the pixel wordmark, docs, privacy, inline JS
   test/                     Vitest suites running inside workerd via @cloudflare/vitest-plugin
 ```
 
