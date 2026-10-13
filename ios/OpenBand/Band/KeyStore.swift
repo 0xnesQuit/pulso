@@ -216,30 +216,57 @@ enum KeyLoader {
     }
 }
 
-/// The selected key lives only in this app's Keychain on the phone.
-enum KeyVault {
-    private static let query: [String: Any] = [
-        kSecClass as String: kSecClassGenericPassword,
-        kSecAttrService as String: "dev.cobanov.bandprobe",
-        kSecAttrAccount as String: "authkey",
-    ]
+/// Secrets live only in this app's Keychain on the phone: one auth key per band and the hub
+/// token. Items are device-only and never sync to iCloud.
+enum Vault {
+    private static let service = "dev.cobanov.openband"
 
-    static func save(_ key: BandKey) {
-        SecItemDelete(query as CFDictionary)
-        let payload = try? JSONEncoder().encode([key.name, key.mac ?? "", key.hex])
-        var item = query
-        item[kSecValueData as String] = payload
+    private static func query(_ account: String) -> [String: Any] {
+        [kSecClass as String: kSecClassGenericPassword,
+         kSecAttrService as String: service,
+         kSecAttrAccount as String: account]
+    }
+
+    static func set(_ value: String, for account: String) {
+        SecItemDelete(query(account) as CFDictionary)
+        var item = query(account)
+        item[kSecValueData as String] = Data(value.utf8)
         item[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
         SecItemAdd(item as CFDictionary, nil)
     }
 
-    static func load() -> BandKey? {
-        var item = query
+    static func get(_ account: String) -> String? {
+        var item = query(account)
         item[kSecReturnData as String] = true
         var result: CFTypeRef?
         guard SecItemCopyMatching(item as CFDictionary, &result) == errSecSuccess,
-              let data = result as? Data,
-              let fields = try? JSONDecoder().decode([String].self, from: data), fields.count == 3 else { return nil }
-        return BandKey(name: fields[0], mac: fields[1].isEmpty ? nil : fields[1], hex: fields[2])
+              let data = result as? Data else { return nil }
+        return String(data: data, encoding: .utf8)
+    }
+
+    static func remove(_ account: String) {
+        SecItemDelete(query(account) as CFDictionary)
+    }
+
+    static func bandKey(_ bandID: UUID) -> String? { get("band-key-\(bandID.uuidString)") }
+    static func setBandKey(_ hex: String, for bandID: UUID) { set(hex, for: "band-key-\(bandID.uuidString)") }
+    static func removeBandKey(_ bandID: UUID) { remove("band-key-\(bandID.uuidString)") }
+
+    static var hubToken: String? {
+        get { get("hub-token") }
+        set { if let newValue { set(newValue, for: "hub-token") } else { remove("hub-token") } }
+    }
+}
+
+extension BandKey {
+    init(hex: String) {
+        self.init(name: "", mac: nil, hex: hex)
+    }
+
+    /// Last four hex digits of the MAC, as in the band's advertised name.
+    var macSuffix: String? {
+        guard let mac else { return nil }
+        let hex = mac.uppercased().filter(\.isHexDigit)
+        return hex.count >= 4 ? String(hex.suffix(4)) : nil
     }
 }
