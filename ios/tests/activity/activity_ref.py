@@ -13,6 +13,7 @@ Swift port has something to diff against.
     activity_ref.py parse --hex 00F15365... [--no-crc]
     activity_ref.py assemble CHUNK1.bin CHUNK2.bin ...
     activity_ref.py --selftest [FIXTURE_DIR]
+    activity_ref.py --dump [FIXTURE_DIR]      (full output per fixture case, for the Swift diff)
 
 Output is JSON on stdout. Timestamps are Unix seconds (UTC); the file id's
 timezone is given in quarter hours and as minutes.
@@ -745,6 +746,73 @@ def selftest(fixture_dir: str) -> int:
 
 
 # ---------------------------------------------------------------------------
+# dump: full normalised output per fixture case, for diffing another implementation
+
+
+def _error_class(e: FormatError) -> str:
+    if isinstance(e, CrcMismatch):
+        return "crc"
+    if isinstance(e, Truncated):
+        return "truncated"
+    return "format"
+
+
+def _dump_case(case: dict):
+    kind = case["kind"]
+    if kind == "fileid":
+        fid = FileId.parse(bytes.fromhex(case["hex"]))
+        return {**fid.to_json(), "is_empty": fid.is_empty, "encoded": fid.to_bytes().hex()}
+    if kind == "idlist":
+        try:
+            return [f.to_json() for f in parse_id_list(bytes.fromhex(case["hex"]))]
+        except FormatError as e:
+            return {"error_class": _error_class(e)}
+    if kind == "fetch_order":
+        ids = [FileId.parse(bytes.fromhex(h)) for h in case["ids"]]
+        return [f.to_bytes().hex() for f in sorted(ids, key=FileId.fetch_key)]
+    if kind == "crc":
+        return f"{crc32(bytes.fromhex(case['hex'])):08x}"
+    if kind == "chunks":
+        asm, done = ChunkAssembler(), None
+        try:
+            for h in case["chunks"]:
+                r = asm.feed(bytes.fromhex(h))
+                if r is not None:
+                    done = r
+        except FormatError:
+            return {"error_class": "sequence"}
+        if done is None:
+            return {"error_class": "incomplete"}
+        try:
+            return {"file_hex": done.hex(), "parsed": parse_file(done, True)}
+        except FormatError as e:
+            return {"error_class": _error_class(e)}
+    if kind == "file":
+        try:
+            return parse_file(bytes.fromhex(case["hex"]), case.get("has_crc", True))
+        except FormatError as e:
+            return {"error_class": _error_class(e)}
+    return {"error_class": f"unknown case kind {kind}"}
+
+
+def dump(fixture_dir: str) -> int:
+    """JSON on stdout: every fixture case's full output, plus CRC vectors checked against zlib."""
+    vectors = []
+    for n in (0, 1, 7, 64, 300):
+        blob = bytes((i * 37 + 11) & 0xFF for i in range(n))
+        assert crc32(blob) == zlib.crc32(blob), "crc32 table broken"
+        vectors.append({"hex": blob.hex(), "crc": f"{zlib.crc32(blob):08x}"})
+    cases = []
+    for path in sorted(glob.glob(os.path.join(fixture_dir, "*.json"))):
+        with open(path, encoding="utf-8") as fh:
+            suite = json.load(fh)
+        for case in suite["cases"]:
+            cases.append({"fixture": os.path.basename(path), "name": case["name"], "output": _dump_case(case)})
+    _dump({"crc_vectors": vectors, "cases": cases})
+    return 0
+
+
+# ---------------------------------------------------------------------------
 # CLI
 
 
@@ -757,9 +825,10 @@ def main(argv: list[str]) -> int:
     if not argv or argv[0] in ("-h", "--help"):
         print(__doc__)
         return 0
-    if argv[0] == "--selftest":
+    if argv[0] in ("--selftest", "--dump"):
         here = os.path.dirname(os.path.abspath(__file__))
-        return selftest(argv[1] if len(argv) > 1 else os.path.join(here, "fixtures"))
+        fixture_dir = argv[1] if len(argv) > 1 else os.path.join(here, "fixtures")
+        return selftest(fixture_dir) if argv[0] == "--selftest" else dump(fixture_dir)
     cmd, rest = argv[0], argv[1:]
     try:
         if cmd == "fileid":
