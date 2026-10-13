@@ -100,6 +100,15 @@ struct PBWriter {
         data.append(value)
     }
 
+    /// sint32/sint64: zigzag-encoded varint.
+    mutating func sint(_ field: Int, _ value: Int64) {
+        varint(field, UInt64(bitPattern: (value << 1) ^ (value >> 63)))
+    }
+
+    mutating func bool(_ field: Int, _ value: Bool) {
+        varint(field, value ? 1 : 0)
+    }
+
     mutating func string(_ field: Int, _ value: String) {
         bytes(field, Data(value.utf8))
     }
@@ -387,5 +396,120 @@ extension MiAuth {
         command.varint(2, 18)
         command.message(4, system)
         return command.data
+    }
+}
+
+extension MiAuth {
+    /// Command{8,1, health(10).activitySyncRequestToday(5){unknown1: 0}}, or Command{8,2} for past files.
+    static func activityListCommand(today: Bool) -> Data {
+        var command = PBWriter()
+        command.varint(1, 8)
+        command.varint(2, today ? 1 : 2)
+        if today {
+            var request = PBWriter()
+            request.varint(1, 0)
+            var health = PBWriter()
+            health.message(5, request)
+            command.message(10, health)
+        }
+        return command.data
+    }
+
+    /// Command{8,3, health(10).activityRequestFileIds(2) = 7-byte id}: the file arrives on channel 5.
+    static func activityFetchCommand(_ id: Data) -> Data {
+        var health = PBWriter()
+        health.bytes(2, id)
+        var command = PBWriter()
+        command.varint(1, 8)
+        command.varint(2, 3)
+        command.message(10, health)
+        return command.data
+    }
+
+    /// The N×7-byte id list in a {8,1} or {8,2} reply (health(10).activityRequestFileIds(2)).
+    static func activityFileIDBytes(_ command: PBMessage) -> Data {
+        command.message(10)?.blobs[2] ?? Data()
+    }
+}
+
+extension MiAuth {
+    /// Command{2,3}: system(4).clock(4){date 1{year, month, day}, time 2{hour, minute, second, ms},
+    /// timezone 3{zoneOffset 1 sint32, dstOffset 2 sint32 (15-minute blocks), name 3}, isNot24hour 4}.
+    /// Date and time are local.
+    static func clockCommand(now: Date = Date(), timeZone: TimeZone = .current, is24Hour: Bool) -> Data {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = timeZone
+        let c = calendar.dateComponents([.year, .month, .day, .hour, .minute, .second, .nanosecond], from: now)
+        var date = PBWriter()
+        date.varint(1, UInt64(c.year ?? 2000))
+        date.varint(2, UInt64(c.month ?? 1))
+        date.varint(3, UInt64(c.day ?? 1))
+        var time = PBWriter()
+        time.varint(1, UInt64(c.hour ?? 0))
+        time.varint(2, UInt64(c.minute ?? 0))
+        time.varint(3, UInt64(c.second ?? 0))
+        time.varint(4, UInt64((c.nanosecond ?? 0) / 1_000_000))
+        let dst = Int64(timeZone.daylightSavingTimeOffset(for: now))
+        let standard = Int64(timeZone.secondsFromGMT(for: now)) - dst
+        var zone = PBWriter()
+        zone.sint(1, standard / 900)
+        zone.sint(2, dst / 900)
+        zone.string(3, timeZone.identifier)
+        var clock = PBWriter()
+        clock.message(1, date)
+        clock.message(2, time)
+        clock.message(3, zone)
+        clock.bool(4, !is24Hour)
+        var system = PBWriter()
+        system.message(4, clock)
+        var command = PBWriter()
+        command.varint(1, 2)
+        command.varint(2, 3)
+        command.message(4, system)
+        return command.data
+    }
+
+    /// Whether the phone shows 24-hour time.
+    static var phoneUses24Hour: Bool {
+        !(DateFormatter.dateFormat(fromTemplate: "j", options: 0, locale: .current) ?? "").contains("a")
+    }
+
+    static func systemGet(_ subtype: UInt64) -> Data {
+        var command = PBWriter()
+        command.varint(1, 2)
+        command.varint(2, subtype)
+        return command.data
+    }
+
+    struct DeviceInfo: Equatable {
+        let serial: String
+        let firmware: String
+        let model: String
+    }
+
+    /// Reply to Command{2,2}: system(4).deviceInfo(3){serialNumber 1, firmware 2, model 4}.
+    static func deviceInfo(_ command: PBMessage) -> DeviceInfo? {
+        guard let info = command.message(4)?.message(3) else { return nil }
+        func text(_ f: Int) -> String { info.blobs[f].map { String(decoding: $0, as: UTF8.self) } ?? "" }
+        return DeviceInfo(serial: text(1), firmware: text(2), model: text(4))
+    }
+
+    struct DeviceState: Equatable {
+        let charging: Bool
+        let worn: Bool
+        let asleep: Bool
+    }
+
+    /// Reply to Command{2,78}: system(4).basicDeviceState(48){isCharging 1, battery 2, isWorn 3, isUserAsleep 4}.
+    /// The band also pushes Command{2,79}: system(4).deviceState(49){charging 1 (1 yes, 2 no), wearing 2, sleep 3}.
+    static func deviceState(_ command: PBMessage) -> DeviceState? {
+        let system = command.message(4)
+        if let basic = system?.message(48) {
+            return DeviceState(charging: basic.varints[1] == 1, worn: basic.varints[3] == 1, asleep: basic.varints[4] == 1)
+        }
+        if let pushed = system?.message(49) {
+            return DeviceState(charging: pushed.varints[1] == 1, worn: pushed.varints[2] == 1, asleep: pushed.varints[3] == 1)
+        }
+        return nil
     }
 }

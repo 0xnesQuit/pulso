@@ -9,7 +9,7 @@ struct FreebandApp: App {
     init() {
         let container: ModelContainer
         do {
-            container = try ModelContainer(for: Band.self, Sample.self, Webhook.self)
+            container = try ModelContainer(for: Band.self, Sample.self, Webhook.self, ActivityBlob.self)
         } catch {
             fatalError("Veri deposu açılamadı: \(error)")
         }

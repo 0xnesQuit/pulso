@@ -32,12 +32,24 @@ final class AppModel: ObservableObject {
 
     var hub: HubClient { HubClient(baseURL: hubURL, token: Vault.hubToken) }
 
+    /// The one model, for App Intents (Siri, Shortcuts).
+    static weak var shared: AppModel?
+
     init(context: ModelContext) {
         self.context = context
         link.onSample = { [weak self] id, draft in self?.record(id, draft) }
         link.onFinish = { [weak self] id, ok in self?.sessionEnded(id, ok) }
         link.onIdentified = { [weak self] id, keyIndex, name in self?.identified(id, keyIndex, name) }
+        link.hasActivityFile = { [weak self] id, hex in self?.hasActivityFile(id, hex) ?? false }
+        link.onDeviceInfo = { [weak self] id, info in
+            guard let self, let band = self.band(id) else { return }
+            band.firmware = info.firmware.isEmpty ? band.firmware : info.firmware
+            band.hardwareModel = info.model.isEmpty ? band.hardwareModel : info.model
+            try? self.context.save()
+        }
+        link.onActivityFile = { [weak self] id, file, data, _ in self?.storeActivityFile(id, file, data) }
         mergeDuplicateBands()
+        AppModel.shared = self
     }
 
     // MARK: band sessions
@@ -143,6 +155,26 @@ final class AppModel: ObservableObject {
             changed = true
         }
         if changed { try? context.save() }
+    }
+
+    // MARK: activity files
+
+    private func blob(_ bandID: UUID, _ hex: String) -> ActivityBlob? {
+        try? context.fetch(FetchDescriptor<ActivityBlob>(predicate: #Predicate { $0.bandID == bandID && $0.fileID == hex })).first
+    }
+
+    private func hasActivityFile(_ bandID: UUID, _ hex: String) -> Bool { blob(bandID, hex) != nil }
+
+    /// Stores (or replaces: today's files grow during the day) a raw file.
+    private func storeActivityFile(_ bandID: UUID, _ file: ActivityFileID, _ data: Data) {
+        if let existing = blob(bandID, file.hex) {
+            existing.data = data
+            existing.fetchedAt = Date()
+            existing.parsedAt = nil
+        } else {
+            context.insert(ActivityBlob(bandID: bandID, id: file, data: data))
+        }
+        try? context.save()
     }
 
     func band(_ id: UUID) -> Band? {

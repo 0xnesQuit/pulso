@@ -90,12 +90,19 @@ struct ConnectionStatus: View {
         }
         if mine, case .failed(let message) = link.phase { return message }
         if mine, link.phase == .live { return "En fazla \(Int(BandLink.liveLimit)) saniye sürer; durdurunca kanal Mi Fitness'a döner." }
+        if mine, link.phase.isBusy, let progress = link.fileProgress, progress.total > 0 {
+            return "Bandın kayıtları alınıyor: \(progress.done)/\(progress.total) dosya"
+        }
         if mine, link.phase.isBusy { return "Mi Fitness bu sırada kapalı olmalı." }
         return nil
     }
 
     /// Quiet states keep to one line: the last sync goes on the right.
     private var trailing: String? {
+        if mine, let state = link.deviceState, link.phase.isBusy {
+            return [state.worn ? "bilekte" : "bilekte değil", state.charging ? "şarjda" : nil, state.asleep ? "uykuda" : nil]
+                .compactMap { $0 }.joined(separator: ", ")
+        }
         guard tone == .quiet else { return nil }
         guard let at = band.lastSyncAt else { return "henüz senkron yok" }
         return "senkron \(at.formatted(.relative(presentation: .named).locale(Theme.locale)))"

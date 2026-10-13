@@ -49,6 +49,8 @@ final class BandLink: NSObject, ObservableObject {
     static let txUUID = CBUUID(string: "005F")
     static let liveLimit: TimeInterval = 120
     static let syncWindow: TimeInterval = 12
+    /// Upper bound for a sync that also fetches activity files.
+    static let fileSyncLimit: TimeInterval = 120
 
     @Published private(set) var phase: Phase = .idle
     @Published private(set) var bandID: UUID?
@@ -65,6 +67,18 @@ final class BandLink: NSObject, ObservableObject {
     var onFinish: ((UUID, Bool) -> Void)?
     /// After authentication: which candidate key worked and the band's own Bluetooth name.
     var onIdentified: ((UUID, Int, String?) -> Void)?
+    /// Past activity files already stored need not be fetched again (today's always are).
+    var hasActivityFile: ((UUID, String) -> Bool)?
+    /// A complete, CRC-checked activity file; `today` when it came from the band's today list.
+    var onActivityFile: ((UUID, ActivityFileID, Data, Bool) -> Void)?
+
+    /// Firmware, serial and model, read after authentication.
+    var onDeviceInfo: ((UUID, MiAuth.DeviceInfo) -> Void)?
+    /// Worn / charging / asleep, read after authentication and pushed by the band when it changes.
+    @Published private(set) var deviceState: MiAuth.DeviceState?
+
+    /// Activity files fetched / requested in this sync.
+    @Published private(set) var fileProgress: (done: Int, total: Int)?
 
     private var central: CBCentralManager!
     private var target: BandTarget?
@@ -81,6 +95,16 @@ final class BandLink: NSObject, ObservableObject {
     private var authed = false
     private var finishing = false
     private var realtimeOn = false
+
+    // activity-file sync (docs/ACTIVITY.md): list today, list past, then one file at a time
+    private enum FileStage { case idle, listingToday, listingPast, fetching, done }
+    private var fileStage = FileStage.idle
+    private var todayIDs: [ActivityFileID] = []
+    private var fileQueue: [ActivityFileID] = []
+    private var currentFile: ActivityFileID?
+    private var currentRetried = false
+    private var assembler = ActivityAssembler()
+    private var fileToken = 0
     private var run = 0
     private var keyIndex = 0
     private var pendingStart: (() -> Void)?
@@ -114,6 +138,12 @@ final class BandLink: NSObject, ObservableObject {
         finishing = false
         realtimeOn = false
         keyIndex = 0
+        deviceState = nil
+        fileStage = .idle
+        todayIDs = []
+        fileQueue = []
+        currentFile = nil
+        fileProgress = nil
         active = true
         note("başlat: \(target.name), \(target.keys.count) anahtar")
 
@@ -212,6 +242,11 @@ final class BandLink: NSObject, ObservableObject {
     private func didAuthenticate() {
         authed = true
         if let id = target?.id { onIdentified?(id, keyIndex, peripheral?.name) }
+        // Every session keeps the band's clock and time zone right (Mi Fitness may be gone) and
+        // reads what the band is and how it is worn.
+        sendCommand(MiAuth.clockCommand(is24Hour: MiAuth.phoneUses24Hour), encrypted: true)
+        sendCommand(MiAuth.systemGet(2), encrypted: true)
+        sendCommand(MiAuth.systemGet(78), encrypted: true)
         if case .send(let commands) = purpose {
             phase = .reading
             note("auth tamam → \(commands.count) komut gönderiliyor")
@@ -225,8 +260,20 @@ final class BandLink: NSObject, ObservableObject {
         sendCommand(MiAuth.batteryCommand(), encrypted: true)
         sendCommand(MiAuth.realtimeCommand(start: true), encrypted: true)
         realtimeOn = true
+        if purpose == .sync {
+            fileStage = .listingToday
+            note("→ bugünün dosya listesi")
+            sendCommand(MiAuth.activityListCommand(today: true), encrypted: true)
+            let listRun = run
+            after(10, listRun) { [weak self] in
+                guard let self, self.fileStage == .listingToday || self.fileStage == .listingPast else { return }
+                self.note("dosya listesi gelmedi, dosyasız devam")
+                self.fileStage = .done
+                self.finishSyncIfDone()
+            }
+        }
         let thisRun = run
-        let window = purpose == .live ? Self.liveLimit : Self.syncWindow
+        let window = purpose == .live ? Self.liveLimit : (purpose == .sync ? Self.fileSyncLimit : Self.syncWindow)
         after(window, thisRun) { [weak self] in
             guard let self, self.active else { return }
             self.note("süre doldu (\(Int(window)) sn)")
@@ -274,12 +321,125 @@ final class BandLink: NSObject, ObservableObject {
             emit(.live(live))
             switch purpose {
             case .check where battery != nil: finish()
-            case .sync where live.heartRate > 10: finish()
+            case .sync where live.heartRate > 10: finishSyncIfDone()
             default: break
             }
 
+        case (8, 1) where fileStage == .listingToday:
+            todayIDs = ActivityFileID.list(MiAuth.activityFileIDBytes(command))
+            note("← bugün \(todayIDs.count) dosya; → geçmiş listesi")
+            fileStage = .listingPast
+            sendCommand(MiAuth.activityListCommand(today: false), encrypted: true)
+
+        case (8, 2) where fileStage == .listingPast:
+            let past = ActivityFileID.list(MiAuth.activityFileIDBytes(command))
+            let id = target?.id
+            let wanted = past.filter { file in
+                guard let id, let has = hasActivityFile else { return true }
+                return !has(id, file.hex)
+            }
+            fileQueue = Array(Set(todayIDs + wanted)).sorted()
+            note("← geçmiş \(past.count) dosya, \(wanted.count) yeni; toplam \(fileQueue.count) istenecek")
+            fileProgress = (0, fileQueue.count)
+            fileStage = .fetching
+            fetchNextFile()
+
+        case (8, 3), (8, 5):
+            break
+
+        case (2, 2):
+            if let info = MiAuth.deviceInfo(command), let id = target?.id {
+                note("← cihaz: \(info.model), firmware \(info.firmware)")
+                onDeviceInfo?(id, info)
+            }
+
+        case (2, 78), (2, 79):
+            if let state = MiAuth.deviceState(command) { deviceState = state }
+
+        case (2, 3):
+            note("← saat ayarlandı (durum \(command.varints[100] ?? 0))")
+
         default:
             note("← \(type)/\(subtype) işlenmedi")
+        }
+    }
+
+    // MARK: activity files
+
+    private func fetchNextFile() {
+        guard active, fileStage == .fetching else { return }
+        guard !fileQueue.isEmpty else {
+            fileStage = .done
+            currentFile = nil
+            note("dosyalar tamam")
+            finishSyncIfDone()
+            return
+        }
+        let file = fileQueue.removeFirst()
+        currentFile = file
+        currentRetried = false
+        requestCurrentFile()
+    }
+
+    private func requestCurrentFile() {
+        guard let file = currentFile else { return }
+        assembler = ActivityAssembler()
+        sendCommand(MiAuth.activityFetchCommand(file.data), encrypted: true)
+        armFileTimer()
+    }
+
+    /// 5 s per chunk; one retry, then the file is skipped for this sync.
+    private func armFileTimer() {
+        fileToken += 1
+        let token = fileToken
+        after(5, run) { [weak self] in
+            guard let self, self.fileToken == token, self.fileStage == .fetching, let file = self.currentFile else { return }
+            if !self.currentRetried {
+                self.currentRetried = true
+                self.note("dosya \(file.hex) cevap vermedi, tekrar")
+                self.requestCurrentFile()
+            } else {
+                self.note("dosya \(file.hex) atlandı")
+                self.advanceFileProgress()
+                self.fetchNextFile()
+            }
+        }
+    }
+
+    private func receiveActivityChunk(_ packet: Data) {
+        guard fileStage == .fetching, let file = currentFile else { return }
+        switch assembler.add(packet) {
+        case .needMore:
+            armFileTimer()
+        case .complete(let data):
+            fileToken += 1
+            if let id = target?.id { onActivityFile?(id, file, data, todayIDs.contains(file)) }
+            advanceFileProgress()
+            fetchNextFile()
+        case .failed(let reason):
+            fileToken += 1
+            note("dosya \(file.hex) bozuk: \(reason)")
+            advanceFileProgress()
+            fetchNextFile()
+        }
+    }
+
+    private func advanceFileProgress() {
+        if let progress = fileProgress { fileProgress = (progress.done + 1, progress.total) }
+    }
+
+    /// A sync ends once its files are in and a heart-rate reading has arrived (or the limit hits).
+    private func finishSyncIfDone() {
+        guard purpose == .sync else { return }
+        let filesDone = fileStage == .done || fileStage == .idle
+        if filesDone, (stats?.heartRate ?? 0) > 10 { finish() }
+        if filesDone, fileStage == .done, stats != nil {
+            // files finished; give the pulse a few seconds, then end anyway
+            let thisRun = run
+            after(8, thisRun) { [weak self] in
+                guard let self, self.active, self.purpose == .sync else { return }
+                self.finish()
+            }
         }
     }
 
@@ -399,7 +559,15 @@ final class BandLink: NSObject, ObservableObject {
             guard let keys else { return }
             body = MiCrypto.ctr(key: keys.decryptionKey, body)
         }
+        if channel == 5 {
+            receiveActivityChunk(body)
+            return
+        }
         guard channel == 1, let command = PBMessage(body) else { return }
+        if command.varints[1] == 2, command.varints[2] == 110 {
+            // Unknown everywhere (docs/CAPABILITIES.md §16); keep the bytes for decoding later.
+            note("← 2/110 \(body.count) bayt: \(body.map { String(format: "%02x", $0) }.joined())")
+        }
         handle(command)
     }
 

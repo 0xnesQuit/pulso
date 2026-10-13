@@ -12,6 +12,8 @@ final class Band {
     var addedAt: Date
     var lastSyncAt: Date?
     var lastBattery: Int?
+    var firmware: String?
+    var hardwareModel: String?
 
     init(name: String, mac: String?) {
         id = UUID()
@@ -69,6 +71,52 @@ final class Sample {
         standingHours = draft.standingHours
         level = draft.level
         pushedToHub = false
+    }
+}
+
+/// A raw activity file from the band, kept as received (CRC-checked) so it can be parsed again
+/// as the parsers improve. `fileID` is the 7-byte id in hex.
+@Model
+final class ActivityBlob {
+    var bandID: UUID
+    var fileID: String
+    var ts: Date
+    var type: Int
+    var subtype: Int
+    var detailType: Int
+    var version: Int
+    @Attribute(.externalStorage) var data: Data
+    var fetchedAt: Date
+    var parsedAt: Date?
+    var parseNote: String?
+
+    init(bandID: UUID, id: ActivityFileID, data: Data) {
+        self.bandID = bandID
+        fileID = id.hex
+        ts = id.ts
+        type = Int(id.type)
+        subtype = Int(id.subtype)
+        detailType = Int(id.detailType)
+        version = Int(id.version)
+        self.data = data
+        fetchedAt = Date()
+    }
+
+    /// "günlük detay v4" style label for diagnostics.
+    var kindLabel: String {
+        let kind: String
+        switch (type, subtype, detailType) {
+        case (0, 0, 0): kind = "günlük detay"
+        case (0, 0, 1): kind = "günlük özet"
+        case (0, 3, _): kind = "uyku evreleri"
+        case (0, 6, _): kind = "elle ölçüm"
+        case (0, 8, _): kind = "uyku"
+        case (1, _, 1): kind = "antrenman özeti"
+        case (1, _, 2): kind = "antrenman GPS"
+        case (1, _, _): kind = "antrenman"
+        default: kind = "bilinmeyen \(type)/\(subtype)/\(detailType)"
+        }
+        return "\(kind) v\(version)"
     }
 }
 

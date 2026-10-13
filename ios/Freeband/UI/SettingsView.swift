@@ -108,6 +108,8 @@ private struct BandDetailView: View {
                 if let suffix = band.macSuffix { LabeledContent("Kimlik", value: suffix) }
                 LabeledContent("Anahtar", value: Vault.bandKey(band.id).map { BandKey(hex: $0).masked } ?? "yok")
                 if let battery = band.lastBattery { LabeledContent("Pil", value: "%\(battery)") }
+                if let firmware = band.firmware { LabeledContent("Firmware", value: firmware) }
+                if let model = band.hardwareModel { LabeledContent("Donanım", value: model) }
                 if let at = band.lastSyncAt {
                     LabeledContent("Son senkron", value: at.formatted(date: .abbreviated, time: .shortened))
                 }
@@ -273,12 +275,36 @@ private struct WebAccessView: View {
 
 private struct DiagnosticsView: View {
     @EnvironmentObject private var link: BandLink
+    @Query(sort: \ActivityBlob.ts, order: .reverse) private var blobs: [ActivityBlob]
+    @State private var shareURLs: [URL] = []
+    @State private var sharing = false
 
     var body: some View {
         List {
             Section {
                 LabeledContent("Durum", value: link.phase.label.isEmpty ? "Boşta" : link.phase.label)
             }
+            Section {
+                if blobs.isEmpty {
+                    Text("Henüz dosya yok. Senkronize edince bandın kayıtları burada listelenir.")
+                        .foregroundStyle(Theme.secondary)
+                } else {
+                    Button("Ham dosyaları paylaş (\(blobs.count))") { shareRaw() }
+                    ForEach(blobs.prefix(60)) { blob in
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(blob.kindLabel).font(Theme.mono(14))
+                            Text("\(blob.ts.formatted(date: .abbreviated, time: .shortened)), \(blob.data.count) bayt\(blob.parseNote.map { ", \($0)" } ?? "")")
+                                .font(Theme.mono(12))
+                                .foregroundStyle(Theme.secondary)
+                        }
+                    }
+                }
+            } header: {
+                Text("Bandın dosyaları")
+            } footer: {
+                Text("Ham dosyalar, dosya biçimlerini doğrulamak için paylaşılabilir; içinde sağlık verin var.")
+            }
+
             Section("Son oturum") {
                 if link.log.isEmpty {
                     Text("Henüz oturum yok.").foregroundStyle(Theme.secondary)
@@ -291,11 +317,26 @@ private struct DiagnosticsView: View {
         .scrollContentBackground(.hidden)
         .background(Theme.ground)
         .navigationTitle("Tanılama")
+        .sheet(isPresented: $sharing) { ActivitySheet(items: shareURLs) }
         .toolbar {
             if !link.log.isEmpty {
                 ShareLink(item: link.log.joined(separator: "\n"))
             }
         }
+    }
+}
+
+extension DiagnosticsView {
+    /// Writes every stored file as <type-subtype-detail-vN>_<id>.bin into a temporary folder.
+    func shareRaw() {
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent("freeband-raw", isDirectory: true)
+        try? FileManager.default.removeItem(at: folder)
+        try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        shareURLs = blobs.compactMap { blob in
+            let url = folder.appendingPathComponent("\(blob.type)-\(blob.subtype)-\(blob.detailType)-v\(blob.version)_\(blob.fileID).bin")
+            return (try? blob.data.write(to: url, options: .completeFileProtection)) != nil ? url : nil
+        }
+        sharing = !shareURLs.isEmpty
     }
 }
 
