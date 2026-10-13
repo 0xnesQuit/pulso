@@ -21,6 +21,7 @@ import {
   newWebhookSecret,
   sha256Hex,
   SESSION_RE,
+  timingSafeEqualStr,
 } from "../lib/crypto";
 import { HttpError, LIMITS, clientIp, getCookie, isSameOrigin, readJson } from "../lib/http";
 import { RATE_LIMITS, enforce } from "../lib/ratelimit";
@@ -59,6 +60,18 @@ function isObject(v: unknown): v is Record<string, unknown> {
   return typeof v === "object" && v !== null && !Array.isArray(v);
 }
 
+/** True when `invite` matches one of the configured codes (case-insensitive, constant time). */
+async function inviteAccepted(configured: string | undefined, invite: unknown): Promise<boolean> {
+  if (typeof invite !== "string" || invite.length === 0 || invite.length > 64) return false;
+  const given = invite.trim().toUpperCase();
+  const codes = (configured ?? "").split(",").map((c) => c.trim().toUpperCase()).filter(Boolean);
+  let ok = false;
+  for (const code of codes) {
+    if (await timingSafeEqualStr(given, code)) ok = true;
+  }
+  return ok;
+}
+
 function bad(message: string): HttpError {
   return new HttpError(400, "invalid_query", message);
 }
@@ -75,6 +88,9 @@ api.post("/accounts", async (c) => {
   if (!isObject(raw)) throw new HttpError(400, "invalid_body", "$: nesne olmalı");
   const name = text(raw.device_name, "device_name", 100) as string;
   if (!isValidTz(raw.tz)) throw new HttpError(400, "invalid_body", "tz: geçerli bir IANA saat dilimi olmalı");
+  if (!(await inviteAccepted(c.env.HUB_INVITE_CODES, raw.invite))) {
+    throw new HttpError(403, "invalid_invite", "Davet kodu geçersiz.");
+  }
 
   const id = crypto.randomUUID();
   const token = newToken();

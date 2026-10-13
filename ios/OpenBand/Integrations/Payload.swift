@@ -125,6 +125,7 @@ struct HubClient {
         var errorDescription: String? {
             switch self {
             case .status(401, _): return "Sunucu API anahtarını tanımadı. Web erişimini kapatıp yeniden aç."
+            case .status(403, _): return "Davet kodu geçersiz. Kodu sunucu yöneticisinden iste."
             case .status(429, _): return "Sunucu çok fazla istek aldı. Biraz sonra tekrar dene."
             case .status(let code, let text): return "Sunucu \(code) döndü: \(text.prefix(120))"
             case .malformed: return "Sunucunun cevabı anlaşılamadı."
@@ -132,8 +133,9 @@ struct HubClient {
         }
     }
 
-    func createAccount(deviceName: String) async throws -> (token: String, webURL: URL?) {
-        let body = try JSONSerialization.data(withJSONObject: ["device_name": deviceName, "tz": TimeZone.current.identifier])
+    func createAccount(deviceName: String, invite: String) async throws -> (token: String, webURL: URL?) {
+        let body = try JSONSerialization.data(withJSONObject: ["device_name": deviceName, "tz": TimeZone.current.identifier,
+                                                               "invite": invite.trimmingCharacters(in: .whitespacesAndNewlines)])
         let json = try await call("POST", "/v1/accounts", body: body, auth: false)
         guard let token = json["token"] as? String else { throw Failure.malformed }
         return (token, (json["web_url"] as? String).flatMap(URL.init(string:)))

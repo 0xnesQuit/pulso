@@ -80,21 +80,42 @@ describe("POST /v1/accounts", () => {
   it("rate limits account creation per IP", async () => {
     const ip = freshIp();
     for (let i = 0; i < 10; i++) {
-      const res = await call("/v1/accounts", { ...json({ device_name: "Band", tz: "UTC" }), ip });
+      const res = await call("/v1/accounts", { ...json({ device_name: "Band", tz: "UTC", invite: "TEST-INVITE" }), ip });
       expect(res.status).toBe(201);
     }
-    const blocked = await call("/v1/accounts", { ...json({ device_name: "Band", tz: "UTC" }), ip });
+    const blocked = await call("/v1/accounts", { ...json({ device_name: "Band", tz: "UTC", invite: "TEST-INVITE" }), ip });
     expect(blocked.status).toBe(429);
     expect(Number(blocked.headers.get("retry-after"))).toBeGreaterThan(0);
     expect(((await blocked.json()) as { error: string }).error).toBe("rate_limited");
 
     // Another IP is unaffected.
-    const other = await call("/v1/accounts", { ...json({ device_name: "Band", tz: "UTC" }), ip: freshIp() });
+    const other = await call("/v1/accounts", { ...json({ device_name: "Band", tz: "UTC", invite: "TEST-INVITE" }), ip: freshIp() });
     expect(other.status).toBe(201);
 
     // Counters hold a keyed hash, never the raw IP.
     const { results } = await env.DB.prepare("SELECT key FROM rate_limits").all<{ key: string }>();
     expect(results.length).toBeGreaterThan(0);
     for (const r of results) expect(r.key).not.toContain(ip);
+  });
+});
+
+describe("invite codes", () => {
+  it("refuses account creation without a valid invite", async () => {
+    for (const invite of [undefined, "", "WRONG", "x".repeat(65)]) {
+      const res = await call("/v1/accounts", {
+        ...json({ device_name: "Band", tz: "Europe/Istanbul", ...(invite === undefined ? {} : { invite }) }),
+        ip: freshIp(),
+      });
+      expect(res.status).toBe(403);
+      expect(((await res.json()) as { error: string }).error).toBe("invalid_invite");
+    }
+  });
+
+  it("accepts any configured code, case-insensitively", async () => {
+    const res = await call("/v1/accounts", {
+      ...json({ device_name: "Band", tz: "Europe/Istanbul", invite: " second-code " }),
+      ip: freshIp(),
+    });
+    expect(res.status).toBe(201);
   });
 });

@@ -39,7 +39,7 @@ export function json(body: unknown, extra: Record<string, string> = {}): CallIni
 
 export async function createAccount(opts: { tz?: string; name?: string; ip?: string } = {}) {
   const res = await call("/v1/accounts", {
-    ...json({ device_name: opts.name ?? "Band 10 Pro D9B9", tz: opts.tz ?? "Europe/Istanbul" }),
+    ...json({ device_name: opts.name ?? "Band 10 Pro D9B9", tz: opts.tz ?? "Europe/Istanbul", invite: "test-invite" }),
     ip: opts.ip ?? freshIp(),
   });
   expect(res.status).toBe(201);

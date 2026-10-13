@@ -65,7 +65,7 @@ Taban adres: `https://openband.cobanov.dev` (geliştirmede `http://localhost:878
 
 | Yöntem | Yol | Açıklama |
 |---|---|---|
-| `POST` | `/v1/accounts` | Yeni hesap. Gövde `{ "device_name": "...", "tz": "Europe/Istanbul" }`. Cevap `{ "account_id", "token", "web_url" }`; token yalnız bir kez döner. IP başına sınırlı. |
+| `POST` | `/v1/accounts` | Yeni hesap. Gövde `{ "device_name": "...", "tz": "Europe/Istanbul", "invite": "..." }`; `invite` sunucu yöneticisinin verdiği davet kodudur (yanlışsa `403 invalid_invite`). Cevap `{ "account_id", "token", "web_url" }`; token yalnız bir kez döner. IP başına sınırlı. |
 | `GET` | `/v1/me` | Hesap bilgisi, örnek sayıları ve bilinen cihazlar (`devices: [{ id, name, model, last_seen }]`). |
 | `POST` | `/v1/ingest` | Gönderim gövdesi (yukarıda). Cevap `{ "accepted", "duplicates" }`. Ardından hesabın sunucu webhook'larına iletilir. |
 | `GET` | `/v1/samples?device=&type=live&from=&to=&limit=` | Ham örnekler, zamana göre artan, en fazla 5000. `device` verilmezse tüm cihazlar; her örnek `device_id` taşır. |

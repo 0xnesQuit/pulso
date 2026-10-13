@@ -129,12 +129,12 @@ final class AppModel: ObservableObject {
 
     // MARK: hub (web access)
 
-    func enableWebAccess() async {
+    func enableWebAccess(invite: String) async {
         hubBusy = true
         defer { hubBusy = false }
         let name = ((try? context.fetch(FetchDescriptor<Band>())) ?? []).first?.name ?? "OpenBand"
         do {
-            let account = try await HubClient(baseURL: hubURL).createAccount(deviceName: name)
+            let account = try await HubClient(baseURL: hubURL).createAccount(deviceName: name, invite: invite)
             Vault.hubToken = account.token
             hubEnabled = true
             hubStatus = "Web erişimi açık."

@@ -199,6 +199,7 @@ private struct WebAccessView: View {
     @Environment(\.openURL) private var openURL
     @State private var confirmOff = false
     @State private var serverText = ""
+    @State private var invite = ""
 
     var body: some View {
         Form {
@@ -223,8 +224,13 @@ private struct WebAccessView: View {
                 }
             } else {
                 Section {
-                    Button("Web erişimini aç") { Task { await model.enableWebAccess() } }
-                        .disabled(model.hubBusy)
+                    TextField("Davet kodu", text: $invite)
+                        .textInputAutocapitalization(.characters)
+                        .autocorrectionDisabled()
+                    Button("Web erişimini aç") { Task { await model.enableWebAccess(invite: invite) } }
+                        .disabled(model.hubBusy || invite.trimmingCharacters(in: .whitespaces).isEmpty)
+                } footer: {
+                    Text("Sunucu davetle çalışıyor; kodu sunucuyu işleten kişiden al.")
                 }
             }
 

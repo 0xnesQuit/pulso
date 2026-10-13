@@ -13,13 +13,14 @@ export default defineConfig(async () => {
   const testHubSecret = btoa(String.fromCharCode(...bytes));
   // Satisfies wrangler's secrets.required check for the test run only.
   process.env.HUB_SECRET = testHubSecret;
+  process.env.HUB_INVITE_CODES = "TEST-INVITE, SECOND-CODE";
 
   return {
     plugins: [
       cloudflareTest({
         wrangler: { configPath: "./wrangler.jsonc" },
         miniflare: {
-          bindings: { TEST_MIGRATIONS: migrations, HUB_SECRET: testHubSecret },
+          bindings: { TEST_MIGRATIONS: migrations, HUB_SECRET: testHubSecret, HUB_INVITE_CODES: "TEST-INVITE, SECOND-CODE" },
         },
       }),
     ],
