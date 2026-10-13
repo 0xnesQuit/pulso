@@ -1,0 +1,28 @@
+{
+  "name": "openband-hub",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev --local",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "types": "wrangler types",
+    "db:migrate:local": "wrangler d1 migrations apply openband-hub --local"
+  },
+  "dependencies": {
+    "hono": "4.13.10"
+  },
+  "devDependencies": {
+    "@cloudflare/vitest-plugin": "1.3.1",
+    "@vitest/runner": "4.1.11",
+    "@vitest/snapshot": "4.1.11",
+    "typescript": "6.0.3",
+    "vitest": "4.1.11",
+    "wrangler": "4.143.0"
+  },
+  "overrides": {
+    "undici": "7.30.0",
+    "sharp": "0.35.5"
+  }
+}

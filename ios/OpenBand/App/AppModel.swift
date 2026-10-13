@@ -174,7 +174,7 @@ final class AppModel: ObservableObject {
         }
     }
 
-    /// Sends every sample not yet on the hub, one request per band, up to 5000 at a time.
+    /// Sends every sample not yet on the hub, one request per band, up to 4000 at a time.
     func pushToHub() async {
         guard Vault.hubToken != nil else { return }
         let bands = (try? context.fetch(FetchDescriptor<Band>())) ?? []
@@ -183,7 +183,7 @@ final class AppModel: ObservableObject {
             let id = band.id
             var descriptor = FetchDescriptor<Sample>(predicate: #Predicate { $0.bandID == id && !$0.pushedToHub },
                                                      sortBy: [SortDescriptor(\.ts)])
-            descriptor.fetchLimit = 5000
+            descriptor.fetchLimit = 4000  // 5000 compact live samples exceed the hub's 512 KB body cap
             guard let pending = try? context.fetch(descriptor), !pending.isEmpty else { continue }
             let body = Payload.body(event: "sync.completed", device: Payload.Device(band),
                                     samples: pending.map(SampleDraft.init(sample:)))

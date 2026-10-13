@@ -1,0 +1,54 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "openband-hub",
+  "main": "src/index.ts",
+  // Matches the workerd runtime shipped with the pinned wrangler 4.143.0.
+  // Raise it together with wrangler and re-run the tests.
+  "compatibility_date": "2026-09-26",
+
+  // Serve only on the custom domain: no *.workers.dev URL, no preview URLs.
+  // Same-origin checks and the "never deliver webhooks to ourselves" rule
+  // assume a single public hostname.
+  "workers_dev": false,
+  "preview_urls": false,
+  "routes": [{ "pattern": "openband.cobanov.dev", "custom_domain": true }],
+
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "openband-hub",
+      // PLACEHOLDER: replace with the id printed by
+      // `wrangler d1 create openband-hub` before the first remote deploy.
+      // Local dev and tests do not need a real id.
+      "database_id": "00000000-0000-0000-0000-000000000000",
+      "migrations_dir": "migrations"
+    }
+  ],
+
+  // Self-hosted Archivo font files (SIL OFL). No third-party requests.
+  "assets": { "directory": "./public" },
+
+  "vars": {
+    // Hostname the hub is served on. Webhooks may not point here.
+    "PUBLIC_HOSTNAME": "openband.cobanov.dev"
+  },
+
+  // HUB_SECRET: at least 32 random characters. Used to encrypt webhook
+  // secrets at rest (AES-GCM) and to key IP hashes for rate limiting.
+  // Production: `wrangler secret put HUB_SECRET`. Local: `.dev.vars` (gitignored).
+  "secrets": { "required": ["HUB_SECRET"] },
+
+  // Daily cleanup of expired sessions and old rate-limit counters.
+  "triggers": { "crons": ["17 3 * * *"] },
+
+  // Local dev: keep request.url on localhost so the same-origin (CSRF) check
+  // matches what the browser sends. Without this, wrangler dev rewrites the
+  // URL to the custom-domain route above.
+  "dev": { "port": 8787, "local_protocol": "http", "upstream_protocol": "http", "host": "localhost:8787" },
+
+  "observability": {
+    "enabled": true,
+    "logs": { "enabled": true, "head_sampling_rate": 1 },
+    "traces": { "enabled": true, "head_sampling_rate": 0.05 }
+  }
+}
