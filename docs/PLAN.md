@@ -204,8 +204,8 @@ Durum notu: aktivite dosyası çözücüleri Swift'e taşındı (`ios/Freeband/B
 | 0 | Kalibrasyon araçları: rapor, makullük kontrolleri, dışa aktarma. Gerçek dosyalar sabah | A | **tamam** (`a99fdd2`) |
 | 1 | Veri hattı (modeller, ingest, rollup), analiz motoru ve testleri, hata düzeltmeleri 1/2/3/5, 30 günlük demo veri, webhook'a yeni türler | A | **tamam** (`a99fdd2`; düzeltme 6 `9d2333f`) |
 | 5a | Hub veri katmanı: `minute`/`sleep`/`score`, upsert, yeni uç noktalar, hata düzeltmeleri 4/6, testler | D | **tamam, canlıda** (`f4b719e`) |
-| 2a | Tasarım sistemi: token'lar, yazı, hareket ve bileşenler (önizlemelerle) | B | başlıyor |
-| 2b | Ekranlar (4 sekme), yerelleştirme (EN/TR), ikon, eski kodun silinmesi | E | A ve B'den sonra |
+| 2a | Tasarım sistemi: token'lar, yazı, hareket ve bileşenler (önizlemelerle) | B | **tamam** (`91c9288`) |
+| 2b | Ekranlar (4 sekme), yerelleştirme (EN/TR), ikon, eski kodun silinmesi | E | sürüyor (bu gecenin son ajanı) |
 | 3 | Bant kontrolleri: kayıpsız `PBTree`, `.exchange` oturumu, alarmlar, sağlık izleme, DND ve bileği kaldırınca ekran (önce GET), hava durumu, kadranlar | — | **ertelendi** (ajan bütçesi; cihaz doğrulaması zaten sabah gerekli) |
 | 5b | Hub paneli Tesla diline ve yeni verilere geçer; yayın (önce migration) | — | **ertelendi** (ajan bütçesi) |
 | 4 | Mi Fitness'ın yerine geçme: arka plan modu, ACK. **Bu gece yalnız iskelet, ACK varsayılan kapalı** | — | sona |
