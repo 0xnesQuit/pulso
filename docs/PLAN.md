@@ -125,6 +125,7 @@ Durum notu: aktivite dosyası çözücüleri Swift'e taşındı (`ios/Freeband/B
   - TRIMP = Σ r · 0,64 · e^(k·r); k erkekte 1,92, kadında 1,67, bilinmiyorsa 1,80.
   - Yük = min(21, 21 · ln(1 + TRIMP/25) / ln 25).
   - Nabız uyanık dakikaların yarısından azını kapsıyorsa: kısa boşluklar doldurulur, dakikada 100 adım ve üstü "r = 0,4" sayılır, güven düşük olur.
+  - **Uygulamada (algoritma v1):** r < 0,3 olan dakikalar TRIMP'e katılmaz. Formül harfiyen uygulanınca hareketsiz bir gün yaklaşık 90 TRIMP, yani 10 civarında yük çıkarıyordu.
 - **Stres ve SpO2:** skora girmez. Stres: zaman ağırlıklı ortalama ve 4 banttaki dakikalar. SpO2: gece ortalaması, minimumu ve %90 altındaki dakikalar. Tıbbi iddia yok.
 - **Güven:** yüksek/orta/düşük/yok, her zaman gerekçe listesiyle ("RR yok", "nabız 30 dakikada bir", "bazalde 5/14 gece").
 
@@ -200,9 +201,9 @@ Durum notu: aktivite dosyası çözücüleri Swift'e taşındı (`ios/Freeband/B
 
 | Faz | İçerik | Kim | Durum |
 |---|---|---|---|
-| 0 | Kalibrasyon araçları: rapor, makullük kontrolleri, dışa aktarma. Gerçek dosyalar sabah | A | sürüyor |
-| 1 | Veri hattı (modeller, ingest, rollup), analiz motoru ve testleri, hata düzeltmeleri 1/2/3/5, 30 günlük demo veri, webhook'a yeni türler | A | sürüyor |
-| 5a | Hub veri katmanı: `minute`/`sleep`/`score`, upsert, yeni uç noktalar, hata düzeltmeleri 4/6, testler | D | sürüyor |
+| 0 | Kalibrasyon araçları: rapor, makullük kontrolleri, dışa aktarma. Gerçek dosyalar sabah | A | **tamam** (`a99fdd2`) |
+| 1 | Veri hattı (modeller, ingest, rollup), analiz motoru ve testleri, hata düzeltmeleri 1/2/3/5, 30 günlük demo veri, webhook'a yeni türler | A | **tamam** (`a99fdd2`; düzeltme 6 `9d2333f`) |
+| 5a | Hub veri katmanı: `minute`/`sleep`/`score`, upsert, yeni uç noktalar, hata düzeltmeleri 4/6, testler | D | **tamam, canlıda** (`f4b719e`) |
 | 2a | Tasarım sistemi: token'lar, yazı, hareket ve bileşenler (önizlemelerle) | B | başlıyor |
 | 2b | Ekranlar (4 sekme), yerelleştirme (EN/TR), ikon, eski kodun silinmesi | E | A ve B'den sonra |
 | 3 | Bant kontrolleri: kayıpsız `PBTree`, `.exchange` oturumu, alarmlar, sağlık izleme, DND ve bileği kaldırınca ekran (önce GET), hava durumu, kadranlar | — | **ertelendi** (ajan bütçesi; cihaz doğrulaması zaten sabah gerekli) |
