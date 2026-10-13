@@ -1,20 +1,36 @@
+import Combine
 import Foundation
 import SwiftData
 import SwiftUI
+import UIKit
 
 /// Ties the band session to storage and integrations: every observation is stored as it
-/// arrives; when a session ends well, webhooks get the session's samples and, if web access
-/// is on, unsent samples go to the hub.
+/// arrives; every activity file is stored, then parsed into the derived models; when a session
+/// ends the touched days are scored again, webhooks get the session's samples and health records
+/// and, if web access is on, unsent samples go to the hub.
 @MainActor
 final class AppModel: ObservableObject {
     let link = BandLink()
     let context: ModelContext
+    let ingest: ActivityIngest
+
+    /// The hub stores minute/sleep/score records since migration 0002 (deployed 2026-10-14).
+    static let hubAcceptsHealthTypes = true
 
     @Published var hubStatus: String?
     @Published var hubBusy = false
     @Published var hubEnabled = Vault.hubToken != nil
     /// An invite opened from a QR code or the hub's /join page, waiting for the user to confirm.
     @Published var pendingInvite: Invite?
+    /// Local midnight of the current day; changes at midnight and on clock/time-zone changes.
+    @Published private(set) var today = Calendar.current.startOfDay(for: Date())
+    /// The newest calibration report (plan section 4, phase 0).
+    @Published private(set) var calibration: CalibrationReport?
+    /// Parsing or scoring is running (reparse all, launch).
+    @Published private(set) var ingestBusy = false
+
+    /// Fires with the new day's midnight when the day changes while the app runs.
+    let dayChanged = PassthroughSubject<Date, Never>()
 
     struct Invite: Identifiable, Equatable {
         let code: String
@@ -24,6 +40,15 @@ final class AppModel: ObservableObject {
     }
 
     private var sessionDrafts: [SampleDraft] = []
+    /// What the ingests of the running session parsed, for its report and webhooks.
+    private var sessionIngest = IngestSummary()
+    /// Earliest day per band whose scores must be recomputed once no session is running.
+    private var pendingRollup: [UUID: DayKey] = [:]
+    private var ingestTask: Task<Void, Never>?
+    private var ingestAgain = false
+    /// Health records waiting for the hub (only while hubAcceptsHealthTypes).
+    private var pendingHubRecords: [UUID: [[String: Any]]] = [:]
+    private var dayObservers: [NSObjectProtocol] = []
 
     var hubURL: URL {
         get { UserDefaults.standard.string(forKey: "hubURL").flatMap(URL.init(string:)) ?? HubClient.defaultURL }
@@ -37,8 +62,9 @@ final class AppModel: ObservableObject {
 
     init(context: ModelContext) {
         self.context = context
+        ingest = ActivityIngest(context: context)
         link.onSample = { [weak self] id, draft in self?.record(id, draft) }
-        link.onFinish = { [weak self] id, ok in self?.sessionEnded(id, ok) }
+        link.onFinish = { [weak self] id, outcome in self?.sessionEnded(id, outcome) }
         link.onIdentified = { [weak self] id, keyIndex, name in self?.identified(id, keyIndex, name) }
         link.hasActivityFile = { [weak self] id, hex in self?.hasActivityFile(id, hex) ?? false }
         link.onDeviceInfo = { [weak self] id, info in
@@ -47,9 +73,12 @@ final class AppModel: ObservableObject {
             band.hardwareModel = info.model.isEmpty ? band.hardwareModel : info.model
             try? self.context.save()
         }
-        link.onActivityFile = { [weak self] id, file, data, _ in self?.storeActivityFile(id, file, data) }
+        link.onActivityFile = { [weak self] id, file, data, today in self?.storeActivityFile(id, file, data, today: today) }
+        calibration = Self.loadCalibration()
         mergeDuplicateBands()
+        observeDayChanges()
         AppModel.shared = self
+        Task { await self.launchMaintenance() }
     }
 
     // MARK: band sessions
@@ -64,6 +93,7 @@ final class AppModel: ObservableObject {
     func start(_ band: Band, _ purpose: BandLink.Purpose) {
         guard let target = target(for: band) else { return }
         sessionDrafts = []
+        sessionIngest = IngestSummary()
         link.start(target, purpose: purpose)
     }
 
@@ -97,15 +127,31 @@ final class AppModel: ObservableObject {
         try? context.save()
     }
 
-    private func sessionEnded(_ id: UUID, _ ok: Bool) {
+    /// `lastSyncAt` moves only on a complete session. Files that arrived are parsed whatever the
+    /// outcome; webhooks get `sync.completed` or `sync.partial`, nothing on failure.
+    private func sessionEnded(_ id: UUID, _ outcome: BandLink.Outcome) {
         let drafts = sessionDrafts
         sessionDrafts = []
-        guard ok, let band = band(id), !drafts.isEmpty else { return }
-        band.lastSyncAt = Date()
-        try? context.save()
+        guard let band = band(id) else { return }
+        if outcome == .complete {
+            band.lastSyncAt = Date()
+            try? context.save()
+        }
         let device = Payload.Device(band)
         Task {
-            await deliverWebhooks(device: device, drafts: drafts)
+            await waitForIngest()
+            let parsed = sessionIngest
+            sessionIngest = IngestSummary()
+            runPendingRollups()
+            if !parsed.isEmpty {
+                setCalibration(makeReport(parsed, bandID: id, outcome: outcome.label))
+            }
+            if case .failed = outcome { return }
+            let records = healthRecords(bandID: id, parsed)
+            guard !drafts.isEmpty || !records.isEmpty else { return }
+            if Self.hubAcceptsHealthTypes, !records.isEmpty { pendingHubRecords[id, default: []] += records }
+            await deliverWebhooks(event: outcome == .complete ? "sync.completed" : "sync.partial", device: device,
+                                  drafts: drafts, records: records)
             await pushToHub()
         }
     }
@@ -126,7 +172,7 @@ final class AppModel: ObservableObject {
     }
 
     /// One band per MAC: folds bands added twice (Mi Fitness keeps several entries per band)
-    /// into the oldest one, moving their samples and keys.
+    /// into the oldest one, moving their samples, files, derived data and keys.
     func mergeDuplicateBands() {
         let bands = ((try? context.fetch(FetchDescriptor<Band>())) ?? []).sorted { $0.addedAt < $1.addedAt }
         var keeper: [String: Band] = [:]
@@ -138,8 +184,7 @@ final class AppModel: ObservableObject {
                 continue
             }
             let from = band.id
-            let samples = (try? context.fetch(FetchDescriptor<Sample>(predicate: #Predicate { $0.bandID == from }))) ?? []
-            samples.forEach { $0.bandID = first.id }
+            reassign(from: from, to: first.id)
             Vault.setBandKeys(Vault.bandKeys(first.id) + Vault.bandKeys(from), for: first.id)
             Vault.removeBandKey(from)
             if band.name.localizedCaseInsensitiveContains("pro"), !first.name.localizedCaseInsensitiveContains("pro") {
@@ -157,28 +202,208 @@ final class AppModel: ObservableObject {
         if changed { try? context.save() }
     }
 
+    /// Moves every row of one band to another (bug fix 1). Raw files are deduplicated by file id
+    /// (the newest copy stays); derived rows of both would overlap, so the keeper's derived rows
+    /// and scores are dropped and its files marked for parsing again (the launch ingest rebuilds them).
+    private func reassign(from: UUID, to: UUID) {
+        for s in (try? context.fetch(FetchDescriptor<Sample>(predicate: #Predicate { $0.bandID == from }))) ?? [] { s.bandID = to }
+        let moved = (try? context.fetch(FetchDescriptor<ActivityBlob>(predicate: #Predicate { $0.bandID == from }))) ?? []
+        for b in moved { b.bandID = to }
+        for r in (try? context.fetch(FetchDescriptor<MinuteDay>(predicate: #Predicate { $0.bandID == from }))) ?? [] { r.bandID = to }
+        for r in (try? context.fetch(FetchDescriptor<DaySummary>(predicate: #Predicate { $0.bandID == from }))) ?? [] { r.bandID = to }
+        for r in (try? context.fetch(FetchDescriptor<SleepRecord>(predicate: #Predicate { $0.bandID == from }))) ?? [] { r.bandID = to }
+        for r in (try? context.fetch(FetchDescriptor<SleepRR>(predicate: #Predicate { $0.bandID == from }))) ?? [] { r.bandID = to }
+        for r in (try? context.fetch(FetchDescriptor<ManualReading>(predicate: #Predicate { $0.bandID == from }))) ?? [] { r.bandID = to }
+        for r in (try? context.fetch(FetchDescriptor<DailyScore>(predicate: #Predicate { $0.bandID == from }))) ?? [] { r.bandID = to }
+        try? context.save()
+        guard !moved.isEmpty else { return }
+
+        let blobs = ((try? context.fetch(FetchDescriptor<ActivityBlob>(predicate: #Predicate { $0.bandID == to }))) ?? [])
+            .sorted { $0.fetchedAt > $1.fetchedAt }
+        var seen = Set<String>()
+        for blob in blobs {
+            if seen.insert(blob.fileID).inserted {
+                blob.parserVersion = 0
+                blob.parsedAt = nil
+                blob.parseStatus = ParseStatus.pending.rawValue
+            } else {
+                context.delete(blob)
+            }
+        }
+        ActivityIngest.deleteDerived(context: context, bandID: to, includingScores: true)
+        pendingRollup[to] = DayKey.current().adding(days: -(DailyRollup.maxDays - 1))
+        try? context.save()
+    }
+
     // MARK: activity files
 
     private func blob(_ bandID: UUID, _ hex: String) -> ActivityBlob? {
         try? context.fetch(FetchDescriptor<ActivityBlob>(predicate: #Predicate { $0.bandID == bandID && $0.fileID == hex })).first
     }
 
-    private func hasActivityFile(_ bandID: UUID, _ hex: String) -> Bool { blob(bandID, hex) != nil }
+    /// Asked for files in the band's past list only: a stored file is not fetched again unless
+    /// it was last fetched from the "today" list. Such a file kept growing after that fetch (the
+    /// rest of its day), so it is fetched once more now that its day is over; the copy fetched
+    /// from the past list is final.
+    private func hasActivityFile(_ bandID: UUID, _ hex: String) -> Bool {
+        guard let blob = blob(bandID, hex) else { return false }
+        return !blob.fetchedFromToday
+    }
 
-    /// Stores (or replaces: today's files grow during the day) a raw file.
-    private func storeActivityFile(_ bandID: UUID, _ file: ActivityFileID, _ data: Data) {
+    /// Stores (or replaces: today's files grow during the day) a raw file, then parses it.
+    private func storeActivityFile(_ bandID: UUID, _ file: ActivityFileID, _ data: Data, today: Bool) {
         if let existing = blob(bandID, file.hex) {
             existing.data = data
             existing.fetchedAt = Date()
             existing.parsedAt = nil
+            existing.parserVersion = 0
+            existing.parseStatus = ParseStatus.pending.rawValue
+            existing.fetchedFromToday = today
         } else {
-            context.insert(ActivityBlob(bandID: bandID, id: file, data: data))
+            let blob = ActivityBlob(bandID: bandID, id: file, data: data)
+            blob.fetchedFromToday = today
+            context.insert(blob)
         }
         try? context.save()
+        scheduleIngest()
+    }
+
+    /// Parses pending files, one pass at a time; a request during a pass runs another after it.
+    /// Scores wait until no session is running (runPendingRollups).
+    func scheduleIngest() {
+        if ingestTask != nil {
+            ingestAgain = true
+            return
+        }
+        ingestTask = Task { [weak self] in
+            guard let self else { return }
+            repeat {
+                self.ingestAgain = false
+                let summary = await self.ingest.ingestPending()
+                self.absorb(summary)
+            } while self.ingestAgain
+            self.ingestTask = nil
+            self.runPendingRollups()
+        }
+    }
+
+    private func absorb(_ summary: IngestSummary) {
+        guard !summary.isEmpty else { return }
+        sessionIngest.absorb(summary)
+        for (band, day) in summary.earliestTouched {
+            pendingRollup[band] = min(pendingRollup[band] ?? day, day)
+        }
+    }
+
+    private func waitForIngest() async {
+        while let task = ingestTask { await task.value }
+    }
+
+    /// Recomputes scores from the earliest touched day of each band; deferred while a session runs.
+    func runPendingRollups() {
+        guard !link.phase.isBusy, !pendingRollup.isEmpty else { return }
+        let profile = Profile.load()
+        let work = pendingRollup
+        pendingRollup = [:]
+        for (band, day) in work where self.band(band) != nil {
+            DailyRollup.recompute(context: context, bandID: band, from: day, profile: profile)
+        }
+    }
+
+    /// At launch: files below the current parser version, scores below the current algorithm.
+    private func launchMaintenance() async {
+        ingestBusy = true
+        defer { ingestBusy = false }
+        scheduleIngest()
+        await waitForIngest()
+        let quiet = !link.phase.isBusy
+        let summary = sessionIngest
+        if quiet { sessionIngest = IngestSummary() }
+        if DailyRollup.isStale(context: context) { rescoreAll() }
+        runPendingRollups()
+        if quiet, !summary.isEmpty { setCalibration(makeReport(summary, bandID: nil, outcome: "launch reparse")) }
+    }
+
+    /// Every band, the last 90 days (algorithm or profile changed).
+    func rescoreAll() {
+        let from = DayKey.current().adding(days: -(DailyRollup.maxDays - 1))
+        for band in (try? context.fetch(FetchDescriptor<Band>())) ?? [] { pendingRollup[band.id] = from }
+        runPendingRollups()
+    }
+
+    /// Diagnostics: drops every derived row and score, parses every stored file again, rescores.
+    func reparseAll() async {
+        guard !ingestBusy else { return }
+        ingestBusy = true
+        defer { ingestBusy = false }
+        await waitForIngest()
+        // Holds the ingest slot so files stored meanwhile wait for the next pass.
+        let job = Task { await self.ingest.reparseAll() }
+        ingestTask = Task { _ = await job.value }
+        let summary = await job.value
+        ingestTask = nil
+        rescoreAll()
+        setCalibration(makeReport(summary, bandID: nil, outcome: "reparse all"))
+        if ingestAgain {
+            ingestAgain = false
+            scheduleIngest()
+        }
     }
 
     func band(_ id: UUID) -> Band? {
         try? context.fetch(FetchDescriptor<Band>(predicate: #Predicate { $0.id == id })).first
+    }
+
+    // MARK: day helpers for the UI
+
+    /// Steps per hour of `day` (bug fix 2): from the minute file where there is one, otherwise
+    /// the rise between live readings spread evenly over the time between them.
+    func hourlySteps(bandID: UUID, day: Date = Date(), live: [(ts: Date, steps: Int)]) -> [Int] {
+        let start = Calendar.current.startOfDay(for: day)
+        let offset = TimeZone.current.secondsFromGMT(for: start) / 60
+        let key = DayKey(date: start, offsetMinutes: offset)
+        let index = key.index
+        let row = try? context.fetch(FetchDescriptor<MinuteDay>(predicate: #Predicate { $0.bandID == bandID && $0.dayIndex == index })).first
+        var minutes: [Int?]?
+        if let series = row?.series {
+            // The minute file is in the band's offset; move it onto the phone's day.
+            let shift = Int(series.start.timeIntervalSince(start) / 60)
+            if shift == 0 {
+                minutes = series.steps
+            } else {
+                var moved = [Int?](repeating: nil, count: MinuteSeries.slots)
+                for (i, v) in series.steps.enumerated() where i + shift >= 0 && i + shift < MinuteSeries.slots { moved[i + shift] = v }
+                minutes = moved
+            }
+        }
+        return HourlySteps.compute(minuteSteps: minutes, dayStart: start, readings: live)
+    }
+
+    /// The day's steps: max of the band's files and the latest live reading.
+    func daySteps(bandID: UUID, day: Date = Date()) -> Int? {
+        DailyRollup.steps(context: context, bandID: bandID, day: DayKey.current(day))
+    }
+
+    // MARK: day change (bug fix 3)
+
+    private func observeDayChanges() {
+        let names: [Notification.Name] = [
+            .NSCalendarDayChanged, UIApplication.significantTimeChangeNotification,
+            .NSSystemTimeZoneDidChange, UIApplication.willEnterForegroundNotification,
+        ]
+        for name in names {
+            dayObservers.append(NotificationCenter.default.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
+                Task { @MainActor in self?.refreshDay() }
+            })
+        }
+    }
+
+    /// Publishes a new `today` when the calendar day differs from the one shown.
+    func refreshDay() {
+        let start = Calendar.current.startOfDay(for: Date())
+        guard start != today else { return }
+        today = start
+        dayChanged.send(start)
     }
 
     // MARK: keys
@@ -210,28 +435,115 @@ final class AppModel: ObservableObject {
         return result
     }
 
+    /// Removes the band with everything stored for it: samples, raw files, derived rows, scores.
     func remove(_ band: Band) {
         let id = band.id
         Vault.removeBandKey(id)
         try? context.delete(model: Sample.self, where: #Predicate { $0.bandID == id })
+        try? context.delete(model: ActivityBlob.self, where: #Predicate { $0.bandID == id })
+        ActivityIngest.deleteDerived(context: context, bandID: id, includingScores: true)
+        pendingRollup[id] = nil
+        pendingHubRecords[id] = nil
         context.delete(band)
         try? context.save()
     }
 
-    func deleteAllSamples() {
+    /// Deletes every observation, raw file, derived row and score; bands, keys and webhooks stay.
+    func deleteAllData() {
         try? context.delete(model: Sample.self)
+        try? context.delete(model: ActivityBlob.self)
+        ActivityIngest.deleteDerived(context: context, bandID: nil, includingScores: true)
+        pendingRollup = [:]
+        pendingHubRecords = [:]
         try? context.save()
+        setCalibration(nil)
+    }
+
+    // MARK: calibration
+
+    private func makeReport(_ summary: IngestSummary, bandID: UUID?, outcome: String?) -> CalibrationReport {
+        var minuteDays = summary.minuteDays.values.flatMap { $0 }
+        // Summaries whose day was not rebuilt in this pass: compare with the stored minute day.
+        let known = Set(minuteDays.map(\.day))
+        let bandIDs = Set(summary.touchedDays.keys)
+        for s in summary.summaries where !known.contains(s.day) {
+            let index = s.day.index
+            for band in bandIDs {
+                if let row = try? context.fetch(FetchDescriptor<MinuteDay>(
+                    predicate: #Predicate { $0.bandID == band && $0.dayIndex == index })).first {
+                    minuteDays.append(row.draft)
+                }
+            }
+        }
+        return Calibration.build(files: summary.files, minuteFiles: summary.minuteFiles, minuteDays: minuteDays,
+                                 summaries: summary.summaries, sleeps: summary.sleeps, fetchedAt: summary.fetchedAt,
+                                 bandID: bandID?.uuidString, outcome: outcome, parserVersion: ActivityIngest.parserVersion,
+                                 algoVersion: ScoreEngine.algoVersion)
+    }
+
+    private static var calibrationURL: URL? {
+        FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first?
+            .appendingPathComponent("calibration-latest.json")
+    }
+
+    private static func loadCalibration() -> CalibrationReport? {
+        guard let url = calibrationURL, let data = try? Data(contentsOf: url) else { return nil }
+        return CalibrationReport.decode(data)
+    }
+
+    private func setCalibration(_ report: CalibrationReport?) {
+        calibration = report
+        guard let url = Self.calibrationURL else { return }
+        if let report {
+            try? FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try? report.json().write(to: url, options: [.atomic, .completeFileProtection])
+        } else {
+            try? FileManager.default.removeItem(at: url)
+        }
+    }
+
+    /// The latest report as a JSON file to share.
+    func exportCalibration() throws -> URL? {
+        guard let calibration else { return nil }
+        let stamp = Payload.iso.string(from: calibration.generatedAt).replacingOccurrences(of: ":", with: "")
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("freeband-calibration-\(stamp).json")
+        try calibration.json().write(to: url, options: .completeFileProtection)
+        return url
     }
 
     // MARK: webhooks
 
-    private func deliverWebhooks(device: Payload.Device, drafts: [SampleDraft]) async {
+    /// Minute, sleep and score records of what this session parsed (plan section 6).
+    private func healthRecords(bandID: UUID, _ summary: IngestSummary) -> [[String: Any]] {
+        var records: [[String: Any]] = []
+        for draft in (summary.minuteDays[bandID] ?? []).sorted(by: { $0.day < $1.day }) {
+            records += Payload.minuteRecords(draft.series)
+        }
+        let sleepIDs = Set(summary.sleeps.map(\.sourceFileID))
+        if !sleepIDs.isEmpty {
+            let rows = (try? context.fetch(FetchDescriptor<SleepRecord>(
+                predicate: #Predicate { $0.bandID == bandID && $0.isPrimary }, sortBy: [SortDescriptor(\.bedTime)]))) ?? []
+            records += rows.filter { sleepIDs.contains($0.sourceFileID) }.compactMap { Payload.sleepRecord($0.draft()) }
+        }
+        let days = summary.touchedDays[bandID] ?? []
+        if let lo = days.min()?.index {
+            let offset = TimeZone.current.secondsFromGMT() / 60
+            let rows = (try? context.fetch(FetchDescriptor<DailyScore>(
+                predicate: #Predicate { $0.bandID == bandID && $0.dayIndex >= lo }, sortBy: [SortDescriptor(\.dayIndex)]))) ?? []
+            records += rows.map { Payload.scoreRecord($0, tzOffsetMinutes: offset) }
+        }
+        return records
+    }
+
+    private func deliverWebhooks(event: String, device: Payload.Device, drafts: [SampleDraft], records: [[String: Any]]) async {
         let hooks = ((try? context.fetch(FetchDescriptor<Webhook>())) ?? []).filter(\.enabled)
         guard !hooks.isEmpty else { return }
-        let body = Payload.body(event: "sync.completed", device: device, samples: drafts)
+        let bodies = Payload.bodies(event: event, device: device, samples: drafts, records: records)
         for hook in hooks {
             guard let url = URL(string: hook.url) else { continue }
-            hook.lastStatus = await WebhookSender.deliver(body, event: "sync.completed", to: url, secret: hook.secret)
+            for body in bodies {
+                hook.lastStatus = await WebhookSender.deliver(body, event: event, to: url, secret: hook.secret)
+            }
             hook.lastAt = Date()
         }
         try? context.save()
@@ -313,7 +625,8 @@ final class AppModel: ObservableObject {
         }
     }
 
-    /// Sends every sample not yet on the hub, one request per band, up to 4000 at a time.
+    /// Sends every sample not yet on the hub, one request per band, up to 4000 at a time. Health
+    /// records follow only once the hub accepts them (hubAcceptsHealthTypes).
     func pushToHub() async {
         guard Vault.hubToken != nil else { return }
         let bands = (try? context.fetch(FetchDescriptor<Band>())) ?? []
@@ -323,16 +636,29 @@ final class AppModel: ObservableObject {
             var descriptor = FetchDescriptor<Sample>(predicate: #Predicate { $0.bandID == id && !$0.pushedToHub },
                                                      sortBy: [SortDescriptor(\.ts)])
             descriptor.fetchLimit = 4000  // 5000 compact live samples exceed the hub's 512 KB body cap
-            guard let pending = try? context.fetch(descriptor), !pending.isEmpty else { continue }
-            let body = Payload.body(event: "sync.completed", device: Payload.Device(band),
-                                    samples: pending.map(SampleDraft.init(sample:)))
-            do {
-                _ = try await hub.ingest(body)
-                pending.forEach { $0.pushedToHub = true }
-                sent += pending.count
-            } catch {
-                hubStatus = error.localizedDescription
-                return
+            if let pending = try? context.fetch(descriptor), !pending.isEmpty {
+                let body = Payload.body(event: "sync.completed", device: Payload.Device(band),
+                                        samples: pending.map(SampleDraft.init(sample:)))
+                do {
+                    _ = try await hub.ingest(body)
+                    pending.forEach { $0.pushedToHub = true }
+                    sent += pending.count
+                } catch {
+                    hubStatus = error.localizedDescription
+                    return
+                }
+            }
+            if Self.hubAcceptsHealthTypes, let records = pendingHubRecords[id], !records.isEmpty {
+                do {
+                    for body in Payload.bodies(event: "sync.completed", device: Payload.Device(band), samples: [], records: records) {
+                        _ = try await hub.ingest(body)
+                    }
+                    pendingHubRecords[id] = nil
+                    sent += records.count
+                } catch {
+                    hubStatus = error.localizedDescription
+                    return
+                }
             }
         }
         try? context.save()

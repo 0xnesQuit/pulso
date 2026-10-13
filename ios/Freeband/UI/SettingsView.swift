@@ -63,9 +63,9 @@ struct SettingsView: View {
             }
             .sheet(item: $exportURL) { ActivitySheet(items: [$0]) }
             .confirmationDialog("Telefondaki tüm kayıtlar silinsin mi?", isPresented: $confirmWipe, titleVisibility: .visible) {
-                Button("Kayıtları sil", role: .destructive) { model.deleteAllSamples() }
+                Button("Kayıtları sil", role: .destructive) { model.deleteAllData() }
             } message: {
-                Text("Bantlar ve anahtarları kalır. Sunucudaki veri etkilenmez.")
+                Text("Ölçümler, bandın ham dosyaları, uyku ve skorlar silinir. Bantlar ve anahtarları kalır. Sunucudaki veri etkilenmez.")
             }
         }
     }
@@ -134,7 +134,7 @@ private struct BandDetailView: View {
                 dismiss()
             }
         } message: {
-            Text("Bu bandın telefondaki kayıtları ve anahtarı silinir.")
+            Text("Bu bandın telefondaki kayıtları, ham dosyaları, skorları ve anahtarı silinir.")
         }
     }
 }
@@ -275,15 +275,21 @@ private struct WebAccessView: View {
 
 private struct DiagnosticsView: View {
     @EnvironmentObject private var link: BandLink
+    @EnvironmentObject private var model: AppModel
     @Query(sort: \ActivityBlob.ts, order: .reverse) private var blobs: [ActivityBlob]
     @State private var shareURLs: [URL] = []
     @State private var sharing = false
+    @State private var exportError: String?
 
     var body: some View {
         List {
             Section {
                 LabeledContent("Durum", value: link.phase.label.isEmpty ? "Boşta" : link.phase.label)
+                if let outcome = link.lastOutcome { LabeledContent("Son oturum", value: outcome.label) }
             }
+            CalibrationSection(report: model.calibration, busy: model.ingestBusy || link.phase.isBusy,
+                               reparse: { Task { await model.reparseAll() } },
+                               export: exportReport, error: exportError)
             Section {
                 if blobs.isEmpty {
                     Text("Henüz dosya yok. Senkronize edince bandın kayıtları burada listelenir.")
@@ -293,7 +299,7 @@ private struct DiagnosticsView: View {
                     ForEach(blobs.prefix(60)) { blob in
                         VStack(alignment: .leading, spacing: 2) {
                             Text(blob.kindLabel).font(Theme.mono(14))
-                            Text("\(blob.ts.formatted(date: .abbreviated, time: .shortened)), \(blob.data.count) bayt\(blob.parseNote.map { ", \($0)" } ?? "")")
+                            Text("\(blob.ts.formatted(date: .abbreviated, time: .shortened)), \(blob.data.count) bayt, \(blob.parseStatus)\(blob.parseNote.map { ", \($0)" } ?? "")")
                                 .font(Theme.mono(12))
                                 .foregroundStyle(Theme.secondary)
                         }
@@ -327,6 +333,18 @@ private struct DiagnosticsView: View {
 }
 
 extension DiagnosticsView {
+    func exportReport() {
+        do {
+            if let url = try model.exportCalibration() {
+                shareURLs = [url]
+                sharing = true
+            }
+            exportError = nil
+        } catch {
+            exportError = "Rapor yazılamadı: \(error.localizedDescription)"
+        }
+    }
+
     /// Writes every stored file as <type-subtype-detail-vN>_<id>.bin into a temporary folder.
     func shareRaw() {
         let folder = FileManager.default.temporaryDirectory.appendingPathComponent("freeband-raw", isDirectory: true)
@@ -337,6 +355,46 @@ extension DiagnosticsView {
             return (try? blob.data.write(to: url, options: .completeFileProtection)) != nil ? url : nil
         }
         sharing = !shareURLs.isEmpty
+    }
+}
+
+/// Phase 0 calibration (plan section 4): the latest per-sync report, a JSON export and
+/// "parse everything again". Minimal on purpose; the redesign replaces it.
+private struct CalibrationSection: View {
+    let report: CalibrationReport?
+    let busy: Bool
+    let reparse: () -> Void
+    let export: () -> Void
+    let error: String?
+
+    var body: some View {
+        Section {
+            if let report {
+                LabeledContent("Rapor", value: report.generatedAt.formatted(date: .abbreviated, time: .shortened))
+                if let outcome = report.outcome { LabeledContent("Sonuç", value: outcome) }
+                LabeledContent("Dosyalar", value: "\(report.files.count)")
+                LabeledContent("Kontroller", value: ["pass", "warn", "fail", "skip"]
+                    .compactMap { k in report.counts[k].map { "\(k) \($0)" } }.joined(separator: " · "))
+                ForEach(Array(report.checks.enumerated()), id: \.offset) { _, check in
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("\(check.status.rawValue.uppercased())  \(check.name)\(check.subject.map { " \($0)" } ?? "")")
+                            .font(Theme.mono(12))
+                            .foregroundStyle(check.status == .fail ? Theme.pulse : Theme.ink)
+                        Text(check.detail).font(Theme.mono(11)).foregroundStyle(Theme.secondary)
+                    }
+                }
+                Button("Raporu JSON olarak paylaş", action: export)
+            } else {
+                Text("Henüz rapor yok. Senkronize edince her dosya ve makullük kontrolleri burada görünür.")
+                    .foregroundStyle(Theme.secondary)
+            }
+            Button(busy ? "Çalışıyor…" : "Hepsini yeniden çöz", action: reparse)
+                .disabled(busy)
+        } header: {
+            Text("Kalibrasyon")
+        } footer: {
+            Text(error ?? "Yeniden çözme, saklanan ham dosyalardan uyku, dakika verisi ve skorları baştan kurar.")
+        }
     }
 }
 

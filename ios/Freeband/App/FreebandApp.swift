@@ -9,13 +9,17 @@ struct FreebandApp: App {
     init() {
         let container: ModelContainer
         do {
-            container = try ModelContainer(for: Band.self, Sample.self, Webhook.self, ActivityBlob.self)
+            // New models and the two new ActivityBlob attributes all have defaults, so an existing
+            // store migrates lightweight (no VersionedSchema needed for this step).
+            container = try ModelContainer(for: Band.self, Sample.self, Webhook.self, ActivityBlob.self,
+                                           MinuteDay.self, DaySummary.self, SleepRecord.self, SleepRR.self,
+                                           ManualReading.self, DailyScore.self)
         } catch {
             fatalError("Veri deposu açılamadı: \(error)")
         }
         self.container = container
         #if DEBUG
-        if ProcessInfo.processInfo.arguments.contains("-freeband-demo") { DemoData.seed(container.mainContext) }
+        if let variant = DemoData.variant(ProcessInfo.processInfo.arguments) { DemoData.seed(container.mainContext, variant) }
         #endif
         _model = StateObject(wrappedValue: AppModel(context: container.mainContext))
     }

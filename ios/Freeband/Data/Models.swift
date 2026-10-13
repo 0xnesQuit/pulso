@@ -89,6 +89,14 @@ final class ActivityBlob {
     var fetchedAt: Date
     var parsedAt: Date?
     var parseNote: String?
+    /// ActivityIngest.parserVersion this file was last parsed with; 0 = never. Files below the
+    /// current version are parsed again at launch.
+    var parserVersion: Int = 0
+    /// ParseStatus raw value: pending, parsed, partial, unsupported, error, crc.
+    var parseStatus: String = "pending"
+    /// Last fetched from the band's "today" list, so it may still have grown since; such a file
+    /// is fetched once more when it shows up in the past list (AppModel.hasActivityFile).
+    var fetchedFromToday: Bool = false
 
     init(bandID: UUID, id: ActivityFileID, data: Data) {
         self.bandID = bandID
@@ -100,6 +108,9 @@ final class ActivityBlob {
         version = Int(id.version)
         self.data = data
         fetchedAt = Date()
+        parserVersion = 0
+        parseStatus = ParseStatus.pending.rawValue
+        fetchedFromToday = false
     }
 
     /// "günlük detay v4" style label for diagnostics.

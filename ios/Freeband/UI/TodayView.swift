@@ -20,8 +20,9 @@ struct TodayView: View {
                     header
                     if let band {
                         ConnectionStatus(band: band)
+                        // A new day (midnight, clock change) rebuilds the day's query.
                         DayContent(band: band)
-                            .id(band.id)
+                            .id("\(band.id.uuidString)-\(model.today.timeIntervalSince1970)")
                     } else {
                         Text("Henüz bant eklenmedi. Ayarlar > Bantlar'dan Mi Fitness klasörünü seçerek ekle.")
                             .foregroundStyle(Theme.secondary)
@@ -137,6 +138,7 @@ private struct DayContent: View {
     let band: Band
     @Query private var samples: [Sample]
     @EnvironmentObject private var link: BandLink
+    @EnvironmentObject private var model: AppModel
 
     init(band: Band) {
         self.band = band
@@ -173,7 +175,7 @@ private struct DayContent: View {
                 .containerRelativeFrame(.horizontal) { width, _ in min(width * 0.48, 200) }
 
             VStack(alignment: .leading, spacing: 12) {
-                total(latest.map { $0.steps.formatted(.number.locale(Theme.locale)) }, "adım", tint: Theme.phosphor, size: 40)
+                total(daySteps.map { $0.formatted(.number.locale(Theme.locale)) }, "adım", tint: Theme.phosphor, size: 40)
                 total(latest.map { $0.calories.formatted(.number.locale(Theme.locale)) }, "kalori", tint: Theme.ink, size: 28)
                 total(band.lastBattery.map { "%\($0)" }, "pil", tint: Theme.ink, size: 28)
             }
@@ -274,18 +276,15 @@ private struct DayContent: View {
 
     // MARK: helpers
 
-    /// Steps per hour from consecutive cumulative readings; the first reading of the day has
-    /// no known spread, so it adds nothing.
+    /// The larger of the band's files and the latest live reading (AppModel.daySteps).
+    private var daySteps: Int? {
+        [model.daySteps(bandID: band.id), latest?.steps].compactMap { $0 }.max()
+    }
+
+    /// Steps per hour: the band's minute file where there is one, else the live readings with
+    /// each rise spread over the time since the previous reading (AppModel.hourlySteps).
     private var hourlySteps: [Int] {
-        var out = Array(repeating: 0, count: 24)
-        var previous: Sample?
-        for sample in live {
-            if let previous, sample.steps >= previous.steps {
-                out[Calendar.current.component(.hour, from: sample.ts)] += sample.steps - previous.steps
-            }
-            previous = sample
-        }
-        return out
+        model.hourlySteps(bandID: band.id, day: Date(), live: live.map { (ts: $0.ts, steps: $0.steps) })
     }
 
     private func hour(of date: Date) -> Double {
