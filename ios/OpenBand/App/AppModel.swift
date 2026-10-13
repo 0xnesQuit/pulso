@@ -13,6 +13,15 @@ final class AppModel: ObservableObject {
     @Published var hubStatus: String?
     @Published var hubBusy = false
     @Published var hubEnabled = Vault.hubToken != nil
+    /// An invite opened from a QR code or the hub's /join page, waiting for the user to confirm.
+    @Published var pendingInvite: Invite?
+
+    struct Invite: Identifiable, Equatable {
+        let code: String
+        let hub: URL
+        var id: String { code + hub.absoluteString }
+        var isDefaultHub: Bool { hub.host == HubClient.defaultURL.host }
+    }
 
     private var sessionDrafts: [SampleDraft] = []
 
@@ -27,14 +36,17 @@ final class AppModel: ObservableObject {
         self.context = context
         link.onSample = { [weak self] id, draft in self?.record(id, draft) }
         link.onFinish = { [weak self] id, ok in self?.sessionEnded(id, ok) }
+        link.onIdentified = { [weak self] id, keyIndex, name in self?.identified(id, keyIndex, name) }
+        mergeDuplicateBands()
     }
 
     // MARK: band sessions
 
     func target(for band: Band) -> BandTarget? {
-        guard let hex = Vault.bandKey(band.id) else { return nil }
+        let keys = Vault.bandKeys(band.id)
+        guard !keys.isEmpty else { return nil }
         return BandTarget(id: band.id, name: band.name, mac: band.mac, macSuffix: band.macSuffix,
-                          key: BandKey(hex: hex).data)
+                          keys: keys.map { BandKey(hex: $0).data })
     }
 
     func start(_ band: Band, _ purpose: BandLink.Purpose) {
@@ -65,26 +77,81 @@ final class AppModel: ObservableObject {
         }
     }
 
+    /// The working key moves to the front; the band's Bluetooth name ("Xiaomi Smart Band 10 Pro
+    /// D9B9") settles its name and model.
+    private func identified(_ id: UUID, _ keyIndex: Int, _ name: String?) {
+        var keys = Vault.bandKeys(id)
+        if keyIndex > 0, keyIndex < keys.count {
+            keys.insert(keys.remove(at: keyIndex), at: 0)
+            Vault.setBandKeys(keys, for: id)
+        }
+        if let name, name.localizedCaseInsensitiveContains("band"), let band = band(id), band.name != name {
+            band.name = name
+            band.model = Band.modelCode(for: name)
+            try? context.save()
+        }
+    }
+
+    /// One band per MAC: folds bands added twice (Mi Fitness keeps several entries per band)
+    /// into the oldest one, moving their samples and keys.
+    func mergeDuplicateBands() {
+        let bands = ((try? context.fetch(FetchDescriptor<Band>())) ?? []).sorted { $0.addedAt < $1.addedAt }
+        var keeper: [String: Band] = [:]
+        var changed = false
+        for band in bands {
+            guard let suffix = band.macSuffix else { continue }
+            guard let first = keeper[suffix] else {
+                keeper[suffix] = band
+                continue
+            }
+            let from = band.id
+            let samples = (try? context.fetch(FetchDescriptor<Sample>(predicate: #Predicate { $0.bandID == from }))) ?? []
+            samples.forEach { $0.bandID = first.id }
+            Vault.setBandKeys(Vault.bandKeys(first.id) + Vault.bandKeys(from), for: first.id)
+            Vault.removeBandKey(from)
+            if band.name.localizedCaseInsensitiveContains("pro"), !first.name.localizedCaseInsensitiveContains("pro") {
+                first.name = band.name
+                first.model = band.model
+            }
+            first.lastSyncAt = [first.lastSyncAt, band.lastSyncAt].compactMap { $0 }.max()
+            if first.lastBattery == nil { first.lastBattery = band.lastBattery }
+            if UserDefaults.standard.string(forKey: "selectedBand") == from.uuidString {
+                UserDefaults.standard.set(first.id.uuidString, forKey: "selectedBand")
+            }
+            context.delete(band)
+            changed = true
+        }
+        if changed { try? context.save() }
+    }
+
     func band(_ id: UUID) -> Band? {
         try? context.fetch(FetchDescriptor<Band>(predicate: #Predicate { $0.id == id })).first
     }
 
     // MARK: keys
 
-    /// Adds bands for the chosen keys, or refreshes the key of a band already added.
+    /// Adds one band per MAC for the chosen keys, or adds the keys to a band already added.
+    /// Keys that worked before stay first; new ones are tried after them.
     @discardableResult
     func add(keys: [BandKey]) -> [Band] {
-        let existing = (try? context.fetch(FetchDescriptor<Band>())) ?? []
+        var bands = (try? context.fetch(FetchDescriptor<Band>())) ?? []
         var result: [Band] = []
-        for key in keys {
-            let match = existing.first { band in
-                if let a = band.macSuffix, let b = key.macSuffix { return a == b }
-                return band.name == key.name.trimmingCharacters(in: .whitespaces)
+        for group in BandKey.groupedByBand(keys) {
+            let lead = group[0]
+            let match = bands.first { band in
+                if let a = band.macSuffix, let b = lead.macSuffix { return a == b }
+                return band.name == lead.name.trimmingCharacters(in: .whitespaces)
             }
-            let band = match ?? Band(name: key.name, mac: key.mac)
-            if match == nil { context.insert(band) }
-            Vault.setBandKey(key.hex, for: band.id)
-            result.append(band)
+            let band = match ?? Band(name: BandKey.bestName(group), mac: lead.mac)
+            if match == nil {
+                context.insert(band)
+                bands.append(band)
+            } else if BandKey.bestName(group).localizedCaseInsensitiveContains("pro"), !band.name.localizedCaseInsensitiveContains("pro") {
+                band.name = BandKey.bestName(group)
+                band.model = Band.modelCode(for: band.name)
+            }
+            Vault.setBandKeys(Vault.bandKeys(band.id) + group.map(\.hex), for: band.id)
+            if !result.contains(where: { $0.id == band.id }) { result.append(band) }
         }
         try? context.save()
         return result
@@ -125,6 +192,25 @@ final class AppModel: ObservableObject {
         hook.lastStatus = await WebhookSender.deliver(body, event: "ping", to: url, secret: hook.secret)
         hook.lastAt = Date()
         try? context.save()
+    }
+
+    // MARK: invites
+
+    /// `openband://join?invite=OB-XXXX-XXXX&hub=https://…`; only https hubs are accepted.
+    func handle(_ url: URL) {
+        guard url.scheme == "openband", url.host == "join",
+              let items = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems else { return }
+        let code = (items.first { $0.name == "invite" }?.value ?? "").trimmingCharacters(in: .whitespaces)
+        guard !code.isEmpty, code.count <= 64 else { return }
+        let hub = items.first { $0.name == "hub" }?.value
+            .flatMap(URL.init(string:))
+            .flatMap { $0.scheme == "https" && $0.host != nil ? $0 : nil } ?? HubClient.defaultURL
+        pendingInvite = Invite(code: code, hub: hub)
+    }
+
+    func accept(_ invite: Invite) async {
+        hubURL = invite.hub
+        await enableWebAccess(invite: invite.code)
     }
 
     // MARK: hub (web access)

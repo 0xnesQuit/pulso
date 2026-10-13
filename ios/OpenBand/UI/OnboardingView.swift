@@ -99,19 +99,21 @@ struct KeyStep: View {
                 }
                 .padding(.top, 4)
             } else {
-                Text(found.count == 1 ? "Bu bant bulundu:" : "Bu bantlar bulundu. Eklemek istediklerini seç:")
+                Text(BandKey.groupedByBand(found).count == 1 ? "Bu bant bulundu:" : "Bu bantlar bulundu. Eklemek istediklerini seç:")
                     .foregroundStyle(Theme.secondary)
-                ForEach(found, id: \.hex) { key in
+                ForEach(BandKey.groupedByBand(found), id: \.first!.hex) { group in
+                    let lead = group[0]
+                    let picked = group.allSatisfy { chosen.contains($0.hex) }
                     Button {
-                        if chosen.contains(key.hex) { chosen.remove(key.hex) } else { chosen.insert(key.hex) }
+                        for key in group { if picked { chosen.remove(key.hex) } else { chosen.insert(key.hex) } }
                     } label: {
                         HStack {
-                            Image(systemName: chosen.contains(key.hex) ? "checkmark.circle.fill" : "circle")
+                            Image(systemName: picked ? "checkmark.circle.fill" : "circle")
                                 .foregroundStyle(Theme.ink)
                             VStack(alignment: .leading, spacing: 2) {
-                                Text(Band.displayName(name: key.name, mac: key.mac))
+                                Text(Band.displayName(name: BandKey.bestName(group), mac: lead.mac))
                                     .foregroundStyle(Theme.ink)
-                                Text("Anahtar \(key.masked)")
+                                Text(group.count == 1 ? "Anahtar \(lead.masked)" : "\(group.count) anahtar bulundu; çalışanı OpenBand seçer")
                                     .font(.footnote)
                                     .foregroundStyle(Theme.secondary)
                             }

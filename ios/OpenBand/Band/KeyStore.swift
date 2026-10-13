@@ -248,8 +248,21 @@ enum Vault {
         SecItemDelete(query(account) as CFDictionary)
     }
 
-    static func bandKey(_ bandID: UUID) -> String? { get("band-key-\(bandID.uuidString)") }
-    static func setBandKey(_ hex: String, for bandID: UUID) { set(hex, for: "band-key-\(bandID.uuidString)") }
+    /// Candidate keys for a band, the one that last authenticated first. Mi Fitness can keep an
+    /// old binding's key next to the new one after a band is reset and paired again.
+    static func bandKeys(_ bandID: UUID) -> [String] {
+        let account = "band-key-\(bandID.uuidString)"
+        guard let stored = get(account) else { return [] }
+        return stored.split(separator: ",").map(String.init).filter { $0.count == 32 }
+    }
+
+    static func setBandKeys(_ keys: [String], for bandID: UUID) {
+        var unique: [String] = []
+        for key in keys.map({ $0.lowercased() }) where !unique.contains(key) { unique.append(key) }
+        if unique.isEmpty { removeBandKey(bandID) } else { set(unique.joined(separator: ","), for: "band-key-\(bandID.uuidString)") }
+    }
+
+    static func bandKey(_ bandID: UUID) -> String? { bandKeys(bandID).first }
     static func removeBandKey(_ bandID: UUID) { remove("band-key-\(bandID.uuidString)") }
 
     static var hubToken: String? {
@@ -259,6 +272,25 @@ enum Vault {
 }
 
 extension BandKey {
+    /// Mi Fitness can list one band several times (old and new bindings, several caches):
+    /// one group per MAC, or per name when there is no MAC.
+    static func groupedByBand(_ keys: [BandKey]) -> [[BandKey]] {
+        var order: [String] = []
+        var groups: [String: [BandKey]] = [:]
+        for key in keys {
+            let id = key.macSuffix ?? key.name.trimmingCharacters(in: .whitespaces).lowercased()
+            if groups[id] == nil { order.append(id) }
+            groups[id, default: []].append(key)
+        }
+        return order.compactMap { groups[$0] }
+    }
+
+    /// A "Pro" name wins (a Band 10 is never called Pro), then the longest.
+    static func bestName(_ group: [BandKey]) -> String {
+        let names = group.map { $0.name.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
+        return names.first { $0.localizedCaseInsensitiveContains("pro") } ?? names.max { $0.count < $1.count } ?? "Xiaomi Smart Band 10"
+    }
+
     init(hex: String) {
         self.init(name: "", mac: nil, hex: hex)
     }

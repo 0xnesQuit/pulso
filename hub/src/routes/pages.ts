@@ -11,7 +11,7 @@ import { dial, heartBuckets, hourlyFromCumulative } from "../views/dial";
 import { clock, dayLabel, num, shortDay } from "../views/format";
 import { html, type Safe } from "../views/html";
 import { page } from "../views/layout";
-import { APP_JS, LOGIN_JS } from "../views/scripts";
+import { APP_JS, JOIN_JS, LOGIN_JS } from "../views/scripts";
 import { docsBody } from "../views/docs";
 import { privacyBody } from "../views/privacy";
 
@@ -66,6 +66,27 @@ pages.get("/login", (c) => {
 </form>
 <p class="small muted">Anahtarı uygulamada Ayarlar'daki Web erişimi bölümünde bulursun. Anahtar tarayıcıda saklanmaz; yalnız oturum açmak için bir kez sunucuya gider ve yerine 30 gün geçerli bir oturum çerezi alırsın.</p>`;
   return render(c, "Giriş", body, { script: LOGIN_JS });
+});
+
+pages.get("/join", (c) => {
+  const testflight = c.env.TESTFLIGHT_URL;
+  const install = testflight
+    ? html`<a href="${testflight}">OpenBand'i TestFlight'tan kur</a>. Önce App Store'dan TestFlight uygulamasını kurman istenebilir.`
+    : html`Seni davet edenden OpenBand'in TestFlight bağlantısını iste.`;
+  const body = html`
+<h1>OpenBand'e katıl</h1>
+<p>Bileğindeki Xiaomi Smart Band 10 ya da 10 Pro'yu Xiaomi hesabı olmadan kullanırsın; verilerin telefonunda kalır. Web erişimi açınca bu sunucudan panelini görebilir, API ile verine ulaşabilirsin.</p>
+<ol class="stack">
+  <li><strong>Uygulamayı kur.</strong> ${install}</li>
+  <li><strong>Bandını Mi Fitness'la bir kez eşle.</strong> OpenBand bandın anahtarını oradan okur. Mi Fitness'ı silme.</li>
+  <li><strong>OpenBand'i aç ve ilk kurulumu bitir.</strong></li>
+  <li><strong>Web erişimine katıl.</strong> Bu sayfa telefonunda açıksa düğmeye dokun; OpenBand davet kodu dolu açılır.
+    <p><a id="join-link" class="button" href="#">OpenBand'de aç</a></p>
+    <p class="small muted">Davet kodu: <code id="join-code">…</code></p>
+  </li>
+</ol>
+<p class="small muted">Davet kodu bağlantının # sonrasında durur ve bu sayfadan sunucuya gönderilmez.</p>`;
+  return render(c, "OpenBand'e katıl", body, { script: JOIN_JS });
 });
 
 // ---------------------------------------------------------------------------

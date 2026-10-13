@@ -1,0 +1,61 @@
+{
+ "source": "Gadgetbridge d4bd8367 app/src/test/java/nodomain/freeyourgadget/gadgetbridge/service/devices/xiaomi/activity/XiaomiActivityFileIdTest.java",
+ "cases": [
+  {
+   "name": "decode SPORTS/FREESTYLE/DETAILS v3",
+   "kind": "fileid",
+   "hex": "21F328650403A0",
+   "ref": "app/src/test/java/nodomain/freeyourgadget/gadgetbridge/service/devices/xiaomi/activity/XiaomiActivityFileIdTest.java:49-60",
+   "expect": {
+    "ts": 1697182497,
+    "tz_quarters": 4,
+    "version": 3,
+    "type": 1,
+    "subtype": 8,
+    "detail": 0,
+    "subtype_name": "freestyle",
+    "detail_name": "details"
+   }
+  },
+  {
+   "name": "decode second id of the decode/encode pair",
+   "kind": "fileid",
+   "hex": "21F3286504008C",
+   "ref": "app/src/test/java/nodomain/freeyourgadget/gadgetbridge/service/devices/xiaomi/activity/XiaomiActivityFileIdTest.java:36, :62-83 (testEncode passes out-of-range constructor args; only the decoded fields and the byte round trip are checked here)",
+   "expect": {
+    "ts": 1697182497,
+    "tz_quarters": 4,
+    "version": 0,
+    "type": 1,
+    "subtype": 3,
+    "detail": 0,
+    "subtype_name": "treadmill"
+   }
+  },
+  {
+   "name": "all-zero id is a placeholder",
+   "kind": "fileid",
+   "hex": "00000000000000",
+   "ref": "app/src/test/java/nodomain/freeyourgadget/gadgetbridge/service/devices/xiaomi/activity/XiaomiActivityFileIdTest.java:85-89",
+   "expect": {
+    "ts": 0,
+    "version": 0,
+    "is_empty": true
+   }
+  },
+  {
+   "name": "decode/encode list of two ids",
+   "kind": "idlist",
+   "hex": "21F328650403A021F3286504008C",
+   "ref": "app/src/test/java/nodomain/freeyourgadget/gadgetbridge/service/devices/xiaomi/activity/XiaomiActivityFileIdTest.java:62-83",
+   "expect": [
+    {
+     "hex": "21f328650403a0"
+    },
+    {
+     "hex": "21f3286504008c"
+    }
+   ]
+  }
+ ]
+}

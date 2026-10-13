@@ -1,0 +1,264 @@
+{
+ "source": "Gadgetbridge d4bd8367 app/src/test/java/nodomain/freeyourgadget/gadgetbridge/service/devices/xiaomi/activity/impl/WorkoutSummaryParserTest.java (captured SUMMARY files; only the envelope is checked, the workout payload is not parsed by activity_ref.py)",
+ "cases": [
+  {
+   "name": "workout summary TREADMILL_V11_24APR",
+   "kind": "file",
+   "hex": "12b1eb69080b8d00fbffefef91ffc0003f12b1eb6930b8eb69180700007f1100008900950100005801000013030000271300005800a300a800a7b35e66668640000000002800e9010000c70400003d0000000e00000010000000ba00170700006666e63f0003000000000000000000a00f0000000000000000000000009411000068000300000000000000000000000000000c0000000000000000000000000000000000000000000000000000000000f2b84b9a",
+   "ref": "app/src/test/java/nodomain/freeyourgadget/gadgetbridge/service/devices/xiaomi/activity/impl/WorkoutSummaryParserTest.java:44",
+   "note": "Treadmill v11, 24 Apr 2026, 4.48 km run (calibrated to 4.5 km), goal 4 km.",
+   "expect": {
+    "kind": "workout_summary",
+    "crc": {
+     "ok": true
+    },
+    "file_id": {
+     "type": 1,
+     "subtype": 3,
+     "detail": 1,
+     "version": 11,
+     "local_date": "2026-04-24"
+    }
+   }
+  },
+  {
+   "name": "workout summary TREADMILL_V9_21JUN",
+   "kind": "file",
+   "hex": "5820386a08098d00fffc7f900e205820386a8726386a28060000a00a0000c0007201000094050000900c0000b40087a5643333f33f0200000020000000000070000000fc020000740100003a010000e80028060000000000000103000000580200002c01881300004a0100000000c8410000a00a00001c00010000000000000f0000000000000000000000000003000087a56403507a00b40085d2c64008ac1c415820386a8726386a0000000028060000280600000000000000000000c0000000a00a0000900c00004302000072010000000000000000000000000000030000000000000000000000000000000000000070000000fc020000740100003a010000000002013333f33f00000000000000000f001c00200000000000000000000000000000000001a88c364491",
+   "ref": "app/src/test/java/nodomain/freeyourgadget/gadgetbridge/service/devices/xiaomi/activity/impl/WorkoutSummaryParserTest.java:51",
+   "note": "Treadmill v9, 21 Jun 2026 \u2014 192 cal, 135 avg HR, 28 training load, +15 vitality.",
+   "expect": {
+    "kind": "workout_summary",
+    "crc": {
+     "ok": true
+    },
+    "file_id": {
+     "type": 1,
+     "subtype": 3,
+     "detail": 1,
+     "version": 9,
+     "local_date": "2026-06-21"
+    }
+   }
+  },
+  {
+   "name": "workout summary ROWING_V7_20APR",
+   "kind": "file",
+   "hex": "fa5de6690807b500ffbff378fffa5de669f067e669f5090000d6008ea45c9a9959400000170000000000a10200006a050000b0000000140100001b01b80400001c0000004700000000000000000000006701000005f5090000cdcccc3e0000000000000000000000450002000091a0d430",
+   "ref": "app/src/test/java/nodomain/freeyourgadget/gadgetbridge/service/devices/xiaomi/activity/impl/WorkoutSummaryParserTest.java:60",
+   "note": "Rowing v7, 20 Apr 2026 \u2014 0.4 anaerobic effect, 71 max stroke rate.",
+   "expect": {
+    "kind": "workout_summary",
+    "crc": {
+     "ok": true
+    },
+    "file_id": {
+     "type": 1,
+     "subtype": 13,
+     "detail": 1,
+     "version": 7,
+     "local_date": "2026-04-20"
+    }
+   }
+  },
+  {
+   "name": "workout summary ROWING_V7_15APR",
+   "kind": "file",
+   "hex": "f2cadf690807b500ffbff378fff2cadf69d0d4df69dd090000d40091aa5f0000604000001c00000000001b050000ac020000fe0000000301000019014c0400001a0000002900000000000000000000000000000001dd090000cdcc8c3f00000000000000000000004d000300000bacc47d",
+   "ref": "app/src/test/java/nodomain/freeyourgadget/gadgetbridge/service/devices/xiaomi/activity/impl/WorkoutSummaryParserTest.java:66",
+   "note": "Rowing v7, 15 Apr 2026 \u2014 1.1 anaerobic effect.",
+   "expect": {
+    "kind": "workout_summary",
+    "crc": {
+     "ok": true
+    },
+    "file_id": {
+     "type": 1,
+     "subtype": 13,
+     "detail": 1,
+     "version": 7,
+     "local_date": "2026-04-15"
+    }
+   }
+  },
+  {
+   "name": "workout summary ROWING_V8_22AUG",
+   "kind": "file",
+   "hex": "25a0896a0808b500ffbfff9bf17f25a0896ab9a0896a930000000e0081916a9a99993e010000000000000000000000330000003b00000025000000000000000013002e000000120000001b00000000000000000000000000000001930000000000000001000000000000000000000000000000020000000000007e591c4b",
+   "ref": "app/src/test/java/nodomain/freeyourgadget/gadgetbridge/service/devices/xiaomi/activity/impl/WorkoutSummaryParserTest.java:72",
+   "note": "Rowing v8, 22 Aug 2026 \u2014 46 strokes at 18 average, 27 maximum.",
+   "expect": {
+    "kind": "workout_summary",
+    "crc": {
+     "ok": true
+    },
+    "file_id": {
+     "type": 1,
+     "subtype": 13,
+     "detail": 1,
+     "version": 8,
+     "local_date": "2026-08-22"
+    }
+   }
+  },
+  {
+   "name": "workout summary FREESTYLE_V10_FRISBEE",
+   "kind": "file",
+   "hex": "1c82b969040aa100fe06feffc0771c82b9697093b96953110000700191bc5a00000000000000008040000023005a0100004204000005070000b4030000d5000000e801531100006666264000270300000000000000008800030000000000000000000000000000000069005d0007000046e5c0da",
+   "ref": "app/src/test/java/nodomain/freeyourgadget/gadgetbridge/service/devices/xiaomi/activity/impl/WorkoutSummaryParserTest.java:78",
+   "note": "Freestyle v10, 17 Mar 2026 \u2014 frisbee workout, 105/93/7 throws low/medium/high.",
+   "expect": {
+    "kind": "workout_summary",
+    "crc": {
+     "ok": true
+    },
+    "file_id": {
+     "type": 1,
+     "subtype": 8,
+     "detail": 1,
+     "version": 10
+    }
+   }
+  },
+  {
+   "name": "workout summary OUTDOOR_CYCLING_V8_23SEP",
+   "kind": "file",
+   "hex": "7681b36a0808dd00f7fe7fd7ff87213f06007681b36aa187b36a2b0600002b060000a2140000a6007f004c0000000c04000051ae40419db43b4285a85000000000000000000000000000000000000000003333134000cdcc4c3f0000000000000000000d0000000000005f0000002e030000540100001b01000000000000000000000000000000000000000000001c00000000000000010000000000000000070000000000000000cbe89dd5",
+   "ref": "app/src/test/java/nodomain/freeyourgadget/gadgetbridge/service/devices/xiaomi/activity/impl/WorkoutSummaryParserTest.java:212",
+   "note": "Outdoor cycling v8 (Smart Band 10 Pro), 23 Sep 2026, 5.28 km ride, no route.",
+   "expect": {
+    "kind": "workout_summary",
+    "crc": {
+     "ok": true
+    },
+    "file_id": {
+     "type": 1,
+     "subtype": 23,
+     "detail": 1,
+     "version": 8,
+     "local_date": "2026-09-23"
+    }
+   }
+  },
+  {
+   "name": "workout summary OUTDOOR_CYCLING_V6_23MAY",
+   "kind": "file",
+   "hex": "57b9116a0806dd00f7ffff5fc3908f060057b9116a26ca116acf100000cf100000ce2e00001a02b70168000000a426000023642041b9eb09425b8d4800000000000000000000000000000000000000009a99193f00000000000000000000000000000000000000000a00000061000000560400000000000000000000000000000000000500010000000000000000000000000000000000000000d634c21f",
+   "ref": "app/src/test/java/nodomain/freeyourgadget/gadgetbridge/service/devices/xiaomi/activity/impl/WorkoutSummaryParserTest.java:249",
+   "note": "Outdoor cycling v6 (Smart Band 10), 23 May 2026, 11.98 km ride, no route.",
+   "expect": {
+    "kind": "workout_summary",
+    "crc": {
+     "ok": true
+    },
+    "file_id": {
+     "type": 1,
+     "subtype": 23,
+     "detail": 1,
+     "version": 6,
+     "local_date": "2026-05-23"
+    }
+   }
+  },
+  {
+   "name": "workout summary OUTDOOR_RUN_V5_30SEP",
+   "kind": "file",
+   "hex": "c297bd6af405d900ffffffffffff0000000100c297bd6a6b9ebd6aa8060000a80600005d1000000b01e400960100008b0100000e03000099990d411b9211414e10000064009200b200a2c8770000000000000000000000000000000000000000000000000000000000000000000000001f020000440100003902000005010000020000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000ea0d6ebb",
+   "ref": "app/src/test/java/nodomain/freeyourgadget/gadgetbridge/service/devices/xiaomi/activity/impl/WorkoutSummaryParserTest.java:301",
+   "note": "Outdoor run v5, Mi Band 9 Active, 30 Sep 2026 (#6875). The paired DETAILS file has 1704 records whose HR spans 119-200 (mean 162), pace 395-782 s/km and cadence up to 178.",
+   "expect": {
+    "kind": "workout_summary",
+    "crc": {
+     "ok": true
+    },
+    "file_id": {
+     "type": 1,
+     "subtype": 22,
+     "detail": 1,
+     "version": 5,
+     "local_date": "2026-09-30"
+    }
+   }
+  },
+  {
+   "name": "workout summary WALKING_V6_29MAY",
+   "kind": "file",
+   "hex": "96b0196a0806d900f7fffff8fe07ff0000020096b0196a0fb8196a7807000078070000730d00001d01e9002b0200007b01000074030000c171cf4076a61741f60e00004f007d00ad0095c083000000000000000000000000000000000000000000004040003333f33f0000000013000071000000180200006a04000073000000000000000000000000000000000000000000000000000000003d000200000000000000000000000000001b0000000000000000000000000000000000000000000000000000000000140e7aee",
+   "ref": "app/src/test/java/nodomain/freeyourgadget/gadgetbridge/service/devices/xiaomi/activity/impl/WorkoutSummaryParserTest.java:328",
+   "note": "Walk v6, 29 May 2026. The paired DETAILS file has 1912 records whose HR spans 131-192 (mean 149.8).",
+   "expect": {
+    "kind": "workout_summary",
+    "crc": {
+     "ok": true
+    },
+    "file_id": {
+     "type": 1,
+     "subtype": 22,
+     "detail": 1,
+     "version": 6,
+     "local_date": "2026-05-29"
+    }
+   }
+  },
+  {
+   "name": "workout summary WALKING_V9_04JAN",
+   "kind": "file",
+   "hex": "82525a690409d900f7fffff83f80007ff00000001f020083525a6921585a699d0500009d050000080a0000cf00af0023020000d6010000560300006fdecd40340df540a60b000055007f00870087a363000000000000000000000000000000000000000066662640000000000000000000000000000010000000000000d50000006d020000ef01000050000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001c000100000000000000000000000000000a000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000b138efd",
+   "ref": "app/src/test/java/nodomain/freeyourgadget/gadgetbridge/service/devices/xiaomi/activity/impl/WorkoutSummaryParserTest.java:345",
+   "note": "Walk v9, 4 Jan 2026. The paired DETAILS file has HR spanning 99-163 (mean 135.5).",
+   "expect": {
+    "kind": "workout_summary",
+    "crc": {
+     "ok": true
+    },
+    "file_id": {
+     "type": 1,
+     "subtype": 22,
+     "detail": 1,
+     "version": 9,
+     "local_date": "2026-01-04"
+    }
+   }
+  },
+  {
+   "name": "workout summary INDOOR_CYCLING_V9_22FEB",
+   "kind": "file",
+   "hex": "501fba6704099d00ffefef9ffe43807f501fba67ba28ba676a0900000000000088020000000087965e9a9939400000480000000000000000006d040000c40400002300000047036a09000000000000000000080700000000000000000000000000000000000000000000000000000000000000000000550002000000000000000000000000000000000400000000000000000000000000000000000000000000000000000000000000000019a658d0",
+   "ref": "app/src/test/java/nodomain/freeyourgadget/gadgetbridge/service/devices/xiaomi/activity/impl/WorkoutSummaryParserTest.java:363",
+   "note": "Indoor cycling v9, 22 Feb 2025. The paired DETAILS file has HR spanning 94-150 (mean 135.6).",
+   "expect": {
+    "kind": "workout_summary",
+    "crc": {
+     "ok": true
+    },
+    "file_id": {
+     "type": 1,
+     "subtype": 7,
+     "detail": 1,
+     "version": 9,
+     "local_date": "2025-02-22"
+    }
+   }
+  },
+  {
+   "name": "workout summary ELLIPTICAL_V6_10FEB",
+   "kind": "file",
+   "hex": "e85baa670406ad00fff7ff8fe85baa67eb62aa6703070000a602680100000c00ae00939c7600006040000048000000000015000000bc0600001d000000000000000603030700009a99993e000000000000000000000060000203002d76683b",
+   "ref": "app/src/test/java/nodomain/freeyourgadget/gadgetbridge/service/devices/xiaomi/activity/impl/WorkoutSummaryParserTest.java:379",
+   "note": "Elliptical v6, 10 Feb 2025. The paired DETAILS file has HR spanning 118-156 (mean 147.6).",
+   "expect": {
+    "kind": "workout_summary",
+    "crc": {
+     "ok": true
+    },
+    "file_id": {
+     "type": 1,
+     "subtype": 11,
+     "detail": 1,
+     "version": 6,
+     "local_date": "2025-02-10"
+    }
+   }
+  }
+ ]
+}

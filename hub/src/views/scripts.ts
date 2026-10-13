@@ -1,6 +1,23 @@
 // Inline scripts for the panel. Plain constants: no server data is ever
 // interpolated into script text. They run under the per-response CSP nonce.
 
+/** /join: the invite stays in the URL fragment and only goes into the openband:// link. */
+export const JOIN_JS = `
+(function () {
+  var m = /(?:^#|&)invite=([^&]+)/.exec(location.hash);
+  var code = m ? decodeURIComponent(m[1]).trim() : "";
+  var link = document.getElementById("join-link");
+  var shown = document.getElementById("join-code");
+  if (!code || code.length > 64) {
+    shown.textContent = "bu bağlantıda yok";
+    link.hidden = true;
+    return;
+  }
+  shown.textContent = code;
+  link.href = "openband://join?invite=" + encodeURIComponent(code) + "&hub=" + encodeURIComponent(location.origin);
+})();
+`;
+
 export const LOGIN_JS = `
 (function () {
   var form = document.getElementById("login-form");

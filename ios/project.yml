@@ -34,6 +34,9 @@ targets:
           UIApplicationSupportsMultipleScenes: false
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
         UIRequiredDeviceCapabilities: [bluetooth-le]
+        CFBundleURLTypes:
+          - CFBundleURLName: dev.cobanov.openband
+            CFBundleURLSchemes: [openband]
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: dev.cobanov.openband

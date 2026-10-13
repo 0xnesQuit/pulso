@@ -46,3 +46,13 @@ do { _ = try KeyLoader.load(from: root); preconditionFailure("expected failure")
     print("OK diagnostics:", message)
 }
 try? FileManager.default.removeItem(at: root)
+
+// 5. one band per MAC, a Pro name wins
+let dupes = [BandKey(name: "Xiaomi Smart Band 10", mac: "20:25:CC:78:D9:B9", hex: String(repeating: "a", count: 32)),
+             BandKey(name: "Xiaomi Smart Band 10 Pro   ", mac: "20:25:cc:78:d9:b9", hex: String(repeating: "b", count: 32)),
+             BandKey(name: "Xiaomi Smart Band 10", mac: "AA:BB:CC:DD:8F:89", hex: String(repeating: "c", count: 32)),
+             BandKey(name: "Xiaomi Smart Band 10", mac: "AA:BB:CC:DD:8F:89", hex: String(repeating: "d", count: 32))]
+let groups = BandKey.groupedByBand(dupes)
+precondition(groups.count == 2 && groups[0].count == 2 && groups[1].count == 2, "\(groups)")
+precondition(BandKey.bestName(groups[0]) == "Xiaomi Smart Band 10 Pro", BandKey.bestName(groups[0]))
+print("OK grouping by MAC:", groups.map { "\(BandKey.bestName($0)) ×\($0.count)" })

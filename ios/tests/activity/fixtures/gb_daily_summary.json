@@ -1,0 +1,249 @@
+{
+ "source": "Gadgetbridge d4bd8367 app/src/test/java/nodomain/freeyourgadget/gadgetbridge/service/devices/xiaomi/activity/impl/DailySummaryParserTest.java (Gadgetbridge's own synthetic inputs, rebuilt byte for byte; they carry no CRC trailer)",
+ "cases": [
+  {
+   "name": "v5 all bits set",
+   "kind": "file",
+   "has_crc": false,
+   "ref": "app/src/test/java/nodomain/freeyourgadget/gadgetbridge/service/devices/xiaomi/activity/impl/DailySummaryParserTest.java:112-146",
+   "hex": "00f1536504050100ffffffff39300000fa004b3cb4e8f4536537d0f8536550285a0a0101019808e0016063b8fc53655ca00054655f8200bc02020519281801031e07004100",
+   "expect": {
+    "kind": "daily_summary",
+    "data": {
+     "steps": 12345,
+     "active_calories": 250,
+     "hr_resting": 60,
+     "hr_max": 180,
+     "hr_max_ts": 1700001000,
+     "hr_min": 55,
+     "hr_min_ts": 1700002000,
+     "hr_avg": 80,
+     "stress_avg": 40,
+     "stress_max": 90,
+     "stress_min": 10,
+     "standing": 65793,
+     "calories": 2200,
+     "recovery_hours": 480,
+     "spo2_max": 99,
+     "spo2_max_ts": 1700003000,
+     "spo2_min": 92,
+     "spo2_min_ts": 1700004000,
+     "spo2_avg": 95,
+     "training_load_day": 130,
+     "training_load_week": 700,
+     "training_load_level": 2,
+     "vitality_light": 5,
+     "vitality_moderate": 25,
+     "vitality_high": 40,
+     "vitality_current": 280
+    }
+   }
+  },
+  {
+   "name": "v5 no bits set",
+   "kind": "file",
+   "has_crc": false,
+   "ref": "app/src/test/java/nodomain/freeyourgadget/gadgetbridge/service/devices/xiaomi/activity/impl/DailySummaryParserTest.java:148-170",
+   "hex": "00f153650405010000000000ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+   "expect": {
+    "data": {
+     "steps": null,
+     "active_calories": null,
+     "hr_resting": null,
+     "hr_max": null,
+     "hr_max_ts": null,
+     "standing": null,
+     "calories": null,
+     "recovery_hours": null,
+     "training_load_day": null,
+     "vitality_light": null,
+     "vitality_moderate": null,
+     "vitality_high": null,
+     "vitality_current": null
+    }
+   }
+  },
+  {
+   "name": "v5 partial vitality",
+   "kind": "file",
+   "has_crc": false,
+   "ref": "app/src/test/java/nodomain/freeyourgadget/gadgetbridge/service/devices/xiaomi/activity/impl/DailySummaryParserTest.java:177-202",
+   "hex": "00f15365040501008000001039300000fa004b3cb4e8f4536537d0f8536550285a0a0101019808e0016063b8fc53655ca00054655f8200bc02020519281801031e07004100",
+   "expect": {
+    "data": {
+     "steps": 12345,
+     "vitality_current": 280,
+     "vitality_light": null,
+     "vitality_moderate": null,
+     "vitality_high": null,
+     "active_calories": null,
+     "hr_max": null,
+     "calories": null
+    }
+   }
+  },
+  {
+   "name": "v5 bitmap MSB-first, slot 0",
+   "kind": "file",
+   "has_crc": false,
+   "ref": "app/src/test/java/nodomain/freeyourgadget/gadgetbridge/service/devices/xiaomi/activity/impl/DailySummaryParserTest.java:208-229",
+   "hex": "00f15365040501008000000039300000fa004b3cb4e8f4536537d0f8536550285a0a0101019808e0016063b8fc53655ca00054655f8200bc02020519281801031e07004100",
+   "expect": {
+    "data": {
+     "steps": 12345,
+     "active_calories": null
+    }
+   }
+  },
+  {
+   "name": "v5 bitmap MSB-first, slot 7",
+   "kind": "file",
+   "has_crc": false,
+   "ref": "app/src/test/java/nodomain/freeyourgadget/gadgetbridge/service/devices/xiaomi/activity/impl/DailySummaryParserTest.java:208-229",
+   "hex": "00f15365040501000100000039300000fa004b3cb4e8f4536537d0f8536550285a0a0101019808e0016063b8fc53655ca00054655f8200bc02020519281801031e07004100",
+   "expect": {
+    "data": {
+     "hr_min_ts": 1700002000,
+     "hr_min": null
+    }
+   }
+  },
+  {
+   "name": "v5 bitmap MSB-first, slot 8",
+   "kind": "file",
+   "has_crc": false,
+   "ref": "app/src/test/java/nodomain/freeyourgadget/gadgetbridge/service/devices/xiaomi/activity/impl/DailySummaryParserTest.java:208-229",
+   "hex": "00f15365040501000080000039300000fa004b3cb4e8f4536537d0f8536550285a0a0101019808e0016063b8fc53655ca00054655f8200bc02020519281801031e07004100",
+   "expect": {
+    "data": {
+     "hr_avg": 80,
+     "hr_min_ts": null
+    }
+   }
+  },
+  {
+   "name": "v5 bitmap MSB-first, slot 23",
+   "kind": "file",
+   "has_crc": false,
+   "ref": "app/src/test/java/nodomain/freeyourgadget/gadgetbridge/service/devices/xiaomi/activity/impl/DailySummaryParserTest.java:208-229",
+   "hex": "00f15365040501000000010039300000fa004b3cb4e8f4536537d0f8536550285a0a0101019808e0016063b8fc53655ca00054655f8200bc02020519281801031e07004100",
+   "expect": {
+    "data": {
+     "training_load_level": 2,
+     "training_load_week": null
+    }
+   }
+  },
+  {
+   "name": "v5 multi-byte fields are little-endian",
+   "kind": "file",
+   "has_crc": false,
+   "ref": "app/src/test/java/nodomain/freeyourgadget/gadgetbridge/service/devices/xiaomi/activity/impl/DailySummaryParserTest.java:232-249",
+   "hex": "00f153650405010080000010010203040000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000201000000000000",
+   "expect": {
+    "data": {
+     "steps": 67305985,
+     "vitality_current": 258
+    }
+   }
+  },
+  {
+   "name": "v5 standing packs 3 bytes LE",
+   "kind": "file",
+   "has_crc": false,
+   "ref": "app/src/test/java/nodomain/freeyourgadget/gadgetbridge/service/devices/xiaomi/activity/impl/DailySummaryParserTest.java:252-268",
+   "hex": "00f15365040501000008000000000000000000000000000000000000000000000000aabbcc0000000000000000000000000000000000000000000000000000000000000000",
+   "expect": {
+    "data": {
+     "standing": 13417386
+    }
+   }
+  },
+  {
+   "name": "unsupported version 99",
+   "kind": "file",
+   "has_crc": false,
+   "ref": "app/src/test/java/nodomain/freeyourgadget/gadgetbridge/service/devices/xiaomi/activity/impl/DailySummaryParserTest.java:271-278",
+   "hex": "00f1536504630100",
+   "expect_error": true
+  },
+  {
+   "name": "v3 all bits set",
+   "kind": "file",
+   "has_crc": false,
+   "ref": "app/src/test/java/nodomain/freeyourgadget/gadgetbridge/service/devices/xiaomi/activity/impl/DailySummaryParserTest.java:285-320",
+   "hex": "00f1536504030100ffffff39300000fa004b3cb4e8f4536537d0f8536550285a0a0101019808e0016063b8fc53655ca00054655f",
+   "expect": {
+    "data": {
+     "steps": 12345,
+     "active_calories": 250,
+     "hr_resting": 60,
+     "hr_max": 180,
+     "hr_max_ts": 1700001000,
+     "hr_min": 55,
+     "hr_min_ts": 1700002000,
+     "hr_avg": 80,
+     "stress_avg": 40,
+     "stress_max": 90,
+     "stress_min": 10,
+     "standing": 65793,
+     "calories": 2200,
+     "recovery_hours": 480,
+     "spo2_max": 99,
+     "spo2_max_ts": 1700003000,
+     "spo2_min": 92,
+     "spo2_min_ts": 1700004000,
+     "spo2_avg": 95,
+     "training_load_day": null,
+     "training_load_week": null,
+     "training_load_level": null,
+     "vitality_light": null,
+     "vitality_moderate": null,
+     "vitality_high": null,
+     "vitality_current": null
+    }
+   }
+  },
+  {
+   "name": "v3 no bits set",
+   "kind": "file",
+   "has_crc": false,
+   "ref": "app/src/test/java/nodomain/freeyourgadget/gadgetbridge/service/devices/xiaomi/activity/impl/DailySummaryParserTest.java:323-341",
+   "hex": "00f1536504030100000000ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+   "expect": {
+    "data": {
+     "steps": null,
+     "active_calories": null,
+     "hr_resting": null,
+     "hr_max": null,
+     "hr_max_ts": null,
+     "standing": null,
+     "calories": null,
+     "recovery_hours": null,
+     "spo2_avg": null
+    }
+   }
+  },
+  {
+   "name": "v3 only hr_max valid",
+   "kind": "file",
+   "has_crc": false,
+   "ref": "app/src/test/java/nodomain/freeyourgadget/gadgetbridge/service/devices/xiaomi/activity/impl/DailySummaryParserTest.java:344-364",
+   "hex": "00f153650403010008000039300000fa004b3cb4e8f4536537d0f8536550285a0a0101019808e0016063b8fc53655ca00054655f",
+   "expect": {
+    "data": {
+     "hr_max": 180,
+     "steps": null,
+     "active_calories": null,
+     "hr_resting": null,
+     "hr_max_ts": null,
+     "hr_min": null,
+     "hr_avg": null,
+     "standing": null,
+     "calories": null,
+     "spo2_avg": null
+    }
+   }
+  }
+ ]
+}

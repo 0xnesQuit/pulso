@@ -1,0 +1,85 @@
+{
+ "source": "Gadgetbridge d4bd8367 app/src/test/java/nodomain/freeyourgadget/gadgetbridge/service/devices/xiaomi/activity/impl/ManualSamplesParserTest.java (captured Mi Band 9 Active packets)",
+ "cases": [
+  {
+   "name": "v1 SpO2 97",
+   "kind": "file",
+   "hex": "EFB9856AF4011800FFEFB9856A0261511E4648",
+   "ref": "app/src/test/java/nodomain/freeyourgadget/gadgetbridge/service/devices/xiaomi/activity/impl/ManualSamplesParserTest.java:34, :38-47",
+   "expect": {
+    "kind": "manual_samples",
+    "crc": {
+     "ok": true
+    },
+    "file_id": {
+     "version": 1,
+     "tz_quarters": -12,
+     "subtype": 6,
+     "detail": 0
+    },
+    "data": {
+     "samples": [
+      {
+       "ts": 1787148783,
+       "type": 18,
+       "value": 97
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "v1 stress 40",
+   "kind": "file",
+   "hex": "65C0856AF4011800FF65C0856A03288CA20578",
+   "ref": "app/src/test/java/nodomain/freeyourgadget/gadgetbridge/service/devices/xiaomi/activity/impl/ManualSamplesParserTest.java:35, :49-57",
+   "expect": {
+    "data": {
+     "samples": [
+      {
+       "type": 19,
+       "value": 40
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "v1 stress 27",
+   "kind": "file",
+   "hex": "D1C3856AF4011800FFD1C3856A031BFBF91375",
+   "ref": "app/src/test/java/nodomain/freeyourgadget/gadgetbridge/service/devices/xiaomi/activity/impl/ManualSamplesParserTest.java:36, :59-62",
+   "expect": {
+    "data": {
+     "samples": [
+      {
+       "type": 19,
+       "value": 27
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "v1 rejects header byte != 0xff (CRC recomputed after the mutation)",
+   "kind": "file",
+   "hex": "efb9856af401180000efb9856a0261615470da",
+   "ref": "app/src/test/java/nodomain/freeyourgadget/gadgetbridge/service/devices/xiaomi/activity/impl/ManualSamplesParserTest.java:65-71",
+   "expect_error": true
+  },
+  {
+   "name": "v1 rejects unknown type 0x04 (CRC recomputed)",
+   "kind": "file",
+   "hex": "efb9856af4011800ffefb9856a0461d7b91c1e",
+   "ref": "app/src/test/java/nodomain/freeyourgadget/gadgetbridge/service/devices/xiaomi/activity/impl/ManualSamplesParserTest.java:73-79",
+   "expect_error": true
+  },
+  {
+   "name": "v1 rejects value 101 (CRC recomputed)",
+   "kind": "file",
+   "hex": "efb9856af4011800ffefb9856a026548da2b4f",
+   "ref": "app/src/test/java/nodomain/freeyourgadget/gadgetbridge/service/devices/xiaomi/activity/impl/ManualSamplesParserTest.java:81-87",
+   "expect_error": true
+  }
+ ]
+}

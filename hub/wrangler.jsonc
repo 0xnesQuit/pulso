@@ -30,7 +30,9 @@
 
   "vars": {
     // Hostname the hub is served on. Webhooks may not point here.
-    "PUBLIC_HOSTNAME": "openband.cobanov.dev"
+    "PUBLIC_HOSTNAME": "openband.cobanov.dev",
+    // Public TestFlight link shown on /join; empty until the app is in TestFlight.
+    "TESTFLIGHT_URL": ""
   },
 
   // HUB_SECRET: at least 32 random characters. Used to encrypt webhook

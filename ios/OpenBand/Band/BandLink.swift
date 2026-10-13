@@ -7,7 +7,8 @@ struct BandTarget {
     let name: String
     let mac: String?
     let macSuffix: String?
-    let key: Data
+    /// Candidate auth keys, tried in order until the band's HMAC matches.
+    let keys: [Data]
 }
 
 /// One BLE session with a band at a time: find it (iOS connection or advertisement), open an
@@ -61,6 +62,8 @@ final class BandLink: NSObject, ObservableObject {
     var onSample: ((UUID, SampleDraft) -> Void)?
     /// Once per session, on the main queue; `true` when the band was read.
     var onFinish: ((UUID, Bool) -> Void)?
+    /// After authentication: which candidate key worked and the band's own Bluetooth name.
+    var onIdentified: ((UUID, Int, String?) -> Void)?
 
     private var central: CBCentralManager!
     private var target: BandTarget?
@@ -77,6 +80,7 @@ final class BandLink: NSObject, ObservableObject {
     private var authed = false
     private var finishing = false
     private var run = 0
+    private var keyIndex = 0
     private var pendingStart: (() -> Void)?
 
     override init() {
@@ -106,8 +110,9 @@ final class BandLink: NSObject, ObservableObject {
         phoneNonce = Data()
         authed = false
         finishing = false
+        keyIndex = 0
         active = true
-        note("başlat: \(target.name)")
+        note("başlat: \(target.name), \(target.keys.count) anahtar")
 
         after(25, thisRun) { [weak self] in
             guard let self, self.active, !self.authed else { return }
@@ -203,6 +208,7 @@ final class BandLink: NSObject, ObservableObject {
 
     private func didAuthenticate() {
         authed = true
+        if let id = target?.id { onIdentified?(id, keyIndex, peripheral?.name) }
         phase = purpose == .live ? .live : .reading
         note("auth tamam → pil + canlı istatistik")
         sendCommand(MiAuth.batteryCommand(), encrypted: true)
@@ -226,11 +232,15 @@ final class BandLink: NSObject, ObservableObject {
                 fail("Bant kimlik doğrulamayı reddetti. Mi Fitness'ı kapatıp tekrar dene.")
                 return
             }
-            guard let target,
-                  let result = MiAuth.confirmCommand(authKey: target.key, phoneNonce: phoneNonce,
+            guard let target, keyIndex < target.keys.count else { return }
+            guard let result = MiAuth.confirmCommand(authKey: target.keys[keyIndex], phoneNonce: phoneNonce,
                                                      watchNonce: watchNonce, watchHmac: watchHmac,
                                                      deviceName: "OpenBand") else {
-                fail("Anahtar bu bantla eşleşmiyor. Mi Fitness klasöründen anahtarı yeniden oku.")
+                if keyIndex + 1 < target.keys.count {
+                    retryWithNextKey()
+                } else {
+                    fail("Anahtar bu bantla eşleşmiyor. Bandı Mi Fitness'ta senkronize edip anahtarı yeniden oku.")
+                }
                 return
             }
             keys = result.keys
@@ -264,6 +274,26 @@ final class BandLink: NSObject, ObservableObject {
     private func emit(_ draft: SampleDraft) {
         guard let id = target?.id else { return }
         onSample?(id, draft)
+    }
+
+    /// The band rejected this key: drop the session and start again with the next candidate.
+    private func retryWithNextKey() {
+        keyIndex += 1
+        note("anahtar tutmadı, \(keyIndex + 1). anahtar deneniyor")
+        if let p = peripheral {
+            if let rx, rx.isNotifying { p.setNotifyValue(false, for: rx) }
+            central.cancelPeripheralConnection(p)
+        }
+        peripheral = nil
+        rx = nil
+        tx = nil
+        buffer = []
+        writeQueue = []
+        seq = 0
+        keys = nil
+        phoneNonce = Data()
+        let thisRun = run
+        after(1.0, thisRun) { [weak self] in self?.locate(thisRun) }
     }
 
     /// Stops the live stream, then releases the channel.

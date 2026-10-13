@@ -49,10 +49,12 @@ struct RootView: View {
                     SettingsView()
                         .tabItem { Label("Ayarlar", systemImage: "slider.horizontal.3") }
                 }
+                .sheet(item: $model.pendingInvite) { JoinSheet(invite: $0) }
             } else {
                 OnboardingView()
             }
         }
+        .onOpenURL { model.handle($0) }
         // Live mode keeps the band measuring; never leave it running in the background.
         .onChange(of: scenePhase) { _, phase in
             if phase == .background { model.stop() }

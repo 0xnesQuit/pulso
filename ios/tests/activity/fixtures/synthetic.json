@@ -1,0 +1,445 @@
+{
+ "source": "SYNTHETIC: built by make_fixtures.py from docs/ACTIVITY.md; not device data",
+ "cases": [
+  {
+   "name": "daily details v4, every group present, extra byte in record 1",
+   "kind": "file",
+   "hex": "5068ed680c040000fe8ccc8cccc00c000300090048410000611e78000500ff7fbf7fd204b440efbe00ffab0000ffff008000000000003f000062000700010031de90f0",
+   "synthetic": true,
+   "expect": {
+    "kind": "daily_details",
+    "crc": {
+     "ok": true
+    },
+    "data": {
+     "header_hex": "fe8ccc8cccc0",
+     "records": [
+      {
+       "ts": 1760389200,
+       "steps": 12,
+       "active_calories": 3,
+       "distance_m": 9,
+       "heart_rate": 72,
+       "energy": 65,
+       "spo2": 97,
+       "stress": 30,
+       "light_raw": 120,
+       "body_momentum_raw": 5
+      },
+      {
+       "ts": 1760389260,
+       "steps": 16383,
+       "active_calories": 63,
+       "distance_m": 1234,
+       "heart_rate": 180,
+       "energy": 64,
+       "spo2": 0,
+       "stress": null,
+       "extra_byte": 171,
+       "light_raw": 0,
+       "body_momentum_raw": 65535
+      },
+      {
+       "ts": 1760389320,
+       "steps": 0,
+       "active_calories": 0,
+       "distance_m": 0,
+       "heart_rate": 0,
+       "energy": 63,
+       "spo2": 98,
+       "stress": 0,
+       "light_raw": 7,
+       "body_momentum_raw": 1
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "daily details v2, absent groups take no bytes, invalid group still consumed",
+   "kind": "file",
+   "hex": "5068ed680c020000ba0cc80064000550005f55004000000000000173550c6d",
+   "synthetic": true,
+   "expect": {
+    "kind": "daily_details",
+    "data": {
+     "records": [
+      {
+       "ts": 1760389200,
+       "steps": 100,
+       "active_calories": 5,
+       "distance_m": 80,
+       "heart_rate": 95,
+       "energy": null,
+       "spo2": null,
+       "stress": null
+      },
+      {
+       "ts": 1760389260,
+       "steps": 0,
+       "active_calories": 0,
+       "distance_m": 0,
+       "heart_rate": 0,
+       "energy": null,
+       "extra_byte": 1
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "daily details v3, 3 stray bytes after the last whole record",
+   "kind": "file",
+   "hex": "d0b9ee680c030000fe8ccc8cc02a0007001e00583200005f2d010203ed9976d5",
+   "synthetic": true,
+   "expect": {
+    "data": {
+     "truncated_tail": 3,
+     "records": [
+      {
+       "ts": 1760475600,
+       "steps": 42,
+       "active_calories": 7,
+       "distance_m": 30,
+       "heart_rate": 88,
+       "energy": 50,
+       "spo2": 95,
+       "stress": 45
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "sleep details v5 (SUMMARY), HR+SpO2 blocks, stage/summary/RR packets",
+   "kind": "file",
+   "hex": "b8a4ee680c052100ffe00160a2ee6830c3ee684e010203040506070809589bee6830c3ee683c00030060a2ee683a373c2c010200b8a4ee68605f0011fbfafcff1160a2ee680000000000020005fbfafcff1160a2ee68000000000111000a101e202d301400051028fbfafcff1160a2ee68000000000010000d120087000500460014002d1003fbfafcff1100472ae499010000000100046462665f13b555fa",
+   "synthetic": true,
+   "expect": {
+    "kind": "sleep_details",
+    "crc": {
+     "ok": true
+    },
+    "data": {
+     "is_awake": 1,
+     "bed_time": 1760469600,
+     "wakeup_time": 1760478000,
+     "sleep_quality": 78,
+     "bed_time2": 1760467800,
+     "wakeup_time2": 1760478000,
+     "hr": {
+      "unit": 60,
+      "count": 3,
+      "first_ts": 1760469600,
+      "values": [
+       58,
+       55,
+       60
+      ]
+     },
+     "spo2": {
+      "unit": 300,
+      "count": 2,
+      "first_ts": 1760470200,
+      "values": [
+       96,
+       95
+      ]
+     },
+     "snore": null,
+     "skipped_bytes": 2,
+     "trailing_bytes": 0,
+     "packets": [
+      {
+       "type": 2,
+       "flags": 5
+      },
+      {
+       "type": 17,
+       "parity": 1
+      },
+      {
+       "type": 16
+      },
+      {
+       "type": 1
+      }
+     ],
+     "stages": [
+      {
+       "ts": 1760469600,
+       "stage": "light",
+       "duration_min": 30
+      },
+      {
+       "ts": 1760471400,
+       "stage": "deep",
+       "duration_min": 45
+      },
+      {
+       "ts": 1760474100,
+       "stage": "rem",
+       "duration_min": 20
+      },
+      {
+       "ts": 1760475300,
+       "stage": "awake",
+       "duration_min": 5
+      },
+      {
+       "ts": 1760475600,
+       "stage": "light",
+       "duration_min": 40
+      }
+     ],
+     "summaries": [
+      {
+       "sleep_index": 1,
+       "wake_count": 2,
+       "sleep_min": 135,
+       "awake_min": 5,
+       "light_min": 70,
+       "rem_min": 20,
+       "deep_min": 45,
+       "flags": 16,
+       "unknown_min": 3
+      }
+     ],
+     "rr": [
+      {
+       "ts_raw": 1760469600000,
+       "rr_ms": [
+        1000,
+        980,
+        1020,
+        950
+       ]
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "sleep details v2 (DETAILS), empty HR block, two stages",
+   "kind": "file",
+   "hex": "6044ed680c022000f0006044ed68285eed683c000000fbfafcff116044ed6800000000001100042032103ceca13039",
+   "synthetic": true,
+   "expect": {
+    "kind": "sleep_details",
+    "data": {
+     "is_awake": 0,
+     "bed_time": 1760380000,
+     "wakeup_time": 1760386600,
+     "sleep_quality": null,
+     "hr": {
+      "unit": 60,
+      "count": 0,
+      "first_ts": null,
+      "values": []
+     },
+     "spo2": null,
+     "snore": null,
+     "stages": [
+      {
+       "ts": 1760380000,
+       "stage": "deep",
+       "duration_min": 50
+      },
+      {
+       "ts": 1760383000,
+       "stage": "light",
+       "duration_min": 60
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "sleep stages v2, five phase changes",
+   "kind": "file",
+   "hex": "706bed680c020c00ffff1000050300a401706bed68e0cded680a01005a00f0004600140007706bed68038079ed6802988eed6804a095ed680318cded6805feb6c920",
+   "synthetic": true,
+   "expect": {
+    "kind": "sleep_stages",
+    "data": {
+     "total_min": 420,
+     "bed_time": 1760390000,
+     "wakeup_time": 1760415200,
+     "deep_min": 90,
+     "light_min": 240,
+     "rem_min": 70,
+     "awake_min": 20,
+     "no_data": false,
+     "stages": [
+      {
+       "ts": 1760390000,
+       "stage": "light",
+       "raw": 3
+      },
+      {
+       "ts": 1760393600,
+       "stage": "deep",
+       "raw": 2
+      },
+      {
+       "ts": 1760399000,
+       "stage": "rem",
+       "raw": 4
+      },
+      {
+       "ts": 1760400800,
+       "stage": "light",
+       "raw": 3
+      },
+      {
+       "ts": 1760415000,
+       "stage": "awake",
+       "raw": 5
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "sleep stages v2 with no data (bed time 0)",
+   "kind": "file",
+   "hex": "706bed680c020c00ffff1000050300000000000000000000000a01005a00f0004600140007e852294c",
+   "synthetic": true,
+   "expect": {
+    "kind": "sleep_stages",
+    "data": {
+     "no_data": true,
+     "stages": []
+    }
+   }
+  },
+  {
+   "name": "manual samples v2 (records from the ManualSamplesParser source comment)",
+   "kind": "file",
+   "hex": "0090a965040218008a90a9651263c793a96513009698a965131ce79ca965445a0e0000729fa96544590e000024f5a863",
+   "synthetic": true,
+   "ref": "app/src/main/java/nodomain/freeyourgadget/gadgetbridge/service/devices/xiaomi/activity/impl/ManualSamplesParser.java:71-77",
+   "expect": {
+    "kind": "manual_samples",
+    "data": {
+     "zero_value_records": 1,
+     "samples": [
+      {
+       "ts": 1705611402,
+       "type": 18,
+       "value": 99
+      },
+      {
+       "ts": 1705613462,
+       "type": 19,
+       "value": 28
+      },
+      {
+       "ts": 1705614567,
+       "type": 68,
+       "value": 3674,
+       "celsius": 36.74
+      },
+      {
+       "ts": 1705615218,
+       "type": 68,
+       "value": 3673,
+       "celsius": 36.73
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "CRC-32 check value of '123456789'",
+   "kind": "crc",
+   "hex": "313233343536373839",
+   "expect": "cbf43926"
+  },
+  {
+   "name": "reassemble real TREADMILL_V9_21JUN from 3 chunks",
+   "kind": "chunks",
+   "chunks": [
+    "030001005820386a08098d00fffc7f900e205820386a8726386a28060000a00a0000c0007201000094050000900c0000b40087a5643333f33f0200000020000000000070000000fc020000740100003a010000e80028060000000000000103000000580200002c01881300004a0100000000c8410000a00a00001c00",
+    "03000200010000000000000f0000000000000000000000000003000087a56403507a00b40085d2c64008ac1c415820386a8726386a0000000028060000280600000000000000000000c0000000a00a0000900c0000430200007201000000000000000000000000000003000000000000000000000000000000000000",
+    "030003000070000000fc020000740100003a010000000002013333f33f00000000000000000f001c00200000000000000000000000000000000001a88c364491"
+   ],
+   "expect_file_hex": "5820386a08098d00fffc7f900e205820386a8726386a28060000a00a0000c0007201000094050000900c0000b40087a5643333f33f0200000020000000000070000000fc020000740100003a010000e80028060000000000000103000000580200002c01881300004a0100000000c8410000a00a00001c00010000000000000f0000000000000000000000000003000087a56403507a00b40085d2c64008ac1c415820386a8726386a0000000028060000280600000000000000000000c0000000a00a0000900c00004302000072010000000000000000000000000000030000000000000000000000000000000000000070000000fc020000740100003a010000000002013333f33f00000000000000000f001c00200000000000000000000000000000000001a88c364491",
+   "expect": {
+    "crc": {
+     "ok": true
+    },
+    "file_id": {
+     "version": 9
+    }
+   }
+  },
+  {
+   "name": "flipped bit in chunk 2 fails the CRC",
+   "kind": "chunks",
+   "chunks": [
+    "030001005820386a08098d00fffc7f900e205820386a8726386a28060000a00a0000c0007201000094050000900c0000b40087a5643333f33f0200000020000000000070000000fc020000740100003a010000e80028060000000000000103000000580200002c01881300004a0100000000c8410000a00a00001c00",
+    "03000200010000000001000f0000000000000000000000000003000087a56403507a00b40085d2c64008ac1c415820386a8726386a0000000028060000280600000000000000000000c0000000a00a0000900c0000430200007201000000000000000000000000000003000000000000000000000000000000000000",
+    "030003000070000000fc020000740100003a010000000002013333f33f00000000000000000f001c00200000000000000000000000000000000001a88c364491"
+   ],
+   "expect_crc_ok": false
+  },
+  {
+   "name": "chunk 3 before chunk 2 is rejected",
+   "kind": "chunks",
+   "chunks": [
+    "030001005820386a08098d00fffc7f900e205820386a8726386a28060000a00a0000c0007201000094050000900c0000b40087a5643333f33f0200000020000000000070000000fc020000740100003a010000e80028060000000000000103000000580200002c01881300004a0100000000c8410000a00a00001c00",
+    "030003000070000000fc020000740100003a010000000002013333f33f00000000000000000f001c00200000000000000000000000000000000001a88c364491",
+    "03000200010000000000000f0000000000000000000000000003000087a56403507a00b40085d2c64008ac1c415820386a8726386a0000000028060000280600000000000000000000c0000000a00a0000900c0000430200007201000000000000000000000000000003000000000000000000000000000000000000"
+   ],
+   "expect_error": true
+  },
+  {
+   "name": "single-chunk file (total 1)",
+   "kind": "chunks",
+   "chunks": [
+    "010001005068ed680c011800ff706bed680262bd8a4857"
+   ],
+   "expect": {
+    "kind": "manual_samples",
+    "data": {
+     "samples": [
+      {
+       "ts": 1760390000,
+       "value": 98
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "id list drops the all-zero placeholder",
+   "kind": "idlist",
+   "hex": "5068ed680c040000000000000000ec67ed680c0521",
+   "expect": [
+    {
+     "hex": "5068ed680c0400"
+    },
+    {
+     "hex": "ec67ed680c0521"
+    }
+   ]
+  },
+  {
+   "name": "fetch order: time first, then summary < details < gps",
+   "kind": "fetch_order",
+   "ids": [
+    "5068ed680c0402",
+    "5068ed680c0400",
+    "5068ed680c0401",
+    "ec67ed680c0521"
+   ],
+   "expect": [
+    "ec67ed680c0521",
+    "5068ed680c0401",
+    "5068ed680c0400",
+    "5068ed680c0402"
+   ]
+  }
+ ]
+}

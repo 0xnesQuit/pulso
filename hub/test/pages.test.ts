@@ -9,7 +9,7 @@ function cspNonce(csp: string): string {
 
 describe("security headers", () => {
   it("sends a nonce-based CSP and hardening headers on HTML", async () => {
-    for (const path of ["/", "/login", "/docs", "/privacy", "/does-not-exist"]) {
+    for (const path of ["/", "/login", "/join", "/docs", "/privacy", "/does-not-exist"]) {
       const res = await call(path);
       expect(res.headers.get("content-type"), path).toContain("text/html");
       const csp = res.headers.get("content-security-policy") ?? "";
