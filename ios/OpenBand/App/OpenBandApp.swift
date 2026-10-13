@@ -42,6 +42,10 @@ struct RootView: View {
                 TabView {
                     TodayView()
                         .tabItem { Label("Bugün", systemImage: "circle.dashed") }
+                    SleepView()
+                        .tabItem { Label("Uyku", systemImage: "moon") }
+                    HistoryView()
+                        .tabItem { Label("Geçmiş", systemImage: "calendar") }
                     SettingsView()
                         .tabItem { Label("Ayarlar", systemImage: "slider.horizontal.3") }
                 }

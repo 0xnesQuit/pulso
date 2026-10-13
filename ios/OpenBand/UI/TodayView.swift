@@ -3,6 +3,7 @@ import SwiftUI
 
 struct TodayView: View {
     @EnvironmentObject private var model: AppModel
+    @EnvironmentObject private var link: BandLink
     @Query(sort: \Band.addedAt) private var bands: [Band]
     @AppStorage("selectedBand") private var selectedBand = ""
 
@@ -14,6 +15,7 @@ struct TodayView: View {
                 VStack(alignment: .leading, spacing: 24) {
                     header
                     if let band {
+                        ConnectionStatus(band: band)
                         DayContent(band: band)
                             .id(band.id)
                     } else {
@@ -26,6 +28,12 @@ struct TodayView: View {
             }
             .background(Theme.ground)
             .toolbar(.hidden, for: .navigationBar)
+            .task(id: bands.count) {
+                while !Task.isCancelled {
+                    link.refreshNearby(bands.map { ($0.id, $0.macSuffix) })
+                    try? await Task.sleep(for: .seconds(10))
+                }
+            }
         }
     }
 
@@ -117,12 +125,6 @@ private struct DayContent: View {
                 }
                 .buttonStyle(QuietButtonStyle(tint: liveRunning ? Theme.pomegranate : Theme.ink))
                 .disabled(link.phase.isBusy && !liveRunning)
-
-                Text(statusLine)
-                    .font(.footnote)
-                    .foregroundStyle(isFailure ? Theme.pomegranate : Theme.secondary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.top, 6)
             }
         }
     }
@@ -143,19 +145,6 @@ private struct DayContent: View {
         guard let lastHeart else { return "nabız yok" }
         if liveRunning { return "bpm, şimdi" }
         return "bpm, \(lastHeart.ts.formatted(date: .omitted, time: .shortened))"
-    }
-
-    private var isFailure: Bool {
-        if case .failed = link.phase, isThisBand { return true }
-        return false
-    }
-
-    private var statusLine: String {
-        if isThisBand, link.phase != .idle, link.phase != .done { return link.phase.label }
-        if let at = band.lastSyncAt {
-            return "Son senkron \(at.formatted(date: .omitted, time: .shortened)). Mi Fitness bu sırada kapalı olmalı."
-        }
-        return "Mi Fitness'ı kapat, sonra senkronize et."
     }
 
     /// Steps per hour from consecutive cumulative readings; the first reading of the day has

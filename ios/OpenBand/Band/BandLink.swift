@@ -53,6 +53,9 @@ final class BandLink: NSObject, ObservableObject {
     @Published private(set) var stats: MiAuth.LiveStats?
     @Published private(set) var battery: Int?
     @Published private(set) var log: [String] = []
+    /// Bands iOS holds a connection to right now (no session needed to know this).
+    @Published private(set) var nearby: Set<UUID> = []
+    @Published private(set) var bluetooth: CBManagerState = .unknown
 
     /// Every observation, on the main queue.
     var onSample: ((UUID, SampleDraft) -> Void)?
@@ -127,6 +130,19 @@ final class BandLink: NSObject, ObservableObject {
         guard active else { return }
         note("kullanıcı durdurdu")
         finish()
+    }
+
+    /// Cheap check, no session: which of these bands is connected to the phone at the moment.
+    func refreshNearby(_ bands: [(id: UUID, suffix: String?)]) {
+        guard central.state == .poweredOn else {
+            nearby = []
+            return
+        }
+        let connected = central.retrieveConnectedPeripherals(withServices: [Self.fe95]).compactMap { $0.name?.uppercased() }
+        nearby = Set(bands.compactMap { band in
+            guard let suffix = band.suffix, connected.contains(where: { $0.hasSuffix(suffix) }) else { return nil }
+            return band.id
+        })
     }
 
     // MARK: finding the band
@@ -370,6 +386,7 @@ final class BandLink: NSObject, ObservableObject {
 
 extension BandLink: CBCentralManagerDelegate {
     func centralManagerDidUpdateState(_ central: CBCentralManager) {
+        bluetooth = central.state
         if central.state == .poweredOn, let start = pendingStart {
             pendingStart = nil
             start()
