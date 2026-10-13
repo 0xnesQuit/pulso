@@ -614,6 +614,26 @@ final class AppModel: ObservableObject {
         hubStatus = "Web erişimi kapatıldı, sunucudaki verin silindi."
     }
 
+    /// Uses a key the user already has (rotated on the web panel, or from another phone): the
+    /// key is kept only once the hub accepts it.
+    func enterAPIKey(_ key: String) async {
+        let key = key.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !key.isEmpty else { return }
+        hubBusy = true
+        defer { hubBusy = false }
+        do {
+            try await HubClient(baseURL: hubURL, token: key).verify()
+            Vault.hubToken = key
+            hubEnabled = true
+            hubStatus = "API anahtarı kaydedildi."
+            await pushToHub()
+        } catch HubClient.Failure.status(401, _) {
+            hubStatus = "Sunucu bu anahtarı tanımadı. Paneldeki en son anahtarı kopyaladığından emin ol."
+        } catch {
+            hubStatus = error.localizedDescription
+        }
+    }
+
     func rotateToken() async {
         hubBusy = true
         defer { hubBusy = false }

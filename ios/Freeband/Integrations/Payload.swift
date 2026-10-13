@@ -266,7 +266,7 @@ struct HubClient {
 
         var errorDescription: String? {
             switch self {
-            case .status(401, _): return "Sunucu API anahtarını tanımadı. Web erişimini kapatıp yeniden aç."
+            case .status(401, _): return "Sunucu API anahtarını tanımadı. Panelde anahtarı yenilediysen Web erişimi > API anahtarını gir'e yeni anahtarı yapıştır."
             case .status(403, _): return "Davet kodu geçersiz. Kodu sunucu yöneticisinden iste."
             case .status(429, _): return "Sunucu çok fazla istek aldı. Biraz sonra tekrar dene."
             case .status(let code, let text): return "Sunucu \(code) döndü: \(text.prefix(120))"
@@ -292,6 +292,11 @@ struct HubClient {
         let json = try await call("POST", "/v1/token/rotate")
         guard let token = json["token"] as? String else { throw Failure.malformed }
         return token
+    }
+
+    /// Checks that the token works (GET /v1/me).
+    func verify() async throws {
+        _ = try await call("GET", "/v1/me")
     }
 
     func deleteAccount() async throws {

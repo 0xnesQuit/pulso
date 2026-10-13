@@ -208,6 +208,7 @@ private struct WebAccessView: View {
     @State private var confirmOff = false
     @State private var serverText = ""
     @State private var invite = ""
+    @State private var apiKey = ""
 
     var body: some View {
         Form {
@@ -240,6 +241,21 @@ private struct WebAccessView: View {
                 } footer: {
                     Text("Sunucu davetle çalışıyor; kodu sunucuyu işleten kişiden al.")
                 }
+            }
+
+            Section {
+                SecureField("API anahtarı", text: $apiKey)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                Button("API anahtarını gir") {
+                    Task {
+                        await model.enterAPIKey(apiKey)
+                        if model.hubStatus == "API anahtarı kaydedildi." { apiKey = "" }
+                    }
+                }
+                .disabled(model.hubBusy || apiKey.trimmingCharacters(in: .whitespaces).isEmpty)
+            } footer: {
+                Text("Panelde anahtarı yenilediysen ya da hesabın başka bir telefonda açıksa anahtarı buraya yapıştır.")
             }
 
             Section {
