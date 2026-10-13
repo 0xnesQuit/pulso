@@ -16,9 +16,19 @@ struct ConnectionStatus: View {
             glyph
                 .frame(width: 16, height: 16)
             VStack(alignment: .leading, spacing: 1) {
-                Text(title)
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(tone == .alert ? Theme.pomegranate : Theme.ink)
+                HStack(alignment: .firstTextBaseline) {
+                    Text(title)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(tone == .alert ? Theme.pomegranate : Theme.ink)
+                        .lineLimit(1)
+                    Spacer(minLength: 8)
+                    if let trailing {
+                        Text(trailing)
+                            .font(.footnote)
+                            .foregroundStyle(Theme.secondary)
+                            .lineLimit(1)
+                    }
+                }
                 if let detail {
                     Text(detail)
                         .font(.footnote)
@@ -26,10 +36,9 @@ struct ConnectionStatus: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
-            Spacer(minLength: 0)
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 10)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
         .background(background, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
         .animation(.easeInOut(duration: 0.2), value: title)
         .accessibilityElement(children: .combine)
@@ -81,9 +90,14 @@ struct ConnectionStatus: View {
         if mine, case .failed(let message) = link.phase { return message }
         if mine, link.phase == .live { return "En fazla \(Int(BandLink.liveLimit)) saniye sürer; durdurunca kanal Mi Fitness'a döner." }
         if mine, link.phase.isBusy { return "Mi Fitness bu sırada kapalı olmalı." }
-        let last = band.lastSyncAt.map { "Son senkron \($0.formatted(.relative(presentation: .named).locale(Theme.locale)))." }
-        if link.nearby.contains(band.id) { return [last, "Okumaya hazır."].compactMap { $0 }.joined(separator: " ") }
-        return [last, "Senkronize et'e basınca OpenBand bandı yakında arar."].compactMap { $0 }.joined(separator: " ")
+        return nil
+    }
+
+    /// Quiet states keep to one line: the last sync goes on the right.
+    private var trailing: String? {
+        guard tone == .quiet else { return nil }
+        guard let at = band.lastSyncAt else { return "henüz senkron yok" }
+        return "senkron \(at.formatted(.relative(presentation: .named).locale(Theme.locale)))"
     }
 
     @ViewBuilder private var glyph: some View {

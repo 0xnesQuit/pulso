@@ -57,6 +57,14 @@ final class AppModel: ObservableObject {
 
     func stop() { link.stop() }
 
+    /// For pull to refresh: starts a sync and returns when the session has ended.
+    func syncAndWait(_ band: Band) async {
+        guard !link.phase.isBusy else { return }
+        start(band, .sync)
+        try? await Task.sleep(for: .milliseconds(300))
+        while link.phase.isBusy { try? await Task.sleep(for: .milliseconds(300)) }
+    }
+
     private func record(_ id: UUID, _ draft: SampleDraft) {
         sessionDrafts.append(draft)
         context.insert(Sample(bandID: id, draft: draft))

@@ -1,6 +1,9 @@
+import Charts
 import SwiftData
 import SwiftUI
 
+/// One screen that reads at a glance: who is connected, the day dial with the latest pulse,
+/// today's totals, a pulse curve, and the two actions pinned above the tab bar.
 struct TodayView: View {
     @EnvironmentObject private var model: AppModel
     @EnvironmentObject private var link: BandLink
@@ -12,7 +15,7 @@ struct TodayView: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(alignment: .leading, spacing: 24) {
+                VStack(alignment: .leading, spacing: 18) {
                     header
                     if let band {
                         ConnectionStatus(band: band)
@@ -24,7 +27,14 @@ struct TodayView: View {
                     }
                 }
                 .padding(.horizontal, 20)
-                .padding(.vertical, 12)
+                .padding(.top, 8)
+                .padding(.bottom, 16)
+            }
+            .refreshable {
+                if let band { await model.syncAndWait(band) }
+            }
+            .safeAreaInset(edge: .bottom) {
+                if let band { ActionBar(band: band) }
             }
             .background(Theme.ground)
             .toolbar(.hidden, for: .navigationBar)
@@ -40,18 +50,22 @@ struct TodayView: View {
     private var header: some View {
         HStack(alignment: .firstTextBaseline) {
             Text(Date().formatted(.dateTime.weekday(.wide).day().month(.wide).locale(Theme.locale)))
-                .font(.title2.weight(.semibold))
+                .font(.title3.weight(.semibold))
                 .foregroundStyle(Theme.ink)
-            Spacer()
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+            Spacer(minLength: 8)
             if bands.count > 1 {
                 Menu {
                     ForEach(bands) { b in
                         Button(b.displayName) { selectedBand = b.id.uuidString }
                     }
                 } label: {
-                    Label(band?.displayName ?? "Bant", systemImage: "chevron.up.chevron.down")
-                        .font(.subheadline.weight(.medium))
-                        .labelStyle(.titleAndIcon)
+                    HStack(spacing: 4) {
+                        Text(band?.displayName ?? "Bant")
+                        Image(systemName: "chevron.up.chevron.down").font(.caption)
+                    }
+                    .font(.subheadline.weight(.medium))
                 }
             } else if let band {
                 Text(band.displayName)
@@ -62,11 +76,54 @@ struct TodayView: View {
     }
 }
 
+/// Sync and live, pinned above the tab bar so they never scroll away.
+private struct ActionBar: View {
+    let band: Band
+    @EnvironmentObject private var model: AppModel
+    @EnvironmentObject private var link: BandLink
+
+    private var mine: Bool { link.bandID == band.id }
+    private var live: Bool { mine && link.phase == .live }
+    private var syncing: Bool { mine && link.phase.isBusy && !live }
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Button {
+                model.start(band, .sync)
+            } label: {
+                if syncing {
+                    ProgressView().tint(Theme.ground)
+                } else {
+                    Label("Senkronize et", systemImage: "arrow.triangle.2.circlepath")
+                }
+            }
+            .buttonStyle(PrimaryButtonStyle())
+            .disabled(link.phase.isBusy)
+
+            Button {
+                if live { model.stop() } else { model.start(band, .live) }
+            } label: {
+                Label(live ? "Durdur" : "Canlı", systemImage: live ? "stop.fill" : "heart.fill")
+                    .font(.body.weight(.semibold))
+                    .foregroundStyle(live ? Theme.ground : Theme.pomegranate)
+                    .frame(minWidth: 112, minHeight: 52)
+                    .background(live ? Theme.pomegranate : Theme.pomegranate.opacity(0.12),
+                                in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+            }
+            .disabled(link.phase.isBusy && !live)
+            .accessibilityLabel(live ? "Canlı nabzı durdur" : "Canlı nabzı başlat")
+        }
+        .padding(.horizontal, 20)
+        .padding(.vertical, 10)
+        .background(Theme.ground.opacity(0.96))
+        .overlay(alignment: .top) { Divider().overlay(Theme.dial) }
+    }
+}
+
 /// Today's samples for one band, live from SwiftData while a session writes them.
 private struct DayContent: View {
     let band: Band
     @Query private var samples: [Sample]
-    @EnvironmentObject private var model: AppModel
     @EnvironmentObject private var link: BandLink
 
     init(band: Band) {
@@ -77,75 +134,134 @@ private struct DayContent: View {
     }
 
     private var live: [Sample] { samples.filter { $0.kind == "live" } }
+    private var hearts: [Sample] { live.filter { $0.heartRate > 10 } }
     private var latest: Sample? { live.last }
-    private var lastHeart: Sample? { live.last { $0.heartRate > 10 } }
-    private var isThisBand: Bool { link.bandID == band.id }
-    private var busy: Bool { isThisBand && link.phase.isBusy }
-    private var liveRunning: Bool { isThisBand && link.phase == .live }
+    private var lastHeart: Sample? { hearts.last }
+    private var liveNow: Bool { link.bandID == band.id && link.phase == .live }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 28) {
-            DayDial(hourlySteps: hourlySteps,
-                    heartRates: lastHeart == nil ? [] : live.filter { $0.heartRate > 10 }.map { (hour(of: $0.ts), $0.heartRate) },
-                    nowHour: hour(of: Date()),
-                    centerValue: lastHeart.map { "\($0.heartRate)" },
-                    centerCaption: heartCaption)
-                .frame(maxWidth: 360)
-                .frame(maxWidth: .infinity)
-
-            if hourlySteps.reduce(0, +) == 0, latest != nil {
-                Text("Saatlik dağılım OpenBand gün içinde senkronize ettikçe dolar.")
-                    .font(.footnote)
-                    .foregroundStyle(Theme.secondary)
-            }
-
-            HStack(alignment: .top) {
-                figure(latest.map { $0.steps.formatted(.number.locale(Theme.locale)) } ?? "–", "adım", tint: Theme.saffron)
-                Spacer()
-                figure(latest.map { $0.calories.formatted(.number.locale(Theme.locale)) } ?? "–", "kalori", tint: Theme.ink)
-                Spacer()
-                figure(band.lastBattery.map { "%\($0)" } ?? "–", "pil", tint: Theme.ink)
-            }
-
-            VStack(spacing: 4) {
-                Button {
-                    model.start(band, .sync)
-                } label: {
-                    if busy && !liveRunning {
-                        ProgressView().tint(Theme.ground)
-                    } else {
-                        Text("Senkronize et")
-                    }
-                }
-                .buttonStyle(PrimaryButtonStyle())
-                .disabled(link.phase.isBusy)
-
-                Button(liveRunning ? "Canlı nabzı durdur" : "Canlı nabzı başlat") {
-                    if liveRunning { model.stop() } else { model.start(band, .live) }
-                }
-                .buttonStyle(QuietButtonStyle(tint: liveRunning ? Theme.pomegranate : Theme.ink))
-                .disabled(link.phase.isBusy && !liveRunning)
-            }
+        VStack(alignment: .leading, spacing: 18) {
+            hero
+            Divider().overlay(Theme.dial)
+            facts
+            Divider().overlay(Theme.dial)
+            pulseChart
         }
     }
 
-    private func figure(_ value: String, _ label: String, tint: Color) -> some View {
-        VStack(alignment: .leading, spacing: 0) {
-            Text(value)
-                .font(Theme.figure(44))
-                .foregroundStyle(tint)
+    // MARK: hero: dial with the pulse in its centre, totals beside it
+
+    private var hero: some View {
+        HStack(alignment: .center, spacing: 18) {
+            DayDial(hourlySteps: hourlySteps,
+                    heartRates: hearts.map { (hour(of: $0.ts), $0.heartRate) },
+                    nowHour: hour(of: Date()),
+                    centerValue: lastHeart.map { "\($0.heartRate)" },
+                    centerCaption: lastHeart == nil ? "nabız yok" : (liveNow ? "bpm, şimdi" : "bpm"))
+                .containerRelativeFrame(.horizontal) { width, _ in min(width * 0.48, 200) }
+
+            VStack(alignment: .leading, spacing: 12) {
+                total(latest.map { $0.steps.formatted(.number.locale(Theme.locale)) }, "adım", tint: Theme.saffron, size: 40)
+                total(latest.map { $0.calories.formatted(.number.locale(Theme.locale)) }, "kalori", tint: Theme.ink, size: 28)
+                total(band.lastBattery.map { "%\($0)" }, "pil", tint: Theme.ink, size: 28)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
+    private func total(_ value: String?, _ label: String, tint: Color, size: CGFloat) -> some View {
+        VStack(alignment: .leading, spacing: -2) {
+            Text(value ?? "–")
+                .font(Theme.figure(size))
+                .foregroundStyle(value == nil ? Theme.secondary : tint)
                 .contentTransition(.numericText())
+                .lineLimit(1)
+                .minimumScaleFactor(0.6)
             Text(label)
-                .font(.subheadline)
+                .font(.footnote)
                 .foregroundStyle(Theme.secondary)
         }
     }
 
-    private var heartCaption: String {
-        guard let lastHeart else { return "nabız yok" }
-        if liveRunning { return "bpm, şimdi" }
-        return "bpm, \(lastHeart.ts.formatted(date: .omitted, time: .shortened))"
+    // MARK: facts: four small readings in two columns
+
+    private var facts: some View {
+        Grid(alignment: .leading, horizontalSpacing: 24, verticalSpacing: 14) {
+            GridRow {
+                fact("Nabız aralığı", heartRange)
+                fact("Ayakta", latest.map { "\($0.standingHours) saat" })
+            }
+            GridRow {
+                fact("Aktif saat", activeHours > 0 ? "\(activeHours) saat" : nil)
+                fact("Son ölçüm", lastHeart.map { $0.ts.formatted(.dateTime.hour(.twoDigits(amPM: .omitted)).minute(.twoDigits).locale(Theme.locale)) })
+            }
+        }
     }
+
+    private func fact(_ label: String, _ value: String?) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(label)
+                .font(.footnote)
+                .foregroundStyle(Theme.secondary)
+            Text(value ?? "–")
+                .font(.title3.weight(.semibold))
+                .monospacedDigit()
+                .foregroundStyle(value == nil ? Theme.secondary : Theme.ink)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var heartRange: String? {
+        let values = hearts.map(\.heartRate)
+        guard let lo = values.min(), let hi = values.max() else { return nil }
+        return lo == hi ? "\(lo) bpm" : "\(lo)–\(hi) bpm"
+    }
+
+    /// Hours with more than 250 steps.
+    private var activeHours: Int { hourlySteps.filter { $0 > 250 }.count }
+
+    // MARK: pulse over the day
+
+    @ViewBuilder private var pulseChart: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Nabız, bugün")
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(Theme.ink)
+            if hearts.count >= 2 {
+                let values = hearts.map(\.heartRate)
+                let lo = (values.min() ?? 50) - 5
+                let hi = (values.max() ?? 120) + 5
+                let start = Calendar.current.startOfDay(for: Date())
+                Chart(hearts) { s in
+                    LineMark(x: .value("Saat", s.ts), y: .value("bpm", s.heartRate))
+                        .interpolationMethod(.monotone)
+                        .foregroundStyle(Theme.pomegranate)
+                }
+                .chartXScale(domain: start...start.addingTimeInterval(86_400))
+                .chartYScale(domain: lo...hi)
+                .chartXAxis {
+                    AxisMarks(values: .stride(by: .hour, count: 6)) {
+                        AxisGridLine().foregroundStyle(Theme.dial)
+                        AxisValueLabel(format: .dateTime.hour(.twoDigits(amPM: .omitted)))
+                    }
+                }
+                .chartYAxis {
+                    AxisMarks(position: .trailing, values: .automatic(desiredCount: 3)) {
+                        AxisGridLine().foregroundStyle(Theme.dial)
+                        AxisValueLabel()
+                    }
+                }
+                .environment(\.locale, Theme.locale)
+                .frame(height: 96)
+            } else {
+                Text("Canlı nabzı açtıkça ya da senkronize ettikçe günün nabız eğrisi burada belirir.")
+                    .font(.footnote)
+                    .foregroundStyle(Theme.secondary)
+            }
+        }
+    }
+
+    // MARK: helpers
 
     /// Steps per hour from consecutive cumulative readings; the first reading of the day has
     /// no known spread, so it adds nothing.
