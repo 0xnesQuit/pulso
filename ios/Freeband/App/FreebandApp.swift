@@ -26,14 +26,22 @@ struct FreebandApp: App {
 
     var body: some Scene {
         WindowGroup {
-            RootView()
-                .environmentObject(model)
-                .environmentObject(model.link)
-                .tint(Theme.ink)
-                .preferredColorScheme(.dark)
-                .font(Theme.body)
+            #if DEBUG
+            if DesignGallery.isRequested { DesignGallery() } else { app }
+            #else
+            app
+            #endif
         }
         .modelContainer(container)
+    }
+
+    private var app: some View {
+        RootView()
+            .environmentObject(model)
+            .environmentObject(model.link)
+            .tint(Theme.ink)
+            .preferredColorScheme(.dark)
+            .font(Theme.body)
     }
 }
 
