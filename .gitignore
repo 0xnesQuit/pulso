@@ -1,0 +1,8 @@
+.env
+.env.*
+.venv/
+vendor/
+out/
+__pycache__/
+xcuserdata/
+*.xcuserstate
