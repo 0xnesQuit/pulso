@@ -11,7 +11,7 @@ Uygulama, webhook'lar ve Cloudflare hub aynı JSON biçimini kullanır. Zamanlar
 
 Sonraki görevde eklenecek: `minute` (dakikalık adım/nabız/stres/SpO2) ve `sleep` (uyku oturumu).
 
-Her örnek `(type, ts)` ile tekildir; aynı ikili tekrar gelirse yok sayılır.
+Bir kullanıcının birden fazla bandı olabilir (ör. Band 10 ve Band 10 Pro). Her gövde tek bir banda aittir ve `device.id` ile tanımlanır. Her örnek `(device.id, type, ts)` ile tekildir; aynı üçlü tekrar gelirse yok sayılır.
 
 ## Gönderim gövdesi (uygulama → hub, uygulama → webhook)
 
@@ -20,7 +20,9 @@ Her örnek `(type, ts)` ile tekildir; aynı ikili tekrar gelirse yok sayılır.
   "schema": "openband.v1",
   "event": "sync.completed",
   "device": {
-    "name": "Xiaomi Smart Band 10 Pro",
+    "id": "5B0E2C9A-4C7D-4F57-9A39-2D2B1D9E8A10",
+    "name": "Xiaomi Smart Band 10 Pro D9B9",
+    "model": "band10pro",
     "app_version": "0.4 (8)",
     "tz": "Europe/Istanbul"
   },
@@ -40,6 +42,7 @@ Her örnek `(type, ts)` ile tekildir; aynı ikili tekrar gelirse yok sayılır.
 ```
 
 - `event`: şimdilik yalnız `sync.completed`; webhook testi için `ping`.
+- `device.id`: uygulamanın her bant için bir kez ürettiği rastgele UUID (bandın MAC'i ya da seri numarası değil). `device.model`: `band10` ya da `band10pro`.
 - `summary.date` cihazın saat dilimindeki gün.
 - Bir gövdede en fazla 5000 örnek, en fazla 512 KB.
 
@@ -63,10 +66,10 @@ Taban adres: `https://openband.cobanov.dev` (geliştirmede `http://localhost:878
 | Yöntem | Yol | Açıklama |
 |---|---|---|
 | `POST` | `/v1/accounts` | Yeni hesap. Gövde `{ "device_name": "...", "tz": "Europe/Istanbul" }`. Cevap `{ "account_id", "token", "web_url" }`; token yalnız bir kez döner. IP başına sınırlı. |
-| `GET` | `/v1/me` | Hesap bilgisi ve örnek sayıları. |
+| `GET` | `/v1/me` | Hesap bilgisi, örnek sayıları ve bilinen cihazlar (`devices: [{ id, name, model, last_seen }]`). |
 | `POST` | `/v1/ingest` | Gönderim gövdesi (yukarıda). Cevap `{ "accepted", "duplicates" }`. Ardından hesabın sunucu webhook'larına iletilir. |
-| `GET` | `/v1/samples?type=live&from=&to=&limit=` | Ham örnekler, zamana göre artan, en fazla 5000. |
-| `GET` | `/v1/days?from=YYYY-MM-DD&to=YYYY-MM-DD` | Günlük özet: `steps`, `calories`, `heart_rate_min/max/avg`, `battery_last`; hesabın saat dilimine göre. |
+| `GET` | `/v1/samples?device=&type=live&from=&to=&limit=` | Ham örnekler, zamana göre artan, en fazla 5000. `device` verilmezse tüm cihazlar; her örnek `device_id` taşır. |
+| `GET` | `/v1/days?device=&from=YYYY-MM-DD&to=YYYY-MM-DD` | Cihaz başına günlük özet (`device_id` alanıyla): `steps`, `calories`, `heart_rate_min/max/avg`, `battery_last`; hesabın saat dilimine göre. |
 | `GET` | `/v1/export.csv` · `/v1/export.json` | `from`/`to` ile dışa aktarma. |
 | `GET` `POST` `DELETE` | `/v1/webhooks`, `/v1/webhooks/:id` | Sunucu webhook'ları (en fazla 5; yalnız https). Oluştururken gizli değer bir kez döner. `POST /v1/webhooks/:id/test` ping gönderir. |
 | `POST` | `/v1/token/rotate` | Yeni token, eskisi hemen geçersiz. |
