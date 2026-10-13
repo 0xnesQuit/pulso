@@ -10,6 +10,7 @@ The hub is meant to run at `https://freeband.cobanov.dev` for the owner and invi
 hub/
   wrangler.jsonc            Worker config (custom domain, D1 binding with a PLACEHOLDER id, cron, observability)
   migrations/0001_init.sql  D1 schema: accounts, devices, samples, webhooks, sessions, rate_limits
+  migrations/0002_health.sql  minutes, sleeps, scores (minute/sleep/score samples; upserts)
   public/                   Static assets: self-hosted Open Sauce Sans (SIL OFL), favicon, _headers
   src/
     index.ts                Entry: security headers + CSP nonce, error handling, scheduled cleanup
@@ -134,8 +135,10 @@ After deploying, check: `curl -sI https://freeband.cobanov.dev/ | grep -i conten
 | Webhooks | 5 per account, https only, 5 s timeout, no redirects | `src/lib/webhooks.ts` |
 | Bands | 10 per account | `src/routes/api.ts` |
 | Sessions | 30 days, at most 20 per account | `src/lib/auth.ts` |
-| Export | 200 000 samples per request, streamed in 5000-row pages | `src/routes/api.ts` |
+| Export | 200 000 rows per request (all types together), streamed in 5000-row pages | `src/routes/api.ts` |
 | `/v1/days` range | 366 days | `src/routes/api.ts` |
+| `/v1/minutes`, `/v1/sleep`, `/v1/scores` page size | 1440 / 100 / 366 by default, at most 5000 / 1000 / 1000 | `src/routes/api.ts` |
+| Valid readings | heart rate 30–220 bpm, SpO2 70–100 %, stress 1–100 | `src/lib/validate.ts` |
 
 ## Security notes
 

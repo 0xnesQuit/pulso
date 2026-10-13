@@ -21,8 +21,10 @@ http.createServer((req, res) => {
       return;
     }
     const body = JSON.parse(raw.toString("utf8"));
-    if (body.event === "sync.completed") {
-      console.log(body.device.id, body.samples.length);
+    if (body.event === "sync.completed" || body.event === "sync.partial") {
+      // Tanımadığın türleri atla; minute/sleep/score için son geleni sakla.
+      const known = body.samples.filter((s) => ["live", "battery", "minute", "sleep", "score"].includes(s.type));
+      console.log(body.device.id, body.event, known.length);
     }
     res.writeHead(204).end();
   });
@@ -43,12 +45,32 @@ class Hook(BaseHTTPRequestHandler):
             self.end_headers()
             return
         body = json.loads(raw)
-        if body["event"] == "sync.completed":
-            print(body["device"]["id"], len(body["samples"]))
+        if body["event"] in ("sync.completed", "sync.partial"):
+            # Tanımadığın türleri atla; minute/sleep/score için son geleni sakla.
+            known = [s for s in body["samples"] if s["type"] in ("live", "battery", "minute", "sleep", "score")]
+            print(body["device"]["id"], body["event"], len(known))
         self.send_response(204)
         self.end_headers()
 
 HTTPServer(("", 8080), Hook).serve_forever()`;
+
+const HEALTH_SAMPLES = `[
+  { "type": "minute", "ts": "2026-10-13T07:42:00Z", "steps": 112, "heart_rate": 96,
+    "spo2": 97, "stress": 34, "active_calories": 6, "distance_m": 84 },
+  { "type": "sleep", "ts": "2026-10-12T20:41:00Z", "end": "2026-10-13T04:12:00Z", "is_nap": false,
+    "minutes": { "deep": 82, "light": 241, "rem": 96, "awake": 32 },
+    "wake_count": 3, "efficiency": 93,
+    "stages": [[0, "light", 14], [14, "deep", 38], [52, "light", 61], [113, "rem", 22]],
+    "hr_min": 48, "spo2_avg": 96.4, "spo2_min": 91, "hrv_rmssd": 42 },
+  { "type": "score", "ts": "2026-10-12T21:00:00Z", "date": "2026-10-13",
+    "sleep": 82, "recovery": 64, "strain": 11.4, "rhr": 54, "hrv_rmssd": 41.5,
+    "confidence": { "sleep": "high", "recovery": "medium", "strain": "low" },
+    "contributors": [
+      { "score": "sleep", "key": "duration", "weight": 35, "value": 431, "unit": "min", "subscore": 88, "baseline": 418 },
+      { "score": "recovery", "key": "hrv", "weight": 40, "value": null, "subscore": null, "note": "RR yok" }
+    ],
+    "algo": "freeband-score/1" }
+]`;
 
 const INGEST_BODY = `{
   "schema": "freeband.v1",
@@ -74,7 +96,7 @@ export function docsBody(origin: string): Safe {
 <div class="doc">
 <nav class="toc" aria-label="Bölümler">
   <span class="label">bölümler</span>
-  <a href="#kimlik">Kimlik doğrulama</a><a href="#hesap">Hesap</a><a href="#gonderim">Veri gönderme</a><a href="#okuma">Veriyi okuma</a><a href="#webhook">Webhook'lar</a><a href="#imza">İmza doğrulama</a><a href="#oturum">Panel oturumu</a>
+  <a href="#kimlik">Kimlik doğrulama</a><a href="#hesap">Hesap</a><a href="#gonderim">Veri gönderme</a><a href="#saglik">Sağlık verisi</a><a href="#okuma">Veriyi okuma</a><a href="#webhook">Webhook'lar</a><a href="#imza">İmza doğrulama</a><a href="#oturum">Panel oturumu</a>
 </nav>
 <article class="prose">
 <p class="label">freeband.v1</p>
@@ -103,55 +125,109 @@ curl ${origin}/v1/me ${H}</pre>
 <pre>curl ${origin}/v1/me ${H}
 
 {"account_id": "…", "name": "…", "tz": "Europe/Istanbul", "created_at": "…",
- "samples": {"live": 1520, "battery": 44, "total": 1564},
+ "samples": {"live": 1520, "battery": 44, "minute": 8640, "sleep": 6, "score": 6, "total": 10216},
  "devices": [{"id": "5B0E2C9A-…", "name": "Xiaomi Smart Band 10 Pro D9B9", "model": "band10pro", "last_seen": "…"}],
  "webhooks": 1}</pre>
 
 <h3>Anahtarı yenile</h3>
-<p>Yeni anahtar döner, eskisi hemen geçersiz olur. Diğer web oturumları kapanır.</p>
+<p>Yeni anahtar döner, eskisi hemen geçersiz olur. Diğer web oturumları kapanır. Yeni anahtarı telefonda Freeband'de <strong>Ayarlar → Web erişimi → API anahtarını gir</strong> alanına yapıştır; o zamana kadar uygulama veri gönderemez.</p>
 <pre>curl -X POST ${origin}/v1/token/rotate ${H}</pre>
 
 <h3>Hesabı sil</h3>
-<p>Hesabı, tüm örnekleri, bant kayıtlarını, webhook'ları ve oturumları kalıcı olarak siler.</p>
+<p>Hesabı, tüm örnekleri, dakika, uyku ve skor kayıtlarını, bant kayıtlarını, webhook'ları ve oturumları kalıcı olarak siler.</p>
 <pre>curl -X DELETE ${origin}/v1/account ${H}</pre>
 
 <h2 id="gonderim">Veri gönderme</h2>
-<p><code>POST /v1/ingest</code> uygulamanın kullandığı uç noktadır. Gövde en fazla 512 KB ve 5000 örnek olabilir. Her gövde tek bir banda aittir. Her örnek <code>(device.id, type, ts)</code> ile tekildir; aynısı tekrar gelirse sayılır ama saklanmaz. Hesap başına saatte 120 istek ve günde 200 000 örnek kabul edilir.</p>
+<p><code>POST /v1/ingest</code> uygulamanın kullandığı uç noktadır. Gövde en fazla 512 KB ve 5000 örnek olabilir. Her gövde tek bir banda aittir. Her örnek <code>(device.id, type, ts)</code> ile tekildir. <code>live</code> ve <code>battery</code> tekrar gelirse sayılır ama saklanmaz; <code>minute</code>, <code>sleep</code> ve <code>score</code> tekrar gelirse son gelen eskisinin yerine geçer (aşağıda). Hesap başına saatte 120 istek ve günde 200 000 örnek kabul edilir.</p>
 <pre>curl -X POST ${origin}/v1/ingest ${H} \\
   -H "Content-Type: application/json" \\
   --data-binary @sync.json
 
 {"accepted": 2, "duplicates": 0}</pre>
 <pre>${INGEST_BODY}</pre>
-<p>Doğrulanan alanlar: <code>schema</code> <code>freeband.v1</code>, <code>event</code> <code>sync.completed</code>, <code>device.id</code> UUID, <code>device.model</code> <code>band10</code> ya da <code>band10pro</code>, <code>heart_rate</code> 0–250, <code>level</code> 0–100, <code>steps</code> 0–200 000, <code>calories</code> 0–50 000, <code>standing_hours</code> 0–24, <code>ts</code> en fazla 2 gün ileride. Bir hesapta en fazla 10 bant olabilir. <code>device.tz</code> gelirse hesabın saat dilimi ona göre güncellenir.</p>
+<p>Doğrulanan alanlar: <code>schema</code> <code>freeband.v1</code>, <code>event</code> <code>sync.completed</code> ya da <code>sync.partial</code>, <code>device.id</code> UUID, <code>device.model</code> <code>band10</code> ya da <code>band10pro</code>, <code>heart_rate</code> 0–250, <code>level</code> 0–100, <code>steps</code> 0–200 000, <code>calories</code> 0–50 000, <code>standing_hours</code> 0–24, <code>ts</code> en fazla 2 gün ileride. Bir hesapta en fazla 10 bant olabilir. <code>device.tz</code> gelirse hesabın saat dilimi ona göre güncellenir.</p>
+<p><code>sync.partial</code>, senkron yarıda kaldığında (ör. 20 dosyadan 12'si okunduğunda) gönderilir. Gövdedeki örnekler geçerlidir ve saklanır; kalanı sonraki senkronda gelir. Webhook'lara aynı olay adıyla iletilir.</p>
+<p>Sözleşme yalnız ekleyerek büyür. Hub tanımadığı bir türdeki örneği reddetmez, atlar ve cevapta sayar: <code>{"accepted": 1, "duplicates": 0, "ignored": 2}</code> (<code>ignored</code> yalnız 0'dan büyükse gelir). Tanınan bir türde tek bir geçersiz alan bütün gövdeyi <code>400 invalid_body</code> ile reddeder; hata mesajı alanın yolunu verir (ör. <code>samples[3].heart_rate</code>).</p>
+
+<h2 id="saglik">Sağlık verisi: dakika, uyku, skor</h2>
+<p>Uygulama bandın aktivite dosyalarını çözünce üç tür daha gönderir. Üçü de üzerine yazılır: aynı <code>(device.id, type, ts)</code> yeniden gelirse son gelen kazanır ve satırın tamamı yenisiyle değişir. Değişmeden gelen satır <code>duplicates</code>'e sayılır ve webhook'ları yeniden tetiklemez. Nabız 30–220, SpO2 70–100, stres 1–100 aralığındadır; ölçülmeyen isteğe bağlı alan gönderilmez ya da <code>null</code> olur.</p>
+<pre>${HEALTH_SAMPLES}</pre>
+<ul>
+  <li><code>minute</code>: <code>ts</code> dakikanın başı (saniye 0). <code>steps</code> 0–1000; isteğe bağlı <code>heart_rate</code>, <code>spo2</code>, <code>stress</code>, <code>active_calories</code> (0–100 kcal), <code>distance_m</code> (0–1000). Yalnız boş olmayan dakikalar gönderilir; bir gövdede en fazla bir gün önerilir.</li>
+  <li><code>sleep</code>: <code>ts</code> yatış, <code>end</code> kalkış (en fazla 24 saat). <code>minutes</code> evre dakikaları, <code>efficiency</code> yüzde, <code>stages</code> <code>[yatıştan dakika, evre, süre]</code> üçlüleri (<code>deep</code>, <code>light</code>, <code>rem</code>, <code>awake</code>). <code>hr_min</code>, <code>spo2_avg</code>, <code>spo2_min</code> ölçülmediyse <code>null</code>; <code>hrv_rmssd</code> yalnız RR varsa. Gece, uyandığın güne aittir.</li>
+  <li><code>score</code>: <code>ts</code>, <code>date</code> gününün yerel gece yarısı. <code>sleep</code> ve <code>recovery</code> 0–100, <code>strain</code> 0–21, hepsi <code>null</code> olabilir. <code>confidence</code> her skor için <code>high</code>, <code>medium</code>, <code>low</code> ya da <code>none</code>. <code>contributors</code> katkı satırları (<code>key</code> gerekli; <code>score</code>, <code>weight</code>, <code>value</code>, <code>unit</code>, <code>subscore</code>, <code>baseline</code>, <code>note</code> isteğe bağlı). <code>algo</code> algoritmanın sürümü.</li>
+</ul>
 
 <h2 id="okuma">Veriyi okuma</h2>
 <h3>Ham örnekler</h3>
-<p><code>GET /v1/samples</code> örnekleri zamana göre artan sırada döner. Parametreler: <code>device</code> (bant kimliği; verilmezse tüm bantlar), <code>type</code> (<code>live</code> ya da <code>battery</code>), <code>from</code>, <code>to</code>, <code>limit</code> (varsayılan 1000, en fazla 5000). <code>from</code> ve <code>to</code> ya ISO 8601 zaman (<code>from</code> dahil, <code>to</code> hariç) ya da hesabın saat dilimine göre <code>YYYY-MM-DD</code> gün (iki uç da dahil) olabilir. <code>has_more</code> doğruysa son örneğin zamanını yeni <code>from</code> olarak kullan.</p>
+<p><code>GET /v1/samples</code> canlı ve pil örneklerini zamana göre artan sırada döner. Parametreler: <code>device</code> (bant kimliği; verilmezse tüm bantlar), <code>type</code> (<code>live</code> ya da <code>battery</code>), <code>from</code>, <code>to</code>, <code>limit</code> (varsayılan 1000, en fazla 5000). <code>from</code> ve <code>to</code> ya ISO 8601 zaman (<code>from</code> dahil, <code>to</code> hariç) ya da hesabın saat dilimine göre <code>YYYY-MM-DD</code> gün (iki uç da dahil) olabilir. <code>has_more</code> doğruysa son örneğin zamanını yeni <code>from</code> olarak kullan.</p>
 <pre>curl "${origin}/v1/samples?type=live&from=2026-10-13&to=2026-10-13" ${H}
 
 {"samples": [{"device_id": "5B0E2C9A-…", "type": "live", "ts": "2026-10-13T20:59:41Z",
   "steps": 8421, "calories": 312, "heart_rate": 74, "standing_hours": 9}],
  "has_more": false}</pre>
 
+<h3>Dakikalar</h3>
+<p><code>GET /v1/minutes</code> dakikaları zamana göre artan sırada döner. Parametreler: <code>device</code>, <code>from</code>, <code>to</code> (ham örneklerdeki gibi), <code>limit</code> (varsayılan 1440, en fazla 5000) ve <code>after</code>. <code>has_more</code> doğruysa aynı isteği <code>after=</code> ve cevaptaki <code>next</code> değeriyle tekrarla; birden çok bant aynı dakikayı paylaşsa da hiçbir satır atlanmaz.</p>
+<pre>curl "${origin}/v1/minutes?from=2026-10-13&to=2026-10-13" ${H}
+
+{"minutes": [{"device_id": "5B0E2C9A-…", "type": "minute", "ts": "2026-10-13T07:42:00Z",
+  "steps": 112, "heart_rate": 96, "spo2": 97, "stress": 34, "active_calories": 6, "distance_m": 84}],
+ "has_more": true, "next": "…"}
+
+curl "${origin}/v1/minutes?from=2026-10-13&to=2026-10-13&after=…" ${H}</pre>
+
+<h3>Uyku</h3>
+<p><code>GET /v1/sleep</code> uyku oturumlarını döner. <code>from</code> ve <code>to</code> kalkış zamanına (<code>end</code>) uygulanır: <code>from=2026-10-13&amp;to=2026-10-13</code> 12'sini 13'üne bağlayan geceyi ve 13'ündeki şekerlemeleri verir. <code>limit</code> varsayılan 100, en fazla 1000; sayfalama dakikalardaki gibi.</p>
+<pre>curl "${origin}/v1/sleep?from=2026-10-13&to=2026-10-13" ${H}
+
+{"sleep": [{"device_id": "5B0E2C9A-…", "type": "sleep", "ts": "2026-10-12T20:41:00Z", "end": "2026-10-13T04:12:00Z",
+  "is_nap": false, "minutes": {"deep": 82, "light": 241, "rem": 96, "awake": 32}, "wake_count": 3, "efficiency": 93,
+  "stages": [[0, "light", 14], [14, "deep", 38]], "hr_min": 48, "spo2_avg": 96.4, "spo2_min": 91, "hrv_rmssd": 42}],
+ "has_more": false, "next": null}</pre>
+
+<h3>Skorlar</h3>
+<p><code>GET /v1/scores</code> günlük skorları kendi <code>date</code> alanına göre döner. <code>from</code> ve <code>to</code> yalnız <code>YYYY-MM-DD</code> olabilir (iki uç dahil); verilmezse sınır yok. <code>limit</code> varsayılan 366, en fazla 1000; sayfalama dakikalardaki gibi.</p>
+<pre>curl "${origin}/v1/scores?from=2026-10-01&to=2026-10-13" ${H}
+
+{"scores": [{"device_id": "5B0E2C9A-…", "type": "score", "ts": "2026-10-12T21:00:00Z", "date": "2026-10-13",
+  "sleep": 82, "recovery": 64, "strain": 11.4, "rhr": 54, "hrv_rmssd": 41.5,
+  "confidence": {"sleep": "high", "recovery": "medium", "strain": "low"},
+  "contributors": [{"score": "sleep", "key": "duration", "weight": 35, "value": 431, "unit": "min", "subscore": 88}],
+  "algo": "freeband-score/1"}],
+ "has_more": false, "next": null}</pre>
+
 <h3>Günlük özet</h3>
-<p><code>GET /v1/days</code> her gün ve her bant için bir satır döner; günler hesabın saat dilimine göredir. <code>steps</code> ve <code>calories</code> gün içinde birikimli geldiği için günün en büyük değeridir. Nabız özetleri 0 değerlerini (ölçülmedi) saymaz. Veri olmayan günler listede yer almaz. Varsayılan aralık bugün dahil son 14 gün, en fazla 366 gün.</p>
+<p><code>GET /v1/days</code> her gün ve her bant için bir satır döner; günler hesabın saat dilimine göredir. <code>steps</code>, canlı örneklerin birikimli en büyük değeri ile dakika adımlarının toplamından büyük olanıdır. <code>calories</code> canlı örneklerden gelir. Nabız özetleri canlı örnekleri ve dakikaları birlikte kullanır ve yalnız 30–220 bpm arasını sayar. Varsa <code>sleep_minutes</code> (o gün biten gece uykusunun derin + hafif + REM dakikaları), <code>nap_minutes</code> (o gün biten şekerlemeler) ve <code>score</code> (o günün skorları) da gelir. Hiç verisi olmayan günler listede yer almaz. Varsayılan aralık bugün dahil son 14 gün, en fazla 366 gün.</p>
 <pre>curl "${origin}/v1/days?from=2026-10-01&to=2026-10-13" ${H}
 
 {"tz": "Europe/Istanbul", "from": "2026-10-01", "to": "2026-10-13", "days": [
   {"date": "2026-10-13", "device_id": "5B0E2C9A-…", "steps": 8421, "calories": 312,
-   "heart_rate_min": 52, "heart_rate_max": 131, "heart_rate_avg": 74, "battery_last": 46}]}</pre>
+   "heart_rate_min": 52, "heart_rate_max": 131, "heart_rate_avg": 74, "battery_last": 46,
+   "sleep_minutes": 419, "nap_minutes": 35,
+   "score": {"sleep": 82, "recovery": 64, "strain": 11.4, "rhr": 54, "hrv_rmssd": 41.5,
+             "confidence": {"sleep": "high", "recovery": "medium", "strain": "low"}, "algo": "freeband-score/1"}}]}</pre>
 
 <h3>Dışa aktarma</h3>
-<p><code>GET /v1/export.csv</code> ve <code>GET /v1/export.json</code>, <code>/v1/samples</code> ile aynı <code>from</code>, <code>to</code>, <code>device</code>, <code>type</code> parametrelerini alır. Parametresiz çağrı tüm veriyi verir. Her satır <code>device_id</code> taşır. Tek seferde en fazla 200 000 örnek; daha fazlası için aralığı böl.</p>
+<p><code>GET /v1/export.csv</code> ve <code>GET /v1/export.json</code>, <code>/v1/samples</code> ile aynı <code>from</code>, <code>to</code> ve <code>device</code> parametrelerini alır; <code>type</code> <code>live</code>, <code>battery</code>, <code>minute</code>, <code>sleep</code> ya da <code>score</code> olabilir. Parametresiz çağrı tüm veriyi verir. Her satır <code>device_id</code> taşır. Tek seferde toplam en fazla 200 000 satır; daha fazlası için aralığı böl.</p>
+<p>JSON her türü içerir: <code>samples</code> (canlı ve pil), <code>minutes</code>, <code>sleep</code> ve <code>scores</code> dizileri, okuma uç noktalarındaki biçimde. CSV düz bir tablo olduğu için her tür kendi dosyasındadır: varsayılan CSV canlı ve pil örnekleridir; <code>type=minute</code>, <code>type=sleep</code> ve <code>type=score</code> kendi sütunlarıyla gelir. Uyku evreleri ve skor katkıları CSV'de tırnaklı JSON hücresidir.</p>
 <pre>curl -o freeband.csv "${origin}/v1/export.csv?from=2026-10-01" ${H}
 
 device_id,type,ts,steps,calories,heart_rate,standing_hours,level
 5B0E2C9A-…,battery,2026-10-13T20:59:40Z,,,,,46
-5B0E2C9A-…,live,2026-10-13T20:59:41Z,8421,312,74,9,</pre>
+5B0E2C9A-…,live,2026-10-13T20:59:41Z,8421,312,74,9,
+
+curl -o dakikalar.csv "${origin}/v1/export.csv?type=minute&from=2026-10-01" ${H}
+
+device_id,type,ts,steps,heart_rate,spo2,stress,active_calories,distance_m
+5B0E2C9A-…,minute,2026-10-13T07:42:00Z,112,96,97,34,6,84
+
+curl -o uyku.csv "${origin}/v1/export.csv?type=sleep" ${H}
+curl -o skorlar.csv "${origin}/v1/export.csv?type=score" ${H}
+curl -o freeband.json "${origin}/v1/export.json" ${H}</pre>
 
 <h2 id="webhook">Webhook'lar</h2>
-<p>Hub, her başarılı gönderimden sonra (en az bir yeni örnek varsa) aynı gövdeyi hesabın webhook'larına POST eder. Adres yalnız <code>https://</code> olabilir, hub'ın kendi alan adı, IP adresleri ve yerel adlar kabul edilmez. Hesap başına en fazla 5 webhook. Yönlendirmeler izlenmez, zaman aşımı 5 saniyedir, şimdilik yeniden deneme yoktur. Aynı örnek iki kez gelebilir; alıcı <code>(device.id, type, ts)</code> ile tekilleştirmeli.</p>
+<p>Hub, her başarılı gönderimden sonra (en az bir yeni ya da değişen satır varsa) doğruladığı gövdeyi, gövdenin olayıyla (<code>sync.completed</code> ya da <code>sync.partial</code>) hesabın webhook'larına POST eder. Hub'ın tanımadığı türler iletilmez. Adres yalnız <code>https://</code> olabilir, hub'ın kendi alan adı, IP adresleri ve yerel adlar kabul edilmez. Hesap başına en fazla 5 webhook. Yönlendirmeler izlenmez, zaman aşımı 5 saniyedir, şimdilik yeniden deneme yoktur. Aynı örnek iki kez gelebilir; alıcı <code>(device.id, type, ts)</code> ile tekilleştirmeli, <code>minute</code>, <code>sleep</code> ve <code>score</code> için son geleni saklamalı, tanımadığı türleri atlamalı.</p>
 <pre>curl -X POST ${origin}/v1/webhooks ${H} \\
   -H "Content-Type: application/json" \\
   -d '{"url": "https://ornek.com/freeband"}'
@@ -168,7 +244,7 @@ curl -X DELETE ${origin}/v1/webhooks/ID ${H}</pre>
 <p>Her istek şu başlıklarla gelir:</p>
 <ul>
   <li><code>Content-Type: application/json</code></li>
-  <li><code>X-Freeband-Event</code>: <code>sync.completed</code> ya da <code>ping</code></li>
+  <li><code>X-Freeband-Event</code>: <code>sync.completed</code>, <code>sync.partial</code> ya da <code>ping</code></li>
   <li><code>X-Freeband-Delivery</code>: her gönderim için rastgele bir UUID</li>
   <li><code>X-Freeband-Signature</code>: <code>sha256=</code> ve gövdenin HMAC-SHA256 özeti (küçük harf hex). Anahtar, gizli değerin UTF-8 baytlarıdır.</li>
 </ul>

@@ -10,12 +10,13 @@
 // Colours and the opening animation live in the stylesheet (layout.ts), so the
 // markup needs no style attributes under the CSP.
 
+import { isHeartRate } from "../lib/validate";
 import { html, raw, type Safe } from "./html";
 
 export interface DialData {
   /** Steps walked in each local hour 0..23. */
   hourlySteps: number[];
-  /** Heart-rate points: local hour of day (fractional) and bpm (> 0). */
+  /** Heart-rate points: local hour of day (fractional) and bpm (30–220). */
   heart: Array<{ h: number; bpm: number }>;
   /** Local hour of "now" when the dial shows today, else null. */
   nowHour: number | null;
@@ -289,11 +290,11 @@ export function hourlyFromCumulative(points: Array<{ h: number; steps: number }>
   return out;
 }
 
-/** Average heart rate per 5-minute bucket, ignoring 0 (not measured). */
+/** Average heart rate per 5-minute bucket, ignoring values outside 30–220 bpm (0 = not measured). */
 export function heartBuckets(points: Array<{ h: number; bpm: number }>): Array<{ h: number; bpm: number }> {
   const buckets = new Map<number, { sum: number; n: number }>();
   for (const p of points) {
-    if (p.bpm <= 0) continue;
+    if (!isHeartRate(p.bpm)) continue;
     const k = Math.floor(p.h * 12);
     const b = buckets.get(k) ?? { sum: 0, n: 0 };
     b.sum += p.bpm;

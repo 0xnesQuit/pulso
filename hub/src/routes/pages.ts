@@ -6,6 +6,7 @@ import { pageSession } from "../lib/auth";
 import { UUID_RE } from "../lib/crypto";
 import { daySummaries, listDevices, querySamples, type DayOut, type DeviceOut } from "../lib/queries";
 import { addDays, isDate, localDate, localHourOfDay, startOfLocalDay } from "../lib/time";
+import { isHeartRate } from "../lib/validate";
 import { MAX_WEBHOOKS } from "../lib/webhooks";
 import { dial, heartBuckets, hourlyFromCumulative, pulseCurve } from "../views/dial";
 import { clock, dayLabel, num, shortDay } from "../views/format";
@@ -187,7 +188,7 @@ async function loadDay(db: D1Database, accountId: string, tz: string, device: De
       }
       if (r.calories !== null) calories = Math.max(calories ?? 0, r.calories);
       if (r.standing_hours !== null) standing = r.standing_hours;
-      if (r.heart_rate !== null && r.heart_rate > 0) {
+      if (isHeartRate(r.heart_rate)) {
         hrPts.push({ h, bpm: r.heart_rate });
         lastHr = { bpm: r.heart_rate, ts: r.ts };
         hrMin = Math.min(hrMin ?? r.heart_rate, r.heart_rate);
@@ -391,8 +392,9 @@ ${deviceSwitcher}
   <div class="grid g3">
     <div>
       <h3>Dışa aktar</h3>
-      <p class="muted">Buradaki tüm verini indir. Her satırda hangi banttan geldiği yazar.</p>
+      <p class="muted">Buradaki tüm verini indir. Her satırda hangi banttan geldiği yazar. JSON her şeyi içerir; CSV canlı örnekler ve pil içindir, diğer türlerin kendi CSV'leri var.</p>
       <div class="row"><a class="btn ghost" href="/v1/export.csv" download>CSV indir</a><a class="btn ghost" href="/v1/export.json" download>JSON indir</a></div>
+      <p class="small muted">Diğer CSV'ler: <a href="/v1/export.csv?type=minute" download>dakikalar</a>, <a href="/v1/export.csv?type=sleep" download>uyku</a>, <a href="/v1/export.csv?type=score" download>skorlar</a>.</p>
     </div>
     <div class="span2">
       <h3>Webhook'lar</h3>
@@ -422,19 +424,19 @@ ${deviceSwitcher}
       <p class="muted">Uygulama veriyi bu anahtarla gönderir. Anahtarın başkasının eline geçtiğini düşünüyorsan yenisini oluştur.</p>
       <button type="button" class="ghost" id="rot-start">Yeni anahtar oluştur</button>
       <div id="rot-confirm" class="confirm" hidden>
-        <p>Eski anahtar hemen çalışmaz olur ve diğer tarayıcılardaki oturumlar kapanır. Telefondaki uygulama, yeni anahtarı girene kadar veri gönderemez.</p>
+        <p>Eski anahtar hemen çalışmaz olur ve diğer tarayıcılardaki oturumlar kapanır. Yeni anahtarı telefonda Freeband'de <strong>Ayarlar → Web erişimi → API anahtarını gir</strong> alanına yapıştırana kadar uygulama veri gönderemez.</p>
         <div class="row"><button type="button" id="rot-go">Yeni anahtarı oluştur</button><button type="button" class="ghost" id="rot-cancel">Vazgeç</button></div>
         <p id="rot-out" class="small" role="status"></p>
       </div>
       <div id="rot-result" hidden>
-        <p>Yeni anahtarın bu. Şimdi kopyala ve uygulamaya gir; bir daha gösterilmeyecek.</p>
+        <p>Yeni anahtarın bu. Şimdi kopyala; bir daha gösterilmeyecek. Telefonda Freeband'i aç ve <strong>Ayarlar → Web erişimi → API anahtarını gir</strong> alanına yapıştır (İngilizce arayüzde Settings → Web access → Enter API key).</p>
         <code id="rot-token" class="secret"></code>
         <button type="button" id="rot-copy">Kopyala</button>
       </div>
     </div>
     <div>
       <h3>Hesabı sil</h3>
-      <p class="muted">Hesabın ve bu sunucudaki tüm örneklerin, bant kayıtların, webhook'ların ve oturumların kalıcı olarak silinir. Telefondaki veriye dokunulmaz.</p>
+      <p class="muted">Hesabın ve bu sunucudaki tüm örneklerin, dakika, uyku ve skor kayıtların, bant kayıtların, webhook'ların ve oturumların kalıcı olarak silinir. Telefondaki veriye dokunulmaz.</p>
       <button type="button" class="ghost danger" id="del-start">Hesabı sil</button>
       <div id="del-confirm" class="confirm" hidden>
         <label for="del-input">Onaylamak için <strong>sil</strong> yaz</label>

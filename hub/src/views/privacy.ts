@@ -18,6 +18,9 @@ export function privacyBody(): Safe {
   <li>Hesap: rastgele bir hesap kimliği, erişim anahtarının SHA-256 özeti (anahtarın kendisi değil), saat dilimi, hesap açılırken verilen cihaz adı ve oluşturulma zamanı.</li>
   <li>Bantlar: uygulamanın her bant için ürettiği rastgele kimlik (MAC adresi ya da seri numarası değil), bant adı, modeli, uygulama sürümü, ilk ve son görülme zamanı.</li>
   <li>Örnekler: zaman, adım, kalori, nabız, ayakta geçen saat ve pil yüzdesi.</li>
+  <li>Dakikalık veri: her dakika için adım, nabız, kandaki oksijen (SpO2), stres, aktif kalori ve mesafe.</li>
+  <li>Uyku: yatış ve kalkış zamanı, evreler ve süreleri, uyanma sayısı, verimlilik, gece en düşük nabız, SpO2 ve kalp atım değişkenliği (HRV).</li>
+  <li>Skorlar: uygulamanın telefonda hesapladığı günlük uyku, toparlanma ve yük skorları, dinlenik nabız, güven düzeyi, katkı satırları ve algoritma sürümü.</li>
   <li>Webhook'lar: eklediğin adresler, şifrelenmiş gizli değerleri ve son gönderimin sonucu.</li>
   <li>Web oturumları: tarayıcındaki çerezin özeti ve bitiş zamanı (en fazla 30 gün).</li>
   <li>Kötüye kullanımı sınırlamak için kısa süreli sayaçlar: IP adresinin anahtarlı özeti, ham IP değil. En geç iki gün içinde silinir.</li>
@@ -34,7 +37,7 @@ export function privacyBody(): Safe {
 <p>Bir webhook eklersen verin her senkronizasyondan sonra seçtiğin adrese de gönderilir. O adrese ulaştıktan sonra veriden adresin sahibi sorumludur.</p>
 </div></section>
 <section class="split"><h2>Silme</h2><div>
-<p>Panelde Hesabı sil'e dokun ya da <code>DELETE /v1/account</code> çağır. Hesabın, örneklerin, bant kayıtların, webhook'ların ve oturumların hemen ve kalıcı olarak silinir; geri alınamaz. Silinen veri, Cloudflare D1'in geri yükleme kaydında en fazla 30 gün daha kalabilir; bu sürede panelden ya da API'den ulaşılamaz ve süre dolunca kendiliğinden kaybolur.</p>
+<p>Panelde Hesabı sil'e dokun ya da <code>DELETE /v1/account</code> çağır. Hesabın, örneklerin, dakikalık veri, uyku ve skor kayıtların, bant kayıtların, webhook'ların ve oturumların hemen ve kalıcı olarak silinir; geri alınamaz. Silinen veri, Cloudflare D1'in geri yükleme kaydında en fazla 30 gün daha kalabilir; bu sürede panelden ya da API'den ulaşılamaz ve süre dolunca kendiliğinden kaybolur.</p>
 <p>Telefondaki veri bundan etkilenmez; onu uygulamadan ya da uygulamayı silerek kaldırırsın.</p>
 </div></section>
 <section class="split"><h2>Soru</h2><div>

@@ -205,10 +205,12 @@ Durum notu: aktivite dosyası çözücüleri Swift'e taşındı (`ios/Freeband/B
 | 5a | Hub veri katmanı: `minute`/`sleep`/`score`, upsert, yeni uç noktalar, hata düzeltmeleri 4/6, testler | D | sürüyor |
 | 2a | Tasarım sistemi: token'lar, yazı, hareket ve bileşenler (önizlemelerle) | B | başlıyor |
 | 2b | Ekranlar (4 sekme), yerelleştirme (EN/TR), ikon, eski kodun silinmesi | E | A ve B'den sonra |
-| 3 | Bant kontrolleri: kayıpsız `PBTree`, `.exchange` oturumu, alarmlar, sağlık izleme, DND ve bileği kaldırınca ekran (önce GET), hava durumu, kadranlar | C | E'den sonra |
-| 5b | Hub paneli Tesla diline ve yeni verilere geçer; yayın (önce migration) | D2 | 5a ve 2a'dan sonra |
+| 3 | Bant kontrolleri: kayıpsız `PBTree`, `.exchange` oturumu, alarmlar, sağlık izleme, DND ve bileği kaldırınca ekran (önce GET), hava durumu, kadranlar | — | **ertelendi** (ajan bütçesi; cihaz doğrulaması zaten sabah gerekli) |
+| 5b | Hub paneli Tesla diline ve yeni verilere geçer; yayın (önce migration) | — | **ertelendi** (ajan bütçesi) |
 | 4 | Mi Fitness'ın yerine geçme: arka plan modu, ACK. **Bu gece yalnız iskelet, ACK varsayılan kapalı** | — | sona |
 | QA | Ekran görüntüsü matrisi (açık/koyu × normal/büyük yazı × EN/TR), checklist-design denetimi, TestFlight, Obsidian/PLAN.md güncellemesi | ben | sona |
+
+**Ajan bütçesi (kullanıcı isteği):** aynı anda en fazla 2 ajan; bu gece A, B ve D bitince yalnız 1 yeni ajan (E, ekranlar). Gerisi ana oturumda ya da sonraki oturumda.
 
 Kurallar: ajanlar commit atmaz, her akışın sonunda ben test edip commit'lerim. Her ajanın kendi derleme klasörü olur. Banda yazan hiçbir test gece çalıştırılmaz, telefon başında kimse yok. 8/5 ACK gönderilmez. Repo private kalır.
 

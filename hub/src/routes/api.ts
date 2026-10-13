@@ -26,15 +26,34 @@ import {
 import { HttpError, LIMITS, clientIp, getCookie, isSameOrigin, readJson } from "../lib/http";
 import { RATE_LIMITS, enforce } from "../lib/ratelimit";
 import {
+  countMinutes,
   countSamples,
+  countScores,
+  countSleeps,
   daySummaries,
   listDevices,
+  minuteCursor,
+  minuteOut,
+  queryMinutes,
   querySamples,
+  queryScoresByDate,
+  queryScoresByTs,
+  querySleeps,
   sampleOut,
+  scoreCursor,
+  scoreOut,
+  sleepCursor,
+  sleepOut,
+  type MinuteCursor,
+  type MinuteDbRow,
   type SampleDbRow,
+  type ScoreCursor,
+  type ScoreDbRow,
+  type SleepCursor,
+  type SleepDbRow,
 } from "../lib/queries";
 import { addDays, daysBetween, isDate, isValidTz, isoOut, localDate, parseIsoInstant, startOfLocalDay } from "../lib/time";
-import { text, validateIngest, SCHEMA } from "../lib/validate";
+import { text, validateIngest, SCHEMA, type SampleRow } from "../lib/validate";
 import {
   MAX_WEBHOOKS,
   checkWebhookUrl,
@@ -108,20 +127,26 @@ api.get("/me", anyAuth, async (c) => {
   const db = c.env.DB;
   const [counts, devices, hooks] = await Promise.all([
     db
-      .prepare("SELECT type, COUNT(*) AS n FROM samples WHERE account_id = ?1 GROUP BY type")
+      .prepare(
+        `SELECT type, COUNT(*) AS n FROM samples WHERE account_id = ?1 GROUP BY type
+         UNION ALL SELECT 'minute', COUNT(*) FROM minutes WHERE account_id = ?1
+         UNION ALL SELECT 'sleep', COUNT(*) FROM sleeps WHERE account_id = ?1
+         UNION ALL SELECT 'score', COUNT(*) FROM scores WHERE account_id = ?1`,
+      )
       .bind(a.id)
       .all<{ type: string; n: number }>(),
     listDevices(db, a.id),
     db.prepare("SELECT COUNT(*) AS n FROM webhooks WHERE account_id = ?1").bind(a.id).first<{ n: number }>(),
   ]);
-  const byType: Record<string, number> = { live: 0, battery: 0 };
+  const byType: Record<string, number> = { live: 0, battery: 0, minute: 0, sleep: 0, score: 0 };
   for (const r of counts.results) byType[r.type] = r.n;
+  const total = Object.values(byType).reduce((x, y) => x + y, 0);
   return c.json({
     account_id: a.id,
     name: a.name,
     tz: a.tz,
     created_at: isoOut(a.created_at),
-    samples: { live: byType.live, battery: byType.battery, total: (byType.live ?? 0) + (byType.battery ?? 0) },
+    samples: { ...byType, total },
     devices,
     webhooks: hooks?.n ?? 0,
   });
@@ -134,6 +159,9 @@ api.delete("/account", anyAuth, async (c) => {
   // foreign-key enforcement were off. One batch = one transaction.
   await db.batch([
     db.prepare("DELETE FROM samples WHERE account_id = ?1").bind(a.id),
+    db.prepare("DELETE FROM minutes WHERE account_id = ?1").bind(a.id),
+    db.prepare("DELETE FROM sleeps WHERE account_id = ?1").bind(a.id),
+    db.prepare("DELETE FROM scores WHERE account_id = ?1").bind(a.id),
     db.prepare("DELETE FROM devices WHERE account_id = ?1").bind(a.id),
     db.prepare("DELETE FROM webhooks WHERE account_id = ?1").bind(a.id),
     db.prepare("DELETE FROM sessions WHERE account_id = ?1").bind(a.id),
@@ -170,8 +198,8 @@ api.post("/ingest", bearerOnly, async (c) => {
 
   const raw = await readJson(c.req.raw, LIMITS.ingestBytes);
   const now = Date.now();
-  const { body, rows } = validateIngest(raw, now);
-  if (rows.length > 0) await enforce(db, RATE_LIMITS.samplesPerAccount, a.id, rows.length);
+  const { body, rows, count, ignored } = validateIngest(raw, now);
+  if (count > 0) await enforce(db, RATE_LIMITS.samplesPerAccount, a.id, count);
 
   const dev = body.device;
   const known = await db
@@ -197,32 +225,77 @@ api.post("/ingest", bearerOnly, async (c) => {
            last_seen = excluded.last_seen`,
       )
       .bind(a.id, dev.id, dev.name, dev.model, dev.app_version ?? null, now),
-    // One statement for up to 5000 samples: rows travel as a single JSON
-    // parameter and are expanded by json_each(). Duplicates are ignored.
-    db
-      .prepare(
-        `INSERT INTO samples (account_id, device_id, type, ts, steps, calories, heart_rate, standing_hours, level, received_at)
-         SELECT ?1, ?2,
-                json_extract(j.value, '$[0]'), json_extract(j.value, '$[1]'), json_extract(j.value, '$[2]'),
-                json_extract(j.value, '$[3]'), json_extract(j.value, '$[4]'), json_extract(j.value, '$[5]'),
-                json_extract(j.value, '$[6]'), ?3
-           FROM json_each(?4) AS j
-          WHERE 1
-         ON CONFLICT (account_id, device_id, type, ts) DO NOTHING`,
-      )
-      .bind(a.id, dev.id, now, JSON.stringify(rows)),
   ];
+  // Each table gets one statement: rows travel as a single JSON parameter
+  // and are expanded by json_each(). Statement indexes that write samples:
+  const writes: number[] = [];
+  const add = (stmt: D1PreparedStatement) => {
+    writes.push(stmts.length);
+    stmts.push(stmt);
+  };
+  if (rows.samples.length > 0) add(insertSamples(db, a.id, dev.id, now, rows.samples));
+  if (rows.minutes.length > 0) add(upsertHealth(db, MINUTES_UPSERT, a.id, dev.id, now, rows.minutes));
+  if (rows.sleeps.length > 0) add(upsertHealth(db, SLEEPS_UPSERT, a.id, dev.id, now, rows.sleeps));
+  if (rows.scores.length > 0) add(upsertHealth(db, SCORES_UPSERT, a.id, dev.id, now, rows.scores));
   // The phone is the source of truth for the user's time zone.
   if (dev.tz && dev.tz !== a.tz) {
     stmts.push(db.prepare("UPDATE accounts SET tz = ?1 WHERE id = ?2").bind(dev.tz, a.id));
   }
   const results = await db.batch(stmts);
-  const accepted = results[1]?.meta.changes ?? 0;
-  const duplicates = rows.length - accepted;
+  const accepted = writes.reduce((n, i) => n + (results[i]?.meta.changes ?? 0), 0);
+  const duplicates = count - accepted;
 
   if (accepted > 0) c.executionCtx.waitUntil(forwardIngest(c.env, a.id, body));
-  return c.json({ accepted, duplicates });
+  return c.json(ignored > 0 ? { accepted, duplicates, ignored } : { accepted, duplicates });
 });
+
+/** live/battery: insert-or-ignore on (device, type, ts). */
+function insertSamples(db: D1Database, accountId: string, deviceId: string, now: number, rows: SampleRow[]) {
+  return db
+    .prepare(
+      `INSERT INTO samples (account_id, device_id, type, ts, steps, calories, heart_rate, standing_hours, level, received_at)
+       SELECT ?1, ?2,
+              json_extract(j.value, '$[0]'), json_extract(j.value, '$[1]'), json_extract(j.value, '$[2]'),
+              json_extract(j.value, '$[3]'), json_extract(j.value, '$[4]'), json_extract(j.value, '$[5]'),
+              json_extract(j.value, '$[6]'), ?3
+         FROM json_each(?4) AS j
+        WHERE 1
+       ON CONFLICT (account_id, device_id, type, ts) DO NOTHING`,
+    )
+    .bind(accountId, deviceId, now, JSON.stringify(rows));
+}
+
+/**
+ * Upsert SQL for a health table: the last write wins, but a row that arrives
+ * unchanged is left alone, so it counts as a duplicate (meta.changes = 0)
+ * and an identical re-sync does not fire webhooks again.
+ */
+function healthUpsert(table: string, cols: string[]): string {
+  const values = cols.map((_, i) => `json_extract(j.value, '$[${i}]')`).join(", ");
+  const data = cols.filter((c) => c !== "ts");
+  return `INSERT INTO ${table} (account_id, device_id, ${cols.join(", ")}, received_at)
+     SELECT ?1, ?2, ${values}, ?3
+       FROM json_each(?4) AS j
+      WHERE 1
+     ON CONFLICT (account_id, device_id, ts) DO UPDATE SET
+       ${data.map((c) => `${c} = excluded.${c}`).join(", ")}, received_at = excluded.received_at
+     WHERE ${data.map((c) => `${table}.${c} IS NOT excluded.${c}`).join(" OR ")}`;
+}
+
+// Column order matches MinuteRow / SleepRow / ScoreRow in lib/validate.ts.
+const MINUTES_UPSERT = healthUpsert("minutes", ["ts", "steps", "heart_rate", "spo2", "stress", "active_calories", "distance_m"]);
+const SLEEPS_UPSERT = healthUpsert("sleeps", [
+  "ts", "end_ts", "is_nap", "deep_min", "light_min", "rem_min", "awake_min", "wake_count", "efficiency", "stages",
+  "hr_min", "spo2_avg", "spo2_min", "hrv_rmssd",
+]);
+const SCORES_UPSERT = healthUpsert("scores", [
+  "ts", "date", "sleep_score", "recovery_score", "strain_score", "rhr", "hrv_rmssd",
+  "conf_sleep", "conf_recovery", "conf_strain", "contributors", "algo",
+]);
+
+function upsertHealth(db: D1Database, sql: string, accountId: string, deviceId: string, now: number, rows: unknown[]) {
+  return db.prepare(sql).bind(accountId, deviceId, now, JSON.stringify(rows));
+}
 
 // ---------------------------------------------------------------------------
 // Reading data
@@ -264,17 +337,17 @@ function timeRange(c: Context<AppEnv>, tz: string): { from: number; to: number }
   return { from, to };
 }
 
+function limitParam(c: Context<AppEnv>, def: number, max: number): number {
+  const v = c.req.query("limit");
+  if (v === undefined) return def;
+  if (!/^\d+$/.test(v) || Number(v) < 1 || Number(v) > max) throw bad(`limit: 1 ile ${max} arasında olmalı`);
+  return Number(v);
+}
+
 api.get("/samples", anyAuth, async (c) => {
   const a = c.get("account");
   const { from, to } = timeRange(c, a.tz);
-  const limitRaw = c.req.query("limit");
-  let limit = DEFAULT_SAMPLE_LIMIT;
-  if (limitRaw !== undefined) {
-    if (!/^\d+$/.test(limitRaw) || Number(limitRaw) < 1 || Number(limitRaw) > LIMITS.maxSamples) {
-      throw bad(`limit: 1 ile ${LIMITS.maxSamples} arasında olmalı`);
-    }
-    limit = Number(limitRaw);
-  }
+  const limit = limitParam(c, DEFAULT_SAMPLE_LIMIT, LIMITS.maxSamples);
   const rows = await querySamples(c.env.DB, a.id, {
     from,
     to,
@@ -301,22 +374,124 @@ api.get("/days", anyAuth, async (c) => {
 });
 
 // ---------------------------------------------------------------------------
+// Health data: minutes, sleep sessions, daily scores
+
+/**
+ * `next` is an opaque cursor: pass it back as `after` to get the following
+ * page. Built from the ORDER BY columns, so pages never skip or repeat rows,
+ * even when several bands share a timestamp.
+ */
+function paged<R>(rows: R[], limit: number, cursorOf: (r: R) => Array<string | number>) {
+  const items = rows.slice(0, limit);
+  const last = items[items.length - 1];
+  const hasMore = rows.length > limit;
+  return { items, has_more: hasMore, next: hasMore && last !== undefined ? cursorOf(last).join("_") : null };
+}
+
+function parseAfter<C>(c: Context<AppEnv>, re: RegExp, build: (m: RegExpExecArray) => C): C | undefined {
+  const v = c.req.query("after");
+  if (v === undefined || v === "") return undefined;
+  const m = re.exec(v);
+  if (!m) throw bad("after: önceki cevabın next değeri olmalı");
+  return build(m);
+}
+
+const DEV = "([0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12})";
+const MINUTE_AFTER = new RegExp(`^(\\d{1,15})_${DEV}$`);
+const SLEEP_AFTER = new RegExp(`^(\\d{1,15})_${DEV}_(\\d{1,15})$`);
+const SCORE_AFTER = new RegExp(`^(\\d{4}-\\d{2}-\\d{2})_${DEV}_(\\d{1,15})$`);
+const up = (s: string | undefined): string => (s ?? "").toUpperCase();
+
+api.get("/minutes", anyAuth, async (c) => {
+  const a = c.get("account");
+  const { from, to } = timeRange(c, a.tz);
+  const limit = limitParam(c, 1440, LIMITS.maxSamples);
+  const after = parseAfter(c, MINUTE_AFTER, (m): MinuteCursor => [Number(m[1]), up(m[2])]);
+  const rows = await queryMinutes(c.env.DB, a.id, { from, to, device: optDevice(c), limit: limit + 1, after });
+  const p = paged(rows, limit, minuteCursor);
+  return c.json({ minutes: p.items.map(minuteOut), has_more: p.has_more, next: p.next });
+});
+
+/** Sessions are filtered and ordered by wake time (`end`): a night belongs to the day it ends. */
+api.get("/sleep", anyAuth, async (c) => {
+  const a = c.get("account");
+  const { from, to } = timeRange(c, a.tz);
+  const limit = limitParam(c, 100, 1000);
+  const after = parseAfter(c, SLEEP_AFTER, (m): SleepCursor => [Number(m[1]), up(m[2]), Number(m[3])]);
+  const rows = await querySleeps(c.env.DB, a.id, { from, to, device: optDevice(c), limit: limit + 1, after });
+  const p = paged(rows, limit, sleepCursor);
+  return c.json({ sleep: p.items.map(sleepOut), has_more: p.has_more, next: p.next });
+});
+
+/** Daily scores by their own `date` (the phone's local day); from/to are YYYY-MM-DD, both inclusive. */
+api.get("/scores", anyAuth, async (c) => {
+  const a = c.get("account");
+  const from = c.req.query("from") || "0000-01-01";
+  const to = c.req.query("to") || "9999-12-31";
+  if (c.req.query("from") && !isDate(from)) throw bad("from: YYYY-MM-DD olmalı");
+  if (c.req.query("to") && !isDate(to)) throw bad("to: YYYY-MM-DD olmalı");
+  if (from > to) throw bad("from, to'dan sonra olamaz");
+  const limit = limitParam(c, 366, 1000);
+  const after = parseAfter(c, SCORE_AFTER, (m): ScoreCursor => [m[1] ?? "", up(m[2]), Number(m[3])]);
+  const rows = await queryScoresByDate(c.env.DB, a.id, { from, to, device: optDevice(c), limit: limit + 1, after });
+  const p = paged(rows, limit, scoreCursor);
+  return c.json({ scores: p.items.map(scoreOut), has_more: p.has_more, next: p.next });
+});
+
+// ---------------------------------------------------------------------------
 // Export (streamed in keyset-paginated chunks)
 
-async function* exportRows(
-  db: D1Database,
-  accountId: string,
-  q: { from: number; to: number; device?: string | undefined; type?: "live" | "battery" | undefined },
-): AsyncGenerator<SampleDbRow[]> {
-  let after: [number, string, string] | undefined;
+const EXPORT_TYPES = ["live", "battery", "minute", "sleep", "score"] as const;
+type ExportType = (typeof EXPORT_TYPES)[number];
+
+interface ExportQuery {
+  from: number;
+  to: number;
+  device?: string | undefined;
+  type?: ExportType | undefined;
+}
+
+function optExportType(c: Context<AppEnv>): ExportType | undefined {
+  const v = c.req.query("type");
+  if (v === undefined || v === "") return undefined;
+  if (!(EXPORT_TYPES as readonly string[]).includes(v)) throw bad(`type: ${EXPORT_TYPES.join(", ")} olmalı`);
+  return v as ExportType;
+}
+
+/** Which tables an export covers: everything, or the one holding `type`. */
+function exportParts(type: ExportType | undefined) {
+  return {
+    samples: !type || type === "live" || type === "battery",
+    minutes: !type || type === "minute",
+    sleep: !type || type === "sleep",
+    scores: !type || type === "score",
+  };
+}
+
+const sampleType = (t: ExportType | undefined): "live" | "battery" | undefined =>
+  t === "live" || t === "battery" ? t : undefined;
+
+async function* chunks<R, C>(fetch: (after: C | undefined) => Promise<R[]>, cursorOf: (r: R) => C): AsyncGenerator<R[]> {
+  let after: C | undefined;
   for (;;) {
-    const rows = await querySamples(db, accountId, { ...q, limit: EXPORT_CHUNK, after });
+    const rows = await fetch(after);
     if (rows.length > 0) yield rows;
     if (rows.length < EXPORT_CHUNK) return;
-    const last = rows[rows.length - 1] as SampleDbRow;
-    after = [last.ts, last.device_id, last.type];
+    after = cursorOf(rows[rows.length - 1] as R);
   }
 }
+
+const exportSamples = (db: D1Database, accountId: string, q: ExportQuery) =>
+  chunks<SampleDbRow, [number, string, string]>(
+    (after) => querySamples(db, accountId, { ...q, type: sampleType(q.type), limit: EXPORT_CHUNK, after }),
+    (r) => [r.ts, r.device_id, r.type],
+  );
+const exportMinutes = (db: D1Database, accountId: string, q: ExportQuery) =>
+  chunks<MinuteDbRow, MinuteCursor>((after) => queryMinutes(db, accountId, { ...q, limit: EXPORT_CHUNK, after }), minuteCursor);
+const exportSleeps = (db: D1Database, accountId: string, q: ExportQuery) =>
+  chunks<SleepDbRow, SleepCursor>((after) => querySleeps(db, accountId, { ...q, limit: EXPORT_CHUNK, after }), sleepCursor);
+const exportScores = (db: D1Database, accountId: string, q: ExportQuery) =>
+  chunks<ScoreDbRow, ScoreCursor>((after) => queryScoresByTs(db, accountId, { ...q, limit: EXPORT_CHUNK, after }), scoreCursor);
 
 function textStream(gen: AsyncGenerator<string>): ReadableStream<Uint8Array> {
   const enc = new TextEncoder();
@@ -336,13 +511,35 @@ function textStream(gen: AsyncGenerator<string>): ReadableStream<Uint8Array> {
   });
 }
 
-const csvCell = (v: unknown): string => (v === null || v === undefined ? "" : String(v));
+/** RFC 4180 cell: quoted only when it holds a comma, quote or line break (JSON columns). */
+const csvCell = (v: unknown): string => {
+  if (v === null || v === undefined) return "";
+  const s = String(v);
+  return /[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+};
+
+async function* csvLines<R>(header: string, gen: AsyncGenerator<R[]>, cells: (r: R) => unknown[]): AsyncGenerator<string> {
+  yield header + "\n";
+  for await (const rows of gen) {
+    let chunk = "";
+    for (const r of rows) chunk += cells(r).map(csvCell).join(",") + "\n";
+    yield chunk;
+  }
+}
 
 async function prepareExport(c: Context<AppEnv>) {
   const a = c.get("account");
+  const db = c.env.DB;
   const { from, to } = timeRange(c, a.tz);
-  const q = { from, to, device: optDevice(c), type: optType(c) };
-  const n = await countSamples(c.env.DB, a.id, q);
+  const q: ExportQuery = { from, to, device: optDevice(c), type: optExportType(c) };
+  const parts = exportParts(q.type);
+  const counts = await Promise.all([
+    parts.samples ? countSamples(db, a.id, { ...q, type: sampleType(q.type) }) : 0,
+    parts.minutes ? countMinutes(db, a.id, q) : 0,
+    parts.sleep ? countSleeps(db, a.id, q) : 0,
+    parts.scores ? countScores(db, a.id, q) : 0,
+  ]);
+  const n = counts.reduce((x, y) => x + y, 0);
   if (n > EXPORT_MAX_ROWS) {
     throw new HttpError(
       413,
@@ -351,38 +548,74 @@ async function prepareExport(c: Context<AppEnv>) {
     );
   }
   const stamp = localDate(Date.now(), a.tz);
-  return { a, q, stamp };
+  return { a, q, parts, stamp };
 }
 
+/**
+ * CSV is one flat table per file: live and battery samples by default (or
+ * with type=live|battery), and minute, sleep or score with type=…
+ */
 api.get("/export.csv", anyAuth, async (c) => {
   const { a, q, stamp } = await prepareExport(c);
   const db = c.env.DB;
-  async function* lines(): AsyncGenerator<string> {
-    yield "device_id,type,ts,steps,calories,heart_rate,standing_hours,level\n";
-    for await (const rows of exportRows(db, a.id, q)) {
-      let chunk = "";
-      for (const r of rows) {
-        chunk +=
-          [r.device_id, r.type, isoOut(r.ts), r.steps, r.calories, r.heart_rate, r.standing_hours, r.level]
-            .map(csvCell)
-            .join(",") + "\n";
-      }
-      yield chunk;
-    }
+  let lines: AsyncGenerator<string>;
+  let name = `freeband-${stamp}.csv`;
+  if (q.type === "minute") {
+    name = `freeband-minute-${stamp}.csv`;
+    lines = csvLines("device_id,type,ts,steps,heart_rate,spo2,stress,active_calories,distance_m", exportMinutes(db, a.id, q), (r) => [
+      r.device_id, "minute", isoOut(r.ts), r.steps, r.heart_rate, r.spo2, r.stress, r.active_calories, r.distance_m,
+    ]);
+  } else if (q.type === "sleep") {
+    name = `freeband-sleep-${stamp}.csv`;
+    lines = csvLines(
+      "device_id,type,ts,end,is_nap,deep,light,rem,awake,wake_count,efficiency,hr_min,spo2_avg,spo2_min,hrv_rmssd,stages",
+      exportSleeps(db, a.id, q),
+      (r) => [
+        r.device_id, "sleep", isoOut(r.ts), isoOut(r.end_ts), r.is_nap === 1, r.deep_min, r.light_min, r.rem_min, r.awake_min,
+        r.wake_count, r.efficiency, r.hr_min, r.spo2_avg, r.spo2_min, r.hrv_rmssd, r.stages,
+      ],
+    );
+  } else if (q.type === "score") {
+    name = `freeband-score-${stamp}.csv`;
+    lines = csvLines(
+      "device_id,type,ts,date,sleep,recovery,strain,rhr,hrv_rmssd,confidence_sleep,confidence_recovery,confidence_strain,algo,contributors",
+      exportScores(db, a.id, q),
+      (r) => [
+        r.device_id, "score", isoOut(r.ts), r.date, r.sleep_score, r.recovery_score, r.strain_score, r.rhr, r.hrv_rmssd,
+        r.conf_sleep, r.conf_recovery, r.conf_strain, r.algo, r.contributors,
+      ],
+    );
+  } else {
+    lines = csvLines("device_id,type,ts,steps,calories,heart_rate,standing_hours,level", exportSamples(db, a.id, q), (r) => [
+      r.device_id, r.type, isoOut(r.ts), r.steps, r.calories, r.heart_rate, r.standing_hours, r.level,
+    ]);
   }
-  return new Response(textStream(lines()), {
+  return new Response(textStream(lines), {
     headers: {
       "Content-Type": "text/csv; charset=utf-8",
-      "Content-Disposition": `attachment; filename="freeband-${stamp}.csv"`,
+      "Content-Disposition": `attachment; filename="${name}"`,
     },
   });
 });
 
+async function* jsonArray<R>(name: string, gen: AsyncGenerator<R[]> | null, out: (r: R) => unknown): AsyncGenerator<string> {
+  yield `,"${name}":[`;
+  let first = true;
+  if (gen) {
+    for await (const rows of gen) {
+      yield (first ? "\n" : ",\n") + rows.map((r) => JSON.stringify(out(r))).join(",\n");
+      first = false;
+    }
+  }
+  yield first ? "]" : "\n]";
+}
+
+/** JSON holds every type: samples (live, battery), minutes, sleep and scores, each as in /v1/... */
 api.get("/export.json", anyAuth, async (c) => {
-  const { a, q, stamp } = await prepareExport(c);
+  const { a, q, parts, stamp } = await prepareExport(c);
   const db = c.env.DB;
   const devices = await listDevices(db, a.id);
-  async function* parts(): AsyncGenerator<string> {
+  async function* doc(): AsyncGenerator<string> {
     const head = {
       schema: SCHEMA,
       exported_at: isoOut(Date.now()),
@@ -392,16 +625,14 @@ api.get("/export.json", anyAuth, async (c) => {
       to: isoOut(q.to),
       devices: q.device ? devices.filter((d) => d.id === q.device) : devices,
     };
-    yield JSON.stringify(head).slice(0, -1) + ',"samples":[';
-    let first = true;
-    for await (const rows of exportRows(db, a.id, q)) {
-      const s = rows.map((r) => JSON.stringify(sampleOut(r))).join(",\n");
-      yield (first ? "\n" : ",\n") + s;
-      first = false;
-    }
-    yield "\n]}\n";
+    yield JSON.stringify(head).slice(0, -1);
+    yield* jsonArray("samples", parts.samples ? exportSamples(db, a.id, q) : null, sampleOut);
+    yield* jsonArray("minutes", parts.minutes ? exportMinutes(db, a.id, q) : null, minuteOut);
+    yield* jsonArray("sleep", parts.sleep ? exportSleeps(db, a.id, q) : null, sleepOut);
+    yield* jsonArray("scores", parts.scores ? exportScores(db, a.id, q) : null, scoreOut);
+    yield "}\n";
   }
-  return new Response(textStream(parts()), {
+  return new Response(textStream(doc()), {
     headers: {
       "Content-Type": "application/json; charset=utf-8",
       "Content-Disposition": `attachment; filename="freeband-${stamp}.json"`,

@@ -1,6 +1,7 @@
 // Server-side webhooks: URL policy, signing and delivery.
 
 import { decryptSecret, hmacSha256Hex } from "./crypto";
+import type { IngestBody, SyncEvent } from "./validate";
 
 export const MAX_WEBHOOKS = 5;
 export const DELIVERY_TIMEOUT_MS = 5000;
@@ -72,7 +73,7 @@ export async function signature(secret: string, body: Uint8Array): Promise<strin
 export async function deliver(
   env: Env,
   hook: HookRow,
-  event: "sync.completed" | "ping",
+  event: SyncEvent | "ping",
   body: Uint8Array,
 ): Promise<DeliveryResult> {
   let result: DeliveryResult;
@@ -124,8 +125,11 @@ export async function deliver(
   return result;
 }
 
-/** Forwards a validated ingest body to every webhook of the account. Runs inside waitUntil. */
-export async function forwardIngest(env: Env, accountId: string, body: unknown): Promise<void> {
+/**
+ * Forwards a validated ingest body to every webhook of the account, with the
+ * body's own event (sync.completed or sync.partial). Runs inside waitUntil.
+ */
+export async function forwardIngest(env: Env, accountId: string, body: IngestBody): Promise<void> {
   try {
     const { results } = await env.DB.prepare(
       "SELECT id, account_id, url, secret_enc FROM webhooks WHERE account_id = ?1",
@@ -134,7 +138,7 @@ export async function forwardIngest(env: Env, accountId: string, body: unknown):
       .all<HookRow>();
     if (results.length === 0) return;
     const bytes = new TextEncoder().encode(JSON.stringify(body));
-    await Promise.allSettled(results.map((h) => deliver(env, h, "sync.completed", bytes)));
+    await Promise.allSettled(results.map((h) => deliver(env, h, body.event, bytes)));
   } catch (err) {
     logError("webhook fan-out failed", err);
   }
