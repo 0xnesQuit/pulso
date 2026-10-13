@@ -23,11 +23,18 @@ extension View {
     }
 
     /// Pins the screen's one primary action to the bottom safe area ("Save", "Send to band").
-    func fbPinnedPrimary(_ title: String, isEnabled: Bool = true, background: Color = .raised,
-                         action: @escaping () -> Void) -> some View {
+    /// `secondary` pins a surface button instead, for actions that stop rather than commit
+    /// (the Live sheet's "Stop").
+    func fbPinnedPrimary(_ title: String, isEnabled: Bool = true, secondary: Bool = false,
+                         background: Color = .raised, action: @escaping () -> Void) -> some View {
         safeAreaInset(edge: .bottom, spacing: 0) {
-            Button(title, action: action)
-                .buttonStyle(.fbPrimary)
+            Group {
+                if secondary {
+                    Button(title, action: action).buttonStyle(.fbSecondary(fullWidth: true))
+                } else {
+                    Button(title, action: action).buttonStyle(.fbPrimary)
+                }
+            }
                 .disabled(!isEnabled)
                 .padding(.horizontal, FBSpace.gutter)
                 .padding(.top, FBSpace.xs)

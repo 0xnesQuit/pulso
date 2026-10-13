@@ -138,8 +138,9 @@ struct TrendChart: View {
     @Environment(\.locale) private var locale
     @ScaledMetric(relativeTo: .caption) private var fullHeight: CGFloat = 168
 
+    /// `selected` pre-selects a day (previews, the gallery, restoring a scrub).
     init(metric: TrendMetric, points: [TrendPoint], range: Binding<TrendRange>,
-         showsRangePicker: Bool = true, style: Style = .full) {
+         showsRangePicker: Bool = true, style: Style = .full, selected: Date? = nil) {
         self.title = metric.title
         self.unit = metric.unit
         self.mark = metric.mark
@@ -151,12 +152,14 @@ struct TrendChart: View {
         _range = range
         self.showsRangePicker = showsRangePicker
         self.style = style
+        _selectedDate = State(initialValue: selected)
     }
 
     init(title: String, unit: String? = nil, mark: TrendMark = .line, tint: Color = .textPrimary,
          thresholds: [Double] = [], yDomain: ClosedRange<Double>? = nil,
          format: @escaping (Double, Locale) -> String = { $0.formatted(.number.precision(.fractionLength(0)).locale($1)) },
-         points: [TrendPoint], range: Binding<TrendRange>, showsRangePicker: Bool = true, style: Style = .full) {
+         points: [TrendPoint], range: Binding<TrendRange>, showsRangePicker: Bool = true, style: Style = .full,
+         selected: Date? = nil) {
         self.title = title
         self.unit = unit
         self.mark = mark
@@ -168,6 +171,7 @@ struct TrendChart: View {
         _range = range
         self.showsRangePicker = showsRangePicker
         self.style = style
+        _selectedDate = State(initialValue: selected)
     }
 
     // MARK: data

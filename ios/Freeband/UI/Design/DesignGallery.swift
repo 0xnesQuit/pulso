@@ -6,6 +6,7 @@ import UIKit
 /// states. DEBUG only: launch with `-freeband-gallery`; add `-freeband-gallery-section <id>`
 /// to open scrolled to a section (ids below, e.g. `scores`, `trends`),
 /// `-freeband-gallery-only` to render just that section (screenshots at large text sizes),
+/// `-freeband-gallery-sheet action|live|form` to open a sample sheet,
 /// `-freeband-gallery-scheme light|dark` to force a theme and `-freeband-gallery-locale en_GB`
 /// to format dates and numbers in another locale. Info.plist still pins the app to dark
 /// (`UIUserInterfaceStyle`), which also hides the system setting from the screen's traits, so
@@ -50,7 +51,8 @@ struct DesignGallery: View {
 
     var body: some View {
         GalleryContent(initialSection: Self.argument(after: "-freeband-gallery-section"),
-                       only: ProcessInfo.processInfo.arguments.contains("-freeband-gallery-only"))
+                       only: ProcessInfo.processInfo.arguments.contains("-freeband-gallery-only"),
+                       initialSheet: Self.argument(after: "-freeband-gallery-sheet"))
             .environment(\.locale, locale)
             .preferredColorScheme(forcedScheme)
     }
@@ -59,6 +61,7 @@ struct DesignGallery: View {
 private struct GalleryContent: View {
     let initialSection: String?
     var only = false
+    var initialSheet: String?
 
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.colorSchemeContrast) private var contrast
@@ -99,7 +102,13 @@ private struct GalleryContent: View {
             }
             .background(.canvas)
             .task {
-                guard let initialSection else { return }
+                switch initialSheet {
+                case "action": sheet = .action
+                case "live": sheet = .live
+                case "form": sheet = .form
+                default: break
+                }
+                guard let initialSection, !only else { return }
                 try? await Task.sleep(for: .milliseconds(300))
                 proxy.scrollTo(initialSection, anchor: .top)
             }
@@ -338,6 +347,12 @@ private struct GalleryContent: View {
             Card { TrendChart(metric: .recovery, points: DesignSamples.days(DesignSamples.recovery), range: $range) }
             Card { TrendChart(metric: .sleepHours, points: DesignSamples.days(DesignSamples.sleepHours), range: $sleepRange) }
             Card { TrendChart(metric: .restingHeartRate, points: DesignSamples.days(DesignSamples.restingHR), range: $hrRange) }
+            label("Scrubbing · the selected day replaces the header value")
+                .id("trends-scrub")
+            Card {
+                TrendChart(metric: .sleepScore, points: DesignSamples.days(DesignSamples.sleepScore), range: .constant(.week),
+                           selected: Calendar.current.date(byAdding: .day, value: -2, to: Calendar.current.startOfDay(for: DesignSamples.now)))
+            }
             label("Trends list cards · static")
             Card {
                 TrendChart(metric: .steps, points: DesignSamples.days(DesignSamples.steps), range: .constant(.week),
@@ -444,14 +459,15 @@ private struct SampleSheet: View {
                 }
                 .padding(.horizontal, FBSpace.gutter)
             } else {
-                Text("The band vibrates until you stop it or tap it.")
+                Text(kind == .form ? "Alarms live on the band and vibrate without your phone."
+                                   : "The band vibrates until you stop it or tap it.")
                     .textStyle(.body)
                     .foregroundStyle(.textSecondary)
                     .padding(.horizontal, FBSpace.gutter)
             }
             Spacer(minLength: 0)
         }
-        .fbPinnedPrimary(kind == .form ? "Save" : "Stop") {}
+        .fbPinnedPrimary(kind == .form ? "Save" : "Stop", secondary: kind != .form) {}
         .fbSheet(kind)
     }
 }
