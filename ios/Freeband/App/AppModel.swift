@@ -57,6 +57,19 @@ final class AppModel: ObservableObject {
 
     func stop() { link.stop() }
 
+    private var notificationID: UInt32 = UInt32(Date().timeIntervalSince1970) % 100_000
+
+    /// Shows a notification on the band.
+    func notify(_ band: Band, title: String, body: String) {
+        notificationID &+= 1
+        start(band, .send([MiAuth.notificationCommand(id: notificationID, appName: "Freeband", title: title, body: body)]))
+    }
+
+    /// Starts or stops the band vibrating so it can be found.
+    func findBand(_ band: Band, start vibrating: Bool) {
+        start(band, .send([MiAuth.findBandCommand(start: vibrating)]))
+    }
+
     /// For pull to refresh: starts a sync and returns when the session has ended.
     func syncAndWait(_ band: Band) async {
         guard !link.phase.isBusy else { return }

@@ -350,3 +350,42 @@ extension MiAuth {
                          heartRate: stats.varints[4] ?? 0, standingHours: stats.varints[6] ?? 0)
     }
 }
+
+extension MiAuth {
+    /// Command{7, 0}: a notification shown on the band.
+    /// notification(9).notification2(3).notification3(1){package 1, appName 2, title 3,
+    /// unknown4 4 (""), body 5, timestamp 6 "yyyyMMdd'T'HHmmss" (local), id 7}
+    static func notificationCommand(id: UInt32, appName: String, title: String, body: String, date: Date = Date()) -> Data {
+        let format = DateFormatter()
+        format.locale = Locale(identifier: "en_US_POSIX")
+        format.dateFormat = "yyyyMMdd'T'HHmmss"
+        var n3 = PBWriter()
+        n3.string(1, "dev.cobanov.freeband")
+        n3.string(2, appName)
+        n3.string(3, title)
+        n3.string(4, "")
+        n3.string(5, body)
+        n3.string(6, format.string(from: date))
+        n3.varint(7, UInt64(id))
+        var n2 = PBWriter()
+        n2.message(1, n3)
+        var notification = PBWriter()
+        notification.message(3, n2)
+        var command = PBWriter()
+        command.varint(1, 7)
+        command.varint(2, 0)
+        command.message(9, notification)
+        return command.data
+    }
+
+    /// Command{2, 18, system(4).findDevice(5)}: 0 starts vibrating, 1 stops.
+    static func findBandCommand(start: Bool) -> Data {
+        var system = PBWriter()
+        system.varint(5, start ? 0 : 1)
+        var command = PBWriter()
+        command.varint(1, 2)
+        command.varint(2, 18)
+        command.message(4, system)
+        return command.data
+    }
+}

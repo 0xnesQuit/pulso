@@ -16,7 +16,8 @@ struct BandTarget {
 /// stats, then always hand the channel back (unsubscribe 005E, release the connection) so
 /// Mi Fitness keeps working. Protocol details: findings.md, sections 4–6.
 final class BandLink: NSObject, ObservableObject {
-    enum Purpose { case check, sync, live }
+    /// `send` authenticates, sends the given protobuf commands encrypted, then lets go.
+    enum Purpose: Equatable { case check, sync, live, send([Data]) }
 
     enum Phase: Equatable {
         case idle, searching, connecting, authenticating, reading, live, done
@@ -79,6 +80,7 @@ final class BandLink: NSObject, ObservableObject {
     private var active = false
     private var authed = false
     private var finishing = false
+    private var realtimeOn = false
     private var run = 0
     private var keyIndex = 0
     private var pendingStart: (() -> Void)?
@@ -110,6 +112,7 @@ final class BandLink: NSObject, ObservableObject {
         phoneNonce = Data()
         authed = false
         finishing = false
+        realtimeOn = false
         keyIndex = 0
         active = true
         note("başlat: \(target.name), \(target.keys.count) anahtar")
@@ -209,10 +212,19 @@ final class BandLink: NSObject, ObservableObject {
     private func didAuthenticate() {
         authed = true
         if let id = target?.id { onIdentified?(id, keyIndex, peripheral?.name) }
+        if case .send(let commands) = purpose {
+            phase = .reading
+            note("auth tamam → \(commands.count) komut gönderiliyor")
+            for command in commands { sendCommand(command, encrypted: true) }
+            let thisRun = run
+            after(2.0, thisRun) { [weak self] in self?.finish() }
+            return
+        }
         phase = purpose == .live ? .live : .reading
         note("auth tamam → pil + canlı istatistik")
         sendCommand(MiAuth.batteryCommand(), encrypted: true)
         sendCommand(MiAuth.realtimeCommand(start: true), encrypted: true)
+        realtimeOn = true
         let thisRun = run
         let window = purpose == .live ? Self.liveLimit : Self.syncWindow
         after(window, thisRun) { [weak self] in
@@ -300,7 +312,7 @@ final class BandLink: NSObject, ObservableObject {
     private func finish() {
         guard active, !finishing else { return }
         finishing = true
-        if authed { sendCommand(MiAuth.realtimeCommand(start: false), encrypted: true) }
+        if authed, realtimeOn { sendCommand(MiAuth.realtimeCommand(start: false), encrypted: true) }
         let thisRun = run
         after(0.4, thisRun) { [weak self] in
             guard let self else { return }

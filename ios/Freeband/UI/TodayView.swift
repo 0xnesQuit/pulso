@@ -9,6 +9,7 @@ struct TodayView: View {
     @EnvironmentObject private var link: BandLink
     @Query(sort: \Band.addedAt) private var bands: [Band]
     @AppStorage("selectedBand") private var selectedBand = ""
+    @State private var showingTools = false
 
     private var band: Band? { bands.first { $0.id.uuidString == selectedBand } ?? bands.first }
 
@@ -38,6 +39,9 @@ struct TodayView: View {
             }
             .background(Theme.ground)
             .toolbar(.hidden, for: .navigationBar)
+            .sheet(isPresented: $showingTools) {
+                if let band { ToolsSheet(band: band) }
+            }
             .task(id: bands.count) {
                 while !Task.isCancelled {
                     link.refreshNearby(bands.map { ($0.id, $0.macSuffix) })
@@ -55,6 +59,16 @@ struct TodayView: View {
                 .lineLimit(1)
                 .minimumScaleFactor(0.8)
             Spacer(minLength: 8)
+            if band != nil {
+                Button { showingTools = true } label: {
+                    Image(systemName: "dot.radiowaves.left.and.right")
+                        .font(.body)
+                        .foregroundStyle(Theme.ink)
+                        .frame(width: 32, height: 32)
+                        .overlay(Rectangle().stroke(Theme.line, lineWidth: 1))
+                }
+                .accessibilityLabel("Araçlar: bildirim gönder, bandı bul")
+            }
             if bands.count > 1 {
                 Menu {
                     ForEach(bands) { b in

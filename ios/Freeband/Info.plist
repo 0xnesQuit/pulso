@@ -43,7 +43,10 @@
 	<string>Freeband bileğindeki bantla doğrudan konuşmak için Bluetooth kullanır.</string>
 	<key>UIAppFonts</key>
 	<array>
-		<string>DepartureMono-Regular.otf</string>
+		<string>OpenSauceSans-Light.otf</string>
+		<string>OpenSauceSans-Regular.otf</string>
+		<string>OpenSauceSans-Medium.otf</string>
+		<string>OpenSauceSans-SemiBold.otf</string>
 	</array>
 	<key>UIApplicationSceneManifest</key>
 	<dict>

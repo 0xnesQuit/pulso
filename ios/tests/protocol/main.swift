@@ -47,6 +47,9 @@ let out: [String: Any] = [
     "battery_cmd": hex(MiAuth.batteryCommand()),
     "realtime_start": hex(MiAuth.realtimeCommand(start: true)),
     "realtime_stop": hex(MiAuth.realtimeCommand(start: false)),
+    "notify_cmd": hex(MiAuth.notificationCommand(id: 42, appName: "Freeband", title: "Başlık", body: "Merhaba", date: Date(timeIntervalSince1970: 1_760_000_000))),
+    "find_start": hex(MiAuth.findBandCommand(start: true)),
+    "find_stop": hex(MiAuth.findBandCommand(start: false)),
     "live_parsed": "\(live.steps)/\(live.calories)/\(live.heartRate)/\(live.standingHours)",
 ]
 print(String(data: try! JSONSerialization.data(withJSONObject: out, options: [.sortedKeys, .prettyPrinted]), encoding: .utf8)!)

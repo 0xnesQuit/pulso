@@ -1,8 +1,8 @@
 import SwiftUI
 import UIKit
 
-/// Tokens from docs/DESIGN.md (v2): always dark, hairline grids, Departure Mono for figures and
-/// labels, light SF Pro for headlines. Accent colours belong to data: phosphor is steps, pulse is
+/// Tokens from docs/DESIGN.md (v2): always dark, hairline grids, one typeface (Open Sauce Sans)
+/// in four weights: light headlines, regular text, medium labels, semibold figures. Accent colours belong to data: phosphor is steps, pulse is
 /// heart rate (and destructive actions). Buttons stay monochrome.
 enum Theme {
     static let ground = Color(hex: 0x0A0A0A)
@@ -17,16 +17,18 @@ enum Theme {
     /// The interface is Turkish; dates and numbers follow it whatever the phone's language.
     static let locale = Locale(identifier: "tr_TR")
 
-    static let monoName = "DepartureMono-Regular"
+    /// Labels, buttons and small readings (Open Sauce Sans Medium). The name stays `mono` from the
+    /// first v2 draft, which used a pixel monospace.
+    static func mono(_ size: CGFloat) -> Font { .custom("OpenSauceSans-Medium", size: size) }
 
-    /// Departure Mono, the pixel monospace used for figures, labels and buttons.
-    static func mono(_ size: CGFloat) -> Font { .custom(monoName, size: size) }
+    /// Large figures (steps, pulse, battery): semibold with tabular digits.
+    static func figure(_ size: CGFloat) -> Font { .custom("OpenSauceSans-SemiBold", size: size).monospacedDigit() }
 
-    /// Large figures (steps, pulse, battery).
-    static func figure(_ size: CGFloat) -> Font { mono(size) }
+    /// Headlines: light.
+    static func headline(_ size: CGFloat) -> Font { .custom("OpenSauceSans-Light", size: size) }
 
-    /// Headlines: thin and quiet next to the pixel figures.
-    static func headline(_ size: CGFloat) -> Font { .system(size: size, weight: .light) }
+    /// Body text, scaling with Dynamic Type.
+    static let body = Font.custom("OpenSauceSans-Regular", size: 17, relativeTo: .body)
 }
 
 extension Color {

@@ -27,6 +27,7 @@ struct FreebandApp: App {
                 .environmentObject(model.link)
                 .tint(Theme.ink)
                 .preferredColorScheme(.dark)
+                .font(Theme.body)
         }
         .modelContainer(container)
     }

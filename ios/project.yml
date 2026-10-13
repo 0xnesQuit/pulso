@@ -23,7 +23,7 @@ targets:
       properties:
         CFBundleDisplayName: Freeband
         UIUserInterfaceStyle: Dark
-        UIAppFonts: [DepartureMono-Regular.otf]
+        UIAppFonts: [OpenSauceSans-Light.otf, OpenSauceSans-Regular.otf, OpenSauceSans-Medium.otf, OpenSauceSans-SemiBold.otf]
         CFBundleDevelopmentRegion: tr
         CFBundleLocalizations: [tr]
         CFBundleShortVersionString: $(MARKETING_VERSION)
