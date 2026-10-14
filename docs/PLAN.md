@@ -205,11 +205,11 @@ Durum notu: aktivite dosyası çözücüleri Swift'e taşındı (`ios/Freeband/B
 | 1 | Veri hattı (modeller, ingest, rollup), analiz motoru ve testleri, hata düzeltmeleri 1/2/3/5, 30 günlük demo veri, webhook'a yeni türler | A | **tamam** (`a99fdd2`; düzeltme 6 `9d2333f`) |
 | 5a | Hub veri katmanı: `minute`/`sleep`/`score`, upsert, yeni uç noktalar, hata düzeltmeleri 4/6, testler | D | **tamam, canlıda** (`f4b719e`) |
 | 2a | Tasarım sistemi: token'lar, yazı, hareket ve bileşenler (önizlemelerle) | B | **tamam** (`91c9288`) |
-| 2b | Ekranlar (4 sekme), yerelleştirme (EN/TR), ikon, eski kodun silinmesi | E | sürüyor (bu gecenin son ajanı) |
+| 2b | Ekranlar (4 sekme), yerelleştirme (EN/TR), ikon, eski kodun silinmesi | E | **tamam** (`a67c16d`, `bdf7770`, `9b4f275`) |
 | 3 | Bant kontrolleri: kayıpsız `PBTree`, `.exchange` oturumu, alarmlar, sağlık izleme, DND ve bileği kaldırınca ekran (önce GET), hava durumu, kadranlar | — | **ertelendi** (ajan bütçesi; cihaz doğrulaması zaten sabah gerekli) |
 | 5b | Hub paneli Tesla diline ve yeni verilere geçer; yayın (önce migration) | — | **ertelendi** (ajan bütçesi) |
 | 4 | Mi Fitness'ın yerine geçme: arka plan modu, ACK. **Bu gece yalnız iskelet, ACK varsayılan kapalı** | — | sona |
-| QA | Ekran görüntüsü matrisi (açık/koyu × normal/büyük yazı × EN/TR), checklist-design denetimi, TestFlight, Obsidian/PLAN.md güncellemesi | ben | sona |
+| QA | Ekran görüntüsü matrisi (açık/koyu × normal/büyük yazı × EN/TR), checklist-design denetimi, TestFlight, Obsidian/PLAN.md güncellemesi | ben | **tamam**: 0.5.0 build 36 TestFlight'ta |
 
 **Ajan bütçesi (kullanıcı isteği):** aynı anda en fazla 2 ajan; bu gece A, B ve D bitince yalnız 1 yeni ajan (E, ekranlar). Gerisi ana oturumda ya da sonraki oturumda.
 
