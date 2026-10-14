@@ -1,3 +1,5 @@
+<img src="docs/img/icon.png" width="96" height="96" alt="Freeband icon: an open arc">
+
 # Freeband
 
 Read your Xiaomi Smart Band 10 / 10 Pro on iPhone without Mi Fitness or a Xiaomi account. Freeband talks to the band directly over Bluetooth LE, and your data stays on your phone.

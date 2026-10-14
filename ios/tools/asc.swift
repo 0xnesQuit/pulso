@@ -12,6 +12,9 @@
 //   swift tools/asc.swift submit          sends the version being prepared to App Review
 //   swift tools/asc.swift builds          the latest builds and their processing state
 //   swift tools/asc.swift tester <email>  add a team member to the internal group that gets every build
+//   swift tools/asc.swift public-beta <beta.json> <email>  TestFlight for everyone: test information,
+//                                           review notes, an external group with a public link, latest build
+//   swift tools/asc.swift beta-submit     send the latest build to Beta App Review
 //
 // Environment: ASC_KEY_ID, ASC_ISSUER_ID, APPLE_TEAM_ID (the key is read from
 // ~/.appstoreconnect/private_keys/AuthKey_<ASC_KEY_ID>.p8).
@@ -450,6 +453,111 @@ func tester(_ email: String) {
     }
 }
 
+/// TestFlight for everyone, from AppStore/beta.json: the privacy policy, the beta description and
+/// feedback address per language, the Beta App Review contact and notes, an external group with a
+/// public link, and the latest processed build in it with its What to Test. The contact phone is
+/// left to App Store Connect (TestFlight > Test Information); beta-submit needs it.
+func publicBeta(_ file: String, _ email: String) {
+    guard let raw = FileManager.default.contents(atPath: file),
+          let cfg = try? JSONSerialization.jsonObject(with: raw) as? [String: Any] else { die("cannot read \(file)") }
+    guard let appID = app()?["id"] as? String else { die("no app record") }
+    let privacy = cfg["privacyPolicyUrl"] as? String ?? ""
+
+    for info in list("/v1/apps/\(appID)/appInfos") {
+        guard let infoID = info["id"] as? String else { continue }
+        for loc in list("/v1/appInfos/\(infoID)/appInfoLocalizations") where attributes(loc)["privacyPolicyUrl"] as? String != privacy {
+            if let id = loc["id"] as? String { patch("appInfoLocalizations", id, attributes: ["privacyPolicyUrl": privacy]) }
+        }
+    }
+    print("privacy policy: \(privacy)")
+
+    let existing = list("/v1/apps/\(appID)/betaAppLocalizations")
+    for (locale, value) in cfg["localizations"] as? [String: [String: String]] ?? [:] {
+        let attrs: [String: Any] = ["description": value["description"] ?? "", "feedbackEmail": email,
+                                    "marketingUrl": cfg["marketingUrl"] ?? "", "privacyPolicyUrl": privacy]
+        if let loc = existing.first(where: { attributes($0)["locale"] as? String == locale }), let id = loc["id"] as? String {
+            patch("betaAppLocalizations", id, attributes: attrs)
+        } else {
+            do {
+                try call("POST", "/v1/betaAppLocalizations", ["data": [
+                    "type": "betaAppLocalizations",
+                    "attributes": attrs.merging(["locale": locale]) { a, _ in a },
+                    "relationships": ["app": ["data": ["type": "apps", "id": appID]]],
+                ]])
+            } catch { die("beta description for \(locale) failed: \(error)") }
+        }
+        print("beta description: \(locale)")
+    }
+
+    let detail = one("/v1/apps/\(appID)/betaAppReviewDetail")
+    guard let detailID = detail["id"] as? String else { die("no beta review detail") }
+    patch("betaAppReviewDetails", detailID, attributes: [
+        "contactFirstName": cfg["contactFirstName"] ?? "", "contactLastName": cfg["contactLastName"] ?? "",
+        "contactEmail": email, "demoAccountRequired": false, "notes": cfg["reviewNotes"] ?? "",
+    ])
+    let phone = attributes(one("/v1/apps/\(appID)/betaAppReviewDetail"))["contactPhone"] as? String
+    print("review contact and notes set\(phone == nil ? "; add the contact phone in App Store Connect" : "")")
+
+    let name = cfg["groupName"] as? String ?? "Public beta"
+    var group = list("/v1/apps/\(appID)/betaGroups?limit=200").first {
+        attributes($0)["name"] as? String == name && attributes($0)["isInternalGroup"] as? Bool != true
+    }
+    if group == nil {
+        do {
+            group = try call("POST", "/v1/betaGroups", ["data": [
+                "type": "betaGroups",
+                "attributes": ["name": name, "publicLinkEnabled": true, "publicLinkLimitEnabled": false, "feedbackEnabled": true],
+                "relationships": ["app": ["data": ["type": "apps", "id": appID]]],
+            ]])["data"] as? [String: Any]
+            print("group \"\(name)\" created")
+        } catch { die("creating the public group failed: \(error)") }
+    } else if let gid = group?["id"] as? String {
+        patch("betaGroups", gid, attributes: ["publicLinkEnabled": true, "feedbackEnabled": true])
+    }
+    guard let gid = group?["id"] as? String else { die("no public group") }
+
+    guard let build = list("/v1/builds?filter[app]=\(appID)&sort=-uploadedDate&limit=1").first,
+          let buildID = build["id"] as? String else { die("no build") }
+    let state = attributes(build)["processingState"] as? String ?? "?"
+    guard state == "VALID" else { die("build \(attributes(build)["version"] ?? "?") is \(state); run again once it is VALID") }
+    let notes = list("/v1/builds/\(buildID)/betaBuildLocalizations")
+    for (locale, text) in cfg["whatToTest"] as? [String: String] ?? [:] {
+        if let loc = notes.first(where: { attributes($0)["locale"] as? String == locale }), let id = loc["id"] as? String {
+            patch("betaBuildLocalizations", id, attributes: ["whatsNew": text])
+        } else {
+            do {
+                try call("POST", "/v1/betaBuildLocalizations", ["data": [
+                    "type": "betaBuildLocalizations",
+                    "attributes": ["locale": locale, "whatsNew": text],
+                    "relationships": ["build": ["data": ["type": "builds", "id": buildID]]],
+                ]])
+            } catch { die("What to Test for \(locale) failed: \(error)") }
+        }
+    }
+    do {
+        try call("POST", "/v1/betaGroups/\(gid)/relationships/builds", ["data": [["type": "builds", "id": buildID]]])
+    } catch { die("adding build to the group failed: \(error)") }
+    print("build \(attributes(build)["version"] ?? "?") is in \"\(name)\" with What to Test")
+    let link = attributes(one("/v1/betaGroups/\(gid)"))["publicLink"] as? String
+    print("public link: \(link ?? "(appears once the build passes Beta App Review)")")
+}
+
+/// Sends the latest build to Beta App Review (needed once per version for external testers).
+func betaSubmit() {
+    guard let appID = app()?["id"] as? String else { die("no app record") }
+    guard let build = list("/v1/builds?filter[app]=\(appID)&sort=-uploadedDate&limit=1").first,
+          let buildID = build["id"] as? String else { die("no build") }
+    do {
+        try call("POST", "/v1/betaAppReviewSubmissions", ["data": [
+            "type": "betaAppReviewSubmissions",
+            "relationships": ["build": ["data": ["type": "builds", "id": buildID]]],
+        ]])
+        print("build \(attributes(build)["version"] ?? "?") sent to Beta App Review")
+    } catch let error as APIError {
+        die("not submitted (HTTP \(error.status)): \(error.body)")
+    } catch { die("not submitted: \(error)") }
+}
+
 let args = CommandLine.arguments.dropFirst()
 switch args.first {
 case "probe": probe()
@@ -475,5 +583,9 @@ case "builds": builds()
 case "tester":
     guard args.count == 2 else { die("usage: tester <email>") }
     tester(args[args.startIndex + 1])
+case "public-beta":
+    guard args.count == 3 else { die("usage: public-beta <beta.json> <feedback email>") }
+    publicBeta(args[args.startIndex + 1], args[args.startIndex + 2])
+case "beta-submit": betaSubmit()
 default: die("usage: swift tools/asc.swift probe|ensure-app|profile <sha1>|builds|tester <email>")
 }

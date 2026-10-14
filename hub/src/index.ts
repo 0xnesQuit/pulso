@@ -18,6 +18,7 @@ function htmlCsp(nonce: string): string {
     `style-src 'nonce-${nonce}'`,
     "font-src 'self'",
     "img-src 'self' data:",
+    "manifest-src 'self'",
     "connect-src 'self'",
     "form-action 'self'",
     "frame-ancestors 'none'",

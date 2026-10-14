@@ -177,7 +177,13 @@ for (const lang of ["en", "tr"] as const) {
   </ol>
   <p class="note small muted">${T("The invite code sits after the # in the link and is never sent to the server from this page.", "Davet kodu bağlantının # sonrasında durur ve bu sayfadan sunucuya gönderilmez.")}</p>
 </section>`;
-    return render(c, T("Join Freeband", "Freeband'e katıl"), body, { script: JOIN_JS, lang, alternates: alternates("/join") });
+    return render(c, T("Join Freeband", "Freeband'e katıl"), body, {
+      script: JOIN_JS,
+      lang,
+      alternates: alternates("/join"),
+      description: HOME_DESCRIPTION[lang],
+      og: og(c, localPath(lang, "/join"), `og-home${lang === "en" ? "" : "-tr"}.png`, HOME_IMAGE_ALT[lang]),
+    });
   });
 }
 
@@ -500,6 +506,15 @@ ${deviceSwitcher}
 for (const lang of ["en", "tr"] as const) {
   pages.get(localPath(lang, "/docs"), async (c) => {
     const signedIn = (await pageSession(c)) !== null;
-    return render(c, DOCS_TITLE[lang], docsBody(new URL(c.req.url).origin, lang), { signedIn, lang, alternates: alternates("/docs") });
+    const suffix = lang === "en" ? "" : `-${lang}`;
+    return render(c, DOCS_TITLE[lang], docsBody(new URL(c.req.url).origin, lang), {
+      signedIn,
+      lang,
+      alternates: alternates("/docs"),
+      description: lang === "en"
+        ? "Freeband's REST API and signed webhooks: authentication, sending and reading data, minutes, sleep, scores, export."
+        : "Freeband'in REST API'si ve imzalı webhook'ları: kimlik doğrulama, veri gönderme ve okuma, dakikalar, uyku, skorlar, dışa aktarma.",
+      og: og(c, localPath(lang, "/docs"), `og-home${suffix}.png`, HOME_IMAGE_ALT[lang]),
+    });
   });
 }

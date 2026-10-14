@@ -1,0 +1,20 @@
+{
+  "groupName": "Public beta",
+  "contactFirstName": "Mert",
+  "contactLastName": "Cobanov",
+  "marketingUrl": "https://freeband.cobanov.dev",
+  "privacyPolicyUrl": "https://freeband.cobanov.dev/privacy",
+  "localizations": {
+    "en-US": {
+      "description": "Freeband reads your Xiaomi Smart Band 10 or 10 Pro directly over Bluetooth, without a Xiaomi account, and keeps your data on your phone. It works out its own Sleep, Recovery and Strain scores and shows what each one is made of.\n\nYou need the band paired with Mi Fitness once, on this iPhone: Freeband reads the band's key from Mi Fitness's folder in the Files app. The setup guide is at https://freeband.cobanov.dev/guide.\n\nNo band at hand? Tap Try with demo data on the first screen."
+    },
+    "tr": {
+      "description": "Freeband, Xiaomi Smart Band 10 ya da 10 Pro'nu Xiaomi hesabı olmadan, doğrudan Bluetooth üzerinden okur ve verini telefonunda tutar. Kendi Uyku, Toparlanma ve Yük skorlarını hesaplar ve her birinin neden oluştuğunu gösterir.\n\nBandın bu iPhone'da bir kez Mi Fitness ile eşlenmiş olmalı: Freeband bandın anahtarını Dosyalar uygulamasındaki Mi Fitness klasöründen okur. Kurulum rehberi: https://freeband.cobanov.dev/tr/guide\n\nBant yanında değil mi? İlk ekranda Demo veriyle dene'ye dokun."
+    }
+  },
+  "whatToTest": {
+    "en-US": "Set up your Band 10 or 10 Pro (https://freeband.cobanov.dev/guide), sync, and check that steps, sleep and scores look right next to Mi Fitness. No band? Try with demo data. Send feedback with a screenshot from TestFlight, or open an issue at https://github.com/cobanov/freeband/issues.",
+    "tr": "Band 10 ya da 10 Pro'nu kur (https://freeband.cobanov.dev/tr/guide), senkronize et ve adım, uyku ve skorların Mi Fitness'takilerle tutarlı olup olmadığına bak. Bant yok mu? Demo veriyle dene. Geri bildirimi TestFlight'tan ekran görüntüsüyle gönder ya da https://github.com/cobanov/freeband/issues adresinde issue aç."
+  },
+  "reviewNotes": "Freeband is a companion app for the Xiaomi Smart Band 10 and 10 Pro fitness bands. It talks to the band over Bluetooth LE without a Xiaomi account, and all data stays on the phone.\n\nTo review without a band: on the first screen, tap \"Try with demo data\". The app shows every screen (Today, Sleep, Trends, Band, settings) with 30 days of sample data, in a separate in-memory store; \"Exit demo\" at the top returns to setup.\n\nWith a band: the band must have been paired once with Xiaomi's Mi Fitness app on the same iPhone. Freeband asks the user to pick Mi Fitness's folder in the Files app, reads the band's key from it on the device, and connects over Bluetooth LE. There is no sign-in and no account. The optional Web access feature needs an invite code and is not needed for review.\n\nFreeband is an independent project and is not affiliated with Xiaomi."
+}

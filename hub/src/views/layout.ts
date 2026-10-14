@@ -440,7 +440,12 @@ ${o.description ? html`<meta property="og:description" content="${o.description}
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta property="og:image:alt" content="${o.og.imageAlt}">
-<meta name="twitter:card" content="summary_large_image">`;
+<meta property="og:image:type" content="image/png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="${o.title}">
+${o.description ? html`<meta name="twitter:description" content="${o.description}">` : ""}
+<meta name="twitter:image" content="${o.og.image}">
+<meta name="twitter:image:alt" content="${o.og.imageAlt}">`;
 }
 
 export function page(o: PageOpts): string {
@@ -458,6 +463,9 @@ export function page(o: PageOpts): string {
 <title>${o.title}</title>
 ${meta(o)}
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="/favicon-32.png" type="image/png" sizes="32x32">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="manifest" href="/site.webmanifest">
 <link rel="preload" href="/fonts/OpenSauceSans-Regular.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/fonts/OpenSauceSans-Medium.woff2" as="font" type="font/woff2" crossorigin>
 <style nonce="${o.nonce}">${raw(CSS)}</style>

@@ -82,6 +82,10 @@ describe("pages", () => {
     expect(home).toContain('<meta property="og:image" content="https://freeband.cobanov.dev/img/og-home.png">');
     expect(home).toContain('<meta property="og:locale" content="en_US">');
     expect(home).toContain('<meta name="twitter:card" content="summary_large_image">');
+    expect(home).toContain('<meta name="twitter:image" content="https://freeband.cobanov.dev/img/og-home.png">');
+    for (const tag of ['<link rel="icon" href="/favicon.svg" type="image/svg+xml">', '<link rel="apple-touch-icon" href="/apple-touch-icon.png">', '<link rel="manifest" href="/site.webmanifest">']) {
+      expect(home).toContain(tag);
+    }
     expect(home).toContain('<link rel="alternate" hreflang="tr" href="https://freeband.cobanov.dev/tr">');
     expect(home).toContain('<link rel="alternate" hreflang="x-default" href="https://freeband.cobanov.dev/">');
     // The globe picker lists both languages and marks the current one.
