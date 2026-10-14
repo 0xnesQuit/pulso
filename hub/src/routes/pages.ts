@@ -1,4 +1,4 @@
-// Server-rendered pages: /, /login, /join, /app, /docs, /privacy.
+// Server-rendered pages: /, /story, /login, /join, /app, /docs, /privacy.
 
 import { Hono, type Context } from "hono";
 import type { AppEnv } from "../types";
@@ -11,10 +11,12 @@ import { MAX_WEBHOOKS } from "../lib/webhooks";
 import { dial, heartBuckets, hourlyFromCumulative, pulseCurve } from "../views/dial";
 import { clock, dayLabel, num, shortDay } from "../views/format";
 import { html, raw, type Safe } from "../views/html";
-import { page } from "../views/layout";
+import { page, type OpenGraph } from "../views/layout";
 import { APP_JS, JOIN_JS, LOGIN_JS } from "../views/scripts";
 import { docsBody } from "../views/docs";
 import { privacyBody } from "../views/privacy";
+import { HOME_DESCRIPTION, homeBody } from "../views/home";
+import { STORY_DESCRIPTION, STORY_TITLE, storyBody } from "../views/story";
 
 export const pages = new Hono<AppEnv>();
 
@@ -26,7 +28,12 @@ const ACTIVE_HOUR_STEPS = 250;
 const CHEV_L = raw('<svg class="ico" viewBox="0 0 10 10" aria-hidden="true"><path d="M6.5 1.5 3 5l3.5 3.5"/></svg>');
 const CHEV_R = raw('<svg class="ico" viewBox="0 0 10 10" aria-hidden="true"><path d="M3.5 1.5 7 5 3.5 8.5"/></svg>');
 
-function render(c: Context<AppEnv>, title: string, body: Safe, extra: { script?: string; signedIn?: boolean; actions?: Safe } = {}) {
+function render(
+  c: Context<AppEnv>,
+  title: string,
+  body: Safe,
+  extra: { script?: string; signedIn?: boolean; actions?: Safe; description?: string; og?: OpenGraph } = {},
+) {
   return c.html(page({ title, nonce: c.get("nonce"), body, path: c.req.path, ...extra }));
 }
 
@@ -34,72 +41,29 @@ const legend = html`<ul class="legend" aria-hidden="true"><li><i class="sw sw-st
 
 // ---------------------------------------------------------------------------
 
-/** A fixed, made-up day for the home page dial. */
-const SAMPLE = (() => {
-  const steps = [0, 0, 0, 0, 0, 0, 90, 1180, 760, 240, 210, 320, 880, 430, 260, 310, 520, 1420, 0, 0, 0, 0, 0, 0];
-  const heart: Array<{ h: number; bpm: number }> = [];
-  for (let k = 0; k < 17.4 * 12; k++) {
-    const h = (k + 0.5) / 12;
-    const wave = Math.sin(k * 0.9) * 3 + Math.sin(k * 0.23) * 4;
-    let bpm = h < 6.6 ? 55 + wave * 0.6 : 72 + wave;
-    if (h >= 7.2 && h < 8.1) bpm += 34;
-    if (h >= 17 && h < 17.4) bpm += 46;
-    heart.push({ h, bpm: Math.round(bpm) });
-  }
-  return dial({
-    hourlySteps: steps,
-    heart,
-    nowHour: 17.4,
-    centerValue: "72",
-    centerCaption: "bpm, şimdi",
-    label: `Örnek bir gün: ${num(steps.reduce((a, b) => a + b, 0))} adım, son nabız 72`,
-  });
-})();
+/** Open Graph data for a public page; absolute URLs on the public hostname. */
+function og(c: Context<AppEnv>, path: string, image: string, imageAlt: string): OpenGraph {
+  const origin = `https://${c.env.PUBLIC_HOSTNAME}`;
+  return { url: origin + path, image: `${origin}/img/${image}`, imageAlt };
+}
 
 pages.get("/", async (c) => {
   const signedIn = (await pageSession(c)) !== null;
-  const deleted = c.req.query("silindi") === "1";
-  const body = html`
-${deleted ? html`<p class="banner small" role="status">Hesabın ve bu sunucudaki tüm verin silindi.</p>` : ""}
-<section class="hero">
-  <div>
-    <p class="label">Xiaomi Smart Band 10 · 10 Pro</p>
-    <h1>Bandının verisi, istediğin yerde</h1>
-    <p class="lede">Freeband, Xiaomi Smart Band 10 ve 10 Pro'yu Mi Fitness ya da Xiaomi hesabı olmadan okuyan bir iPhone uygulaması. Veri telefonunda kalır.</p>
-    <p class="muted">Bu sayfa Freeband hub'ı. Uygulamada Web erişimini açarsan telefon verini buraya da gönderir. Günü tarayıcıdan görebilir, verini dışa aktarabilir ya da webhook ile kendi sunucuna aktarabilirsin. Açmazsan buraya hiçbir şey gelmez.</p>
-    <div class="row">${signedIn ? html`<a class="btn" href="/app">Panele git ${CHEV_R}</a>` : html`<a class="btn" href="/login">Anahtarla giriş yap ${CHEV_R}</a>`}<a class="btn ghost" href="/docs">API belgesi</a></div>
-  </div>
-  <figure class="grid frame" aria-label="Örnek kadran">
-    <figcaption class="cell-head"><span>örnek bir gün</span><span>00–24</span></figcaption>
-    <div class="dialcell">${SAMPLE}${legend}</div>
-  </figure>
-</section>
+  const body = homeBody({ deleted: c.req.query("silindi") === "1" });
+  return render(c, "Freeband · Xiaomi Smart Band 10, hesapsız", body, {
+    signedIn,
+    description: HOME_DESCRIPTION,
+    og: og(c, "/", "og-home.png", "Freeband uygulamasının Bugün ve Toparlanma ekranları"),
+  });
+});
 
-<section>
-  <h2>Nasıl giriş yapılır. <span class="muted">Üç adım, hepsi telefonda.</span></h2>
-  <ol class="grid g3 steps">
-    <li>Telefonda Freeband'i aç ve Ayarlar'a git.</li>
-    <li>Web erişimini aç. Uygulama senin için bir hesap ve kişisel bir anahtar oluşturur.</li>
-    <li>Web paneli aç'a dokun. Tarayıcı açılır ve seni doğrudan panele alır.</li>
-  </ol>
-  <p class="note small muted">Başka bir bilgisayardan girmek için anahtarı uygulamadan kopyala ve <a href="/login">giriş sayfasına</a> yapıştır. Anahtar bir parola gibidir; kimseyle paylaşma.</p>
-</section>
-
-<section class="grid g2">
-  <div>
-    <p class="label">geliştiriciler için</p>
-    <h3>REST API ve imzalı webhook'lar</h3>
-    <p class="muted">Verine REST API ve imzalı webhook'larla da ulaşabilirsin. Uç noktalar, örnekler ve imza doğrulama API belgesinde.</p>
-    <a class="btn ghost" href="/docs">API belgesi</a>
-  </div>
-  <div>
-    <p class="label">gizlilik</p>
-    <h3>Olabildiğince az veri</h3>
-    <p class="muted">Neyin saklandığını, kimin görebildiğini ve nasıl silineceğini gizlilik sayfası anlatıyor.</p>
-    <a class="btn ghost" href="/privacy">Gizlilik</a>
-  </div>
-</section>`;
-  return render(c, "Freeband", body, { signedIn });
+pages.get("/story", async (c) => {
+  const signedIn = (await pageSession(c)) !== null;
+  return render(c, `${STORY_TITLE} · Freeband`, storyBody(), {
+    signedIn,
+    description: STORY_DESCRIPTION,
+    og: og(c, "/story", "og-story.png", "Şifreli çerçeve düzeni: a5 a5, type, seq, len, crc16, payload"),
+  });
 });
 
 // ---------------------------------------------------------------------------

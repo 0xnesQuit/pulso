@@ -16,7 +16,7 @@ hub/
     index.ts                Entry: security headers + CSP nonce, error handling, scheduled cleanup
     types.ts                Hono context types
     routes/api.ts           /v1/* endpoints
-    routes/pages.ts         /, /login, /app, /docs, /privacy
+    routes/pages.ts         /, /story, /login, /join, /app, /docs, /privacy
     lib/auth.ts             Bearer token and session cookie auth, CSRF check for cookie requests
     lib/crypto.ts           Tokens, hashing, HMAC, AES-GCM for webhook secrets, keyed IP hashes
     lib/http.ts             Bounded JSON body reader, cookies, same-origin check
@@ -25,7 +25,7 @@ hub/
     lib/queries.ts          Account-scoped read queries (samples, daily summaries, devices)
     lib/time.ts             Time-zone math on Intl (DST-safe local days)
     lib/webhooks.ts         URL policy, signing, delivery with a 5 s timeout
-    views/                  HTML templates (auto-escaping), layout + CSS, the 24-hour pixel dial, the pixel wordmark, docs, privacy, inline JS
+    views/                  HTML templates (auto-escaping), layout + CSS, home, story, the 24-hour pixel dial (panel), docs, privacy, inline JS
   test/                     Vitest suites running inside workerd via @cloudflare/vitest-plugin
 ```
 

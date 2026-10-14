@@ -9,7 +9,7 @@ function cspNonce(csp: string): string {
 
 describe("security headers", () => {
   it("sends a nonce-based CSP and hardening headers on HTML", async () => {
-    for (const path of ["/", "/login", "/join", "/docs", "/privacy", "/does-not-exist"]) {
+    for (const path of ["/", "/story", "/login", "/join", "/docs", "/privacy", "/does-not-exist"]) {
       const res = await call(path);
       expect(res.headers.get("content-type"), path).toContain("text/html");
       const csp = res.headers.get("content-security-policy") ?? "";
@@ -32,8 +32,9 @@ describe("security headers", () => {
       // No inline handlers or style attributes that the CSP would have to allow.
       expect(htmlText).not.toMatch(/\son[a-z]+\s*=/i);
       expect(htmlText).not.toMatch(/\sstyle\s*=/i);
-      // No third-party resources.
-      expect(htmlText).not.toMatch(/(src|href)="https?:\/\//);
+      // No third-party resources (outbound links such as GitHub are fine).
+      expect(htmlText).not.toMatch(/\ssrc="https?:\/\//);
+      expect(htmlText).not.toMatch(/<link\b[^>]*href="https?:\/\//);
     }
   });
 
@@ -58,9 +59,28 @@ describe("security headers", () => {
 
 describe("pages", () => {
   it("renders the home, docs and privacy pages in Turkish", async () => {
-    const home = await (await call("/")).text();
+    const res = await call("/");
+    expect(res.status).toBe(200);
+    const home = await res.text();
     expect(home).toContain('lang="tr"');
     expect(home).toContain("Web erişimi");
+    expect(home).toContain('<meta name="color-scheme" content="light dark">');
+    // The product first: screens, an honest caption and the two actions.
+    for (const img of ["today", "score-recovery", "sleep", "band"]) expect(home).toContain(`src="/img/${img}.webp"`);
+    expect(home).toContain("Ekranlar demo veriyle");
+    expect(home).toMatch(/<a class="btn" href="\/story">Nasıl yaptık<\/a>/);
+    expect(home).toMatch(/<a class="btn ghost" href="https:\/\/github.com\/cobanov\/freeband">GitHub<\/a>/);
+    for (const s of ["Mi Fitness'sız, hesapsız", "Uyku", "Toparlanma", "Yük", "İsteğe bağlı web erişimi", "TestFlight", "App Store"]) {
+      expect(home).toContain(s);
+    }
+    // No TestFlight link, no old dial, no pixel wordmark.
+    expect(home).not.toContain("testflight.apple.com");
+    expect(home).not.toContain('class="dial"');
+    expect(home).not.toContain('class="wordmark"');
+    // Open Graph and the trademark line.
+    expect(home).toContain('<meta property="og:image" content="https://freeband.cobanov.dev/img/og-home.png">');
+    expect(home).toContain('<meta name="twitter:card" content="summary_large_image">');
+    expect(home).toContain("Xiaomi ile bağlantısı yoktur");
     const docs = await (await call("/docs")).text();
     expect(docs).toContain("X-Freeband-Signature");
     expect(docs).toContain("createHmac");
@@ -68,6 +88,60 @@ describe("pages", () => {
     expect(docs).toContain("curl");
     const privacy = await (await call("/privacy")).text();
     for (const s of ["Cloudflare", "DELETE /v1/account", "Web erişimi", "SHA-256"]) expect(privacy).toContain(s);
+  });
+
+  it("renders the story page as a numbered timeline with diagrams", async () => {
+    const res = await call("/story");
+    expect(res.status).toBe(200);
+    const story = await res.text();
+    expect(story).toContain("<title>Xiaomi Smart Band 10&#39;u nasıl çözdük · Freeband</title>");
+    expect(story).toMatch(/<meta name="description" content="[^"]+">/);
+    expect(story).toContain('<meta property="og:url" content="https://freeband.cobanov.dev/story">');
+    expect(story).toContain('<meta property="og:image" content="https://freeband.cobanov.dev/img/og-story.png">');
+    expect(story).toContain('<ol class="timeline">');
+    expect(story.match(/<span class="step-n" aria-hidden="true">/g)).toHaveLength(14);
+    expect(story).toContain(">14</span>");
+    // Facts from docs/STORY.md, code terms in chips.
+    for (const s of ["%46", "13 test vektörüne", "147 test", "37 bin", "HKDF-SHA256", "AES-128-CTR", "AES-CCM", "Keychain", "Teşekkürler"]) {
+      expect(story).toContain(s);
+    }
+    for (const s of ["FE95", "005E", "005F", "a5 a5", "2/110", "device_type = iOS"]) expect(story).toContain(`<code>${s}</code>`);
+    // Two inline SVG diagrams.
+    expect(story.match(/<svg viewBox="[^"]+" role="img"/g)).toHaveLength(2);
+    // Links to the repo's notes and the projects we learned from.
+    for (const href of [
+      "https://github.com/cobanov/freeband/blob/main/findings.md",
+      "https://github.com/cobanov/freeband/blob/main/docs/CAPABILITIES.md",
+      "https://github.com/cobanov/freeband/blob/main/docs/ACTIVITY.md",
+      "https://codeberg.org/Freeyourgadget/Gadgetbridge",
+      "https://github.com/AstralSightStudios",
+      "https://github.com/artyomxx/xiaomi-band-ios-export",
+      "https://github.com/LordierClaw/blueband-map",
+      "https://github.com/ireescc277-dotcom/band9-rust-ios",
+    ]) {
+      expect(story).toContain(`href="${href}"`);
+    }
+  });
+
+  it("has the shared nav on public pages and marks the current one", async () => {
+    for (const path of ["/", "/story", "/docs", "/privacy", "/join"]) {
+      const page = await (await call(path)).text();
+      for (const href of ["/story", "/docs", "https://github.com/cobanov/freeband", "/login"]) {
+        expect(page, `${path} → ${href}`).toContain(`class="navlink" href="${href}"`);
+      }
+      expect(page).toContain('<a class="brand" href="/">Freeband</a>');
+      expect(page).toContain('<a href="/privacy">Gizlilik</a>');
+    }
+    const story = await (await call("/story")).text();
+    expect(story).toContain('href="/story" aria-current="page"');
+  });
+
+  it("swaps the sign-in link for the panel when signed in", async () => {
+    const { token } = await createAccount();
+    const cookie = await login(token);
+    const home = await (await call("/", { headers: { Cookie: cookie } })).text();
+    expect(home).toContain('<a class="navlink" href="/app">Panele git</a>');
+    expect(home).not.toContain('href="/login" aria-current');
   });
 
   it("renders the panel with the dial and escapes user data", async () => {
