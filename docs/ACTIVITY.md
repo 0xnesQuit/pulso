@@ -295,6 +295,8 @@ Kayıt (her biri bir dakika) — grupları sırayla, yalnız nibble'ında `0x8` 
 | 4 | 3 | 21 (0–20) | 41 | "Mi Band 9 Active" |
 | 5 | 4 | 32 (0–31) | 57 | "Mi Band 10 and later" |
 
+**Gerçek Band 10 Pro (2026-10-14) [GERÇEK]:** iki v5 dosyası da gövdede bitmap'ten sonra **53 bayt** taşıyor, yani slot 29'da bitiyor; bitmap'te 30 ve 31 bitleri de kapalı. Gadgetbridge sabit 32 slot okuyor ve bu dosyada taşardı. Freeband: slot 21'den (v3/v4 kümesinin sonu) sonra gövde bir slot sınırında biterse kalan slotlar `nil`, hata yok.
+
 Düzen: gövde = `bitmap | slot0 | slot1 | …`. **Her slot, bit'i kapalı olsa da boyu kadar tüketilir**; bit yalnız değerin kullanılıp kullanılmayacağını söyler (`:48-54`, `:182-184`). Bitmap bölüm 5.1'deki MSB-önce kural. Dosyada bir kayıt var; zamanı `fileId.ts`, timezone `fileId.tz` olarak saklanır (`:178-180`).
 
 | Slot | Gövde ofseti* | Boy | Alan | Birim / not |
@@ -360,6 +362,14 @@ Bitmap boyu: v1–v4 1 bayt, v5 2 bayt (`:55-69`). Bitmap indeksi (`headerIdx`) 
 
 v5'te bilinmeyen 9 bayt + iki u32 için indeks 5 ilerler (`:127`).
 
+**Sürüm 6 [GERÇEK, tek dosya: Band 10 Pro, 2026-10-14; Gadgetbridge'de yok]:**
+
+- Bitmap **3 bayt** (`DF FF FC`: 0–21 arası bitler, 2 hariç, açık). `wakeupTime` bit 2 kapalıyken de dolu geldi; v5'teki gibi her zaman okunur.
+- `isAwake`, `bedTime`, `wakeupTime`, `sleepQuality`, 9 bilinmeyen bayt, `bedTime2`, `wakeupTime2`: v5 ile aynı yerde ve aynı anlamda. 9 baytın düzeni `u8 | u32 | u32` gibi duruyor: u32'ler `bedTime − bedTime2` ve `wakeupTime − bedTime2` saniyesine eşit çıktı. [TAHMİN]
+- Ardından **24 bilinmeyen bayt** (u16/u32 karışık küçük sayılar ve bir zaman damgası). Ham saklanıyor (`v6_unknown_hex`).
+- Sonra v5'teki sırayla nabız, SpO2 ve horlama blokları. Gerçek dosyada nabız ve SpO2 60 sn aralıklı, "ölçüm yok" örnekleri **0**; horlama 600 sn aralıklı ve örnekler **u16** (v3–v5'te float32). Üçünden sonra akış tam olarak ilk sihirli değerde başlıyor.
+- Yeni alanların bitmap indeksleri bilinmiyor; bloklar v5 indeksleriyle (9, 10, 11) okunuyor. Freeband ve referans parser bunu doğruluyor: bloklar bittiğinde sıradaki 4 bayt sihirli değer değilse (ya da blok taşarsa) üç blok da atılıyor (`blocks_error`), akış blokların başından taranıyor. Böylece evreler kaybolmuyor. [ÖNERİ]
+
 Örnek bloğu (`:133-145`, `:152-164`, `:172-184`):
 
 | Alan | Tür | Not |
@@ -386,6 +396,8 @@ Akış, 17 baytlık başlığı olan paketlerden oluşur. Başlık **sihirli de�
 | 17 | veri | `dataLen` bayt, içeriği **big-endian** (`:227-230`) |
 
 - Tip 2, 3, 9, 12, 13, 14, 15'te veri **yok**; `dataLen` alanı bayrak sayılıyor ve atlanmıyor. (`:221-225`)
+- **Tip 18 ve 19 da verisiz** [GERÇEK, v6]: `dataLen` 1 ama sıradaki paket hemen başlıyor. Bunlar listede olmasa bir sonraki paketin başı atlanır. Gerçek dosyada ayrıca 10, 11 ve 20 (veri uzunluğu `dataLen` kadar) ve 101 (4 bayt) tipleri var; anlamları bilinmiyor. Bu kuralla 231 paketlik dosyada atlanan ve artan bayt sıfır.
+- **Gece birden çok kez gönderiliyor** [GERÇEK, v6]: aynı `ts` (`bedTime`) ile bir ara tip-16/17 çifti (gece ortasında, o ana kadarki evreler) ve uyanınca son çift geliyor; son tip-17, ilkini önek olarak içeriyor. Evreler birleştirilirse çakışır. Freeband her `ts` için **son** tip-17 paketini kullanıyor (`nightStages`), dakikalar son tip-16'dan.
 - Bilinen tipler: 0 `acc_unk`, 1 `ppg_unk` (RR aralıkları), 2 `fall_asleep`, 3 `wake_up`, 12/13 `switch_ts_unk`, 16 özet, 17 evreler. (`:211-219`)
 - `ts` birimi karışık: "sometimes in seconds and other times in nanoseconds. Message types 16 and 17 are in seconds" (`:204-205`). Tip 1 için Gadgetbridge `ts`'i **milisaniye** gibi kullanıyor (`:235-240`). [TAHMİN: tip 1'in birimi kesin değil]
 
@@ -524,11 +536,11 @@ Oturum sınırları:
 
 | Dosya | Gadgetbridge'in desteklediği sürümler | Kaynaktaki cihaz ipucu | Band 10 / 10 Pro için beklenti |
 |---|---|---|---|
-| DailyDetails | 1, 2, 3, 4 (`DailyDetailsParser.java:53-67`) | yok | v4 [TAHMİN: en yeni, light/body momentum alanlı] |
-| DailySummary | 3, 4, 5 | v3 "Smart Band 8 Active", v4 "Mi Band 9 Active", v5 "Mi Band 10 and later" (`DailySummaryParser.java:152-157`) | **v5** [KOD yorumu] |
-| SleepDetails | 1–5 | v2 DETAILS, v4/v5 SUMMARY (`SleepDetailsParser.java:53`); Band 9 FW 2.3.93 RR notu (`:101`) | v5, SUMMARY [TAHMİN] |
+| DailyDetails | 1, 2, 3, 4 (`DailyDetailsParser.java:53-67`) | yok | **v4** [GERÇEK, Band 10 Pro] |
+| DailySummary | 3, 4, 5 | v3 "Smart Band 8 Active", v4 "Mi Band 9 Active", v5 "Mi Band 10 and later" (`DailySummaryParser.java:152-157`) | **v5**, 30 slot [GERÇEK, Band 10 Pro] |
+| SleepDetails | 1–5 | v2 DETAILS, v4/v5 SUMMARY (`SleepDetailsParser.java:53`); Band 9 FW 2.3.93 RR notu (`:101`) | **v6, SUMMARY** [GERÇEK, Band 10 Pro]; Gadgetbridge v6'yı tanımıyor |
 | SleepStages | 2 | yok | belirsiz; hiç gelmeyebilir [TAHMİN] |
-| ManualSamples | 1, 2 | v1 "Mi Band 9 Active" (`ManualSamplesParser.java:130`) | v2 [TAHMİN] |
+| ManualSamples | 1, 2 | v1 "Mi Band 9 Active" (`ManualSamplesParser.java:130`) | **v2** [GERÇEK, Band 10 Pro] |
 | Antrenman özeti | türe göre 1–11 | açık hava bisiklet v8 "Smart Band 10 Pro" (`WorkoutSummaryParser.java:605`, test `:211`), v6 "Smart Band 10" (test `:248`) | kapsam dışı |
 | Antrenman detayı | türe göre | `SPORTS_OUTDOOR_CYCLING v5 (Smart Band 10 Pro)` (`WorkoutDetailsParser.java:567`) | kapsam dışı |
 
@@ -559,7 +571,7 @@ Not: "Mi Band 9 Active", Band 9 / 10'dan farklı bir platform; v1 manuel ölçü
 
 ```
 cd ios/tests/activity
-python3 -I activity_ref.py --selftest            # 51/51 vaka
+python3 -I activity_ref.py --selftest            # 54/54 vaka
 python3 -I fixtures/make_fixtures.py              # fikstürleri yeniden üretir (vendor/Gadgetbridge gerekir)
 python3 -I activity_ref.py parse DOSYA.bin        # tek dosya → JSON
 python3 -I activity_ref.py assemble p1.bin p2.bin # çözülmüş kanal-5 parçaları → JSON
@@ -574,8 +586,16 @@ python3 -I activity_ref.py fileid 21F328650403A0  # id ya da id listesi
 | `gb_manual_samples_v1.json` | [TEST] `T/impl/ManualSamplesParserTest.java:34-87` | 3 **gerçek** Band 9 Active paketi (CRC'li) ve 3 ret vakası; mutasyondan sonra CRC yeniden hesaplandı ki ret içerikten gelsin |
 | `gb_daily_summary.json` | [TEST] `T/impl/DailySummaryParserTest.java` | Gadgetbridge'in bellekte kurduğu girdiler bayt bayt yeniden üretildi (CRC'siz); beklenenler testin assert'leri |
 | `gb_workout_summary_blobs.json` | [TEST] `T/impl/WorkoutSummaryParserTest.java` | 13 **gerçek** antrenman özeti dosyası: id, CRC ve yerel tarih kontrolü; içerik parse edilmiyor |
-| `synthetic.json` | **SENTETİK**, `make_fixtures.py` | DailyDetails v2/v3/v4, SleepDetails v2/v5, SleepStages v2, ManualSamples v2 (kayıtlar kaynak yorumundan), CRC kontrol değeri, gerçek bir dosyanın 3 parçaya bölünüp birleştirilmesi, bozuk parça, sıra dışı parça, id listesi ve getirme sırası |
+| `synthetic.json` | **SENTETİK**, `make_fixtures.py` | DailyDetails v2/v3/v4, SleepDetails v2/v5/v6 (v6: gerçek dosyanın biçiminde, değerler uydurma; bir de blokları hizalanmayan v6), 30 slotluk DailySummary v5, SleepStages v2, ManualSamples v2 (kayıtlar kaynak yorumundan), CRC kontrol değeri, gerçek bir dosyanın 3 parçaya bölünüp birleştirilmesi, bozuk parça, sıra dışı parça, id listesi ve getirme sırası |
 
 Gadgetbridge test ağacında **günlük detay, uyku detayı ve uyku evreleri için hiç gerçek veri yok**; bunlar için yalnız sentetik fikstür var. Sentetik dosyalar bu belgedeki düzenle `make_fixtures.py` içinde, parser'dan bağımsız olarak paketlendi; beklenen değerler paketlenen değerler. Yani iki uygulamanın birbirine uyduğunu gösteriyorlar, bilekliğin gerçekten böyle gönderdiğini değil. İlk gerçek Band 10 dosyaları geldiğinde (`activity_ref.py parse` ile) bu bölümler doğrulanmalı.
+
+### 11.1 Gerçek Band 10 Pro dosyaları (2026-10-14)
+
+İlk gerçek dosyalar, uygulamanın veritabanından alındı (12 dosya: 8 DailyDetails v4, 2 DailySummary v5, 1 ManualSamples v2, 1 SleepDetails v6). Hepsinin CRC'si doğru ve hepsi hem referans parser'da hem Swift'te hatasız çözülüyor. Uyku dosyasında son tip-16 özetindeki hafif/derin/REM/uyanık dakikaları, son tip-17 paketindeki evre sürelerinin toplamıyla birebir aynı; ham evre kodu eşlemesi (bölüm 8) doğrulandı.
+
+Sağlık verisi oldukları için repoda değiller (`out/`, gitignored). Kendi dosyalarınızı denemek için: `python3 -I activity_ref.py parse DOSYA.bin`.
+
+Not: SwiftData/Core Data, harici depolamaya izin verilen `Data` alanını SQLite'ta bir işaret baytıyla saklıyor (`0x01` = satır içi, ardından veri). Veritabanından dosya çıkarırken bu ilk bayt atılmalı; protokolün parçası değil.
 
 Selftest'in hataları yakaladığı da denendi: bitmap bit sırası, nibble slot sırası, zaman kayması, paket uzunluğunun endian'ı, `tz` işareti ve ek bayt atlanması gibi tek satırlık bozulmaların her biri en az bir vakayı düşürüyor.

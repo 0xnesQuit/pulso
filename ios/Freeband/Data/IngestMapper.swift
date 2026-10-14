@@ -293,7 +293,7 @@ enum IngestMapper {
 
     static func sleepDraft(details d: SleepDetails, tzOffsetMinutes tz: Int, hex: String) -> SleepDraft? {
         guard let session = d.session else { return nil }
-        let segments = d.stages.compactMap { s -> StageSegment? in
+        let segments = d.nightStages.compactMap { s -> StageSegment? in
             guard let m = s.durationMinutes, m > 0 else { return nil }
             return StageSegment(start: s.ts, minutes: m, stage: stageKind(s.stage))
         }

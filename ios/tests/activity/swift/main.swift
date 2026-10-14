@@ -98,7 +98,7 @@ indirect enum JSON: Decodable, Equatable {
 
 /// Subset match (exact: false) mirrors activity_ref.py `_match`: only the expected keys are
 /// checked, lists must have equal length. Exact match also requires equal key sets. Free-text
-/// "error" messages are compared by presence only.
+/// "error" and "blocks_error" messages are compared by presence only.
 func match(_ expected: JSON, _ actual: JSON, exact: Bool, path: String = "$") -> [String] {
     switch expected {
     case let .object(e):
@@ -110,7 +110,7 @@ func match(_ expected: JSON, _ actual: JSON, exact: Bool, path: String = "$") ->
                 errors.append("\(path).\(key): missing")
                 continue
             }
-            if key == "error", ev.string != nil, av.string != nil { continue }
+            if key == "error" || key == "blocks_error", ev.string != nil, av.string != nil { continue }
             errors += match(ev, av, exact: exact, path: "\(path).\(key)")
         }
         if exact {
@@ -327,6 +327,8 @@ func dataJSON(_ payload: ActivityPayload) -> JSON {
             o["bed_time2"] = jTime(s.bedTime2)
             o["wakeup_time2"] = jTime(s.wakeTime2)
         }
+        if s.version >= 6 { o["v6_unknown_hex"] = jHex(s.unknownV6 ?? []) }
+        if let e = s.blocksError { o["blocks_error"] = .string(e) }
         if let e = s.streamError { o["error"] = .string(e) }
         return .object(o)
 
@@ -790,6 +792,9 @@ let ddV4 = fixtureBytes("daily details v4")
 let ddV2 = fixtureBytes("daily details v2")
 let sleepV5 = fixtureBytes("sleep details v5")
 let sleepV2 = fixtureBytes("sleep details v2")
+let sleepV6 = fixtureBytes("sleep details v6 (")
+let sleepV6Misaligned = fixtureBytes("sleep details v6, snore bit set")
+let summaryV5Short = fixtureBytes("daily summary v5 ending after slot 29")
 let stagesV2 = fixtureBytes("sleep stages v2, five")
 let stagesNoData = fixtureBytes("sleep stages v2 with no data")
 let manualV2 = fixtureBytes("manual samples v2")
@@ -925,6 +930,27 @@ check("sleep details v5: session minutes from the type-16 summary, stages with d
 check("sleep details v2: without a summary, minutes are summed from stage durations") {
     guard case let .sleepDetails(s) = parsed(sleepV2).payload, let session = s.session else { return ["parse"] }
     return expect(session.deepMinutes == 50 && session.lightMinutes == 60 && session.remMinutes == 0 && session.awakeMinutes == 0, "\(session)")
+}
+
+check("sleep details v6: the night sent twice counts once, from the last packet") {
+    guard case let .sleepDetails(s) = parsed(sleepV6).payload, let session = s.session else { return ["parse"] }
+    return expect(s.stages.count == 11 && s.nightStages.count == 7, "stages \(s.stages.count) night \(s.nightStages.count)")
+        + expect(session.stages == s.nightStages && session.stages.map(\.stage) == [.light, .deep, .rem, .light, .awake, .deep, .rem], "session stages")
+        + expect(session.lightMinutes == 115 && session.deepMinutes == 30 && session.remMinutes == 15 && session.awakeMinutes == 20, "\(session)")
+        + expect(s.snore?.values == [57, 45] && s.blocksError == nil && s.unknownV6?.count == 24, "blocks")
+}
+
+check("sleep details v6: misaligned sample blocks are dropped with a warning, the night is kept") {
+    let r = parsed(sleepV6Misaligned)
+    guard case let .sleepDetails(s) = r.payload, let session = s.session else { return ["\(r.payload)"] }
+    return expect(s.heartRate == nil && s.spo2 == nil && s.snore == nil && s.blocksError != nil, "blocks")
+        + expect(session.lightMinutes == 115 && s.nightStages.count == 7 && s.skippedBytes > 0, "night")
+        + expect(r.warnings.contains { $0.contains("sample blocks dropped") }, r.description)
+}
+
+check("daily summary v5 ending after slot 29: slots 30-31 nil, nothing trailing") {
+    guard case let .dailySummary(s) = parsed(summaryV5Short).payload else { return ["parse"] }
+    return expect(s.steps == 12345 && s.vitalityCurrent == 280 && s.slots[30] == nil && s.slots[31] == nil && s.trailingBytes == 0, "values")
 }
 
 check("sleep details: a packet longer than the file keeps the packets before it") {

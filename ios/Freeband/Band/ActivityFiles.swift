@@ -178,7 +178,7 @@ enum ActivityFileKind: String, Sendable, CaseIterable {
         switch self {
         case .dailyDetails: return [1, 2, 3, 4]
         case .dailySummary: return [3, 4, 5]
-        case .sleepDetails: return [1, 2, 3, 4, 5]
+        case .sleepDetails: return [1, 2, 3, 4, 5, 6]
         case .sleepStages: return [2]
         case .manualSamples: return [1, 2]
         case .workoutSummary, .workoutDetails, .workoutGPS, .unknown: return []
@@ -718,6 +718,9 @@ struct DailySummary: Equatable, Sendable {
     static let slotSizes = [4, 2, 1, 1, 1, 4, 1, 4, 1, 1, 1, 1, 3, 2, 2, 1, 1, 4, 1, 4, 1,
                             2, 2, 1, 1, 1, 1, 2, 1, 1, 2, 2]
     static let layouts: [UInt8: (bitmapBytes: Int, slots: Int)] = [3: (3, 21), 4: (3, 21), 5: (4, 32)]
+    /// A Band 10 Pro v5 file stops after slot 29 (its bitmap marks 30 and 31 invalid), so slots
+    /// past the v3/v4 set may be missing when the body ends cleanly on a slot boundary.
+    static let baseSlots = 21
 
     let version: UInt8
     /// fileID.ts.
@@ -770,6 +773,7 @@ struct DailySummary: Equatable, Sendable {
         let bitmap = try r.array(layout.bitmapBytes)
         var slots = [Int?](repeating: nil, count: slotSizes.count)
         for i in 0 ..< min(layout.slots, slotSizes.count) {
+            if i >= baseSlots, r.remaining == 0 { break }
             let value = try r.uintLE(slotSizes[i])
             slots[i] = bitValid(bitmap, i) ? Int(value) : nil
         }
@@ -831,10 +835,12 @@ struct SleepRRPacket: Equatable, Sendable {
 
 /// ACTIVITY / SLEEP / any detail type.
 struct SleepDetails: Equatable, Sendable {
-    static let bitmapLengths: [UInt8: Int] = [1: 1, 2: 1, 3: 1, 4: 1, 5: 2]
+    static let bitmapLengths: [UInt8: Int] = [1: 1, 2: 1, 3: 1, 4: 1, 5: 2, 6: 3]
+    /// v6: unknown fields between the second wake time and the HR block.
+    static let v6ExtraLength = 24
     static let packetMagic: [UInt8] = [0xFB, 0xFA, 0xFC, 0xFF]
     static let packetHeaderLength = 17
-    static let payloadlessPacketTypes: Set<UInt8> = [2, 3, 9, 12, 13, 14, 15]
+    static let payloadlessPacketTypes: Set<UInt8> = [2, 3, 9, 12, 13, 14, 15, 18, 19]
 
     let version: UInt8
     let bitmap: [UInt8]
@@ -848,13 +854,21 @@ struct SleepDetails: Equatable, Sendable {
     let unknownV5: [UInt8]?
     let bedTime2: Date?
     let wakeTime2: Date?
+    /// v6: 24 unknown bytes after the second wake time.
+    let unknownV6: [UInt8]?
     let heartRate: SleepSampleBlock<Int>?
     let spo2: SleepSampleBlock<Int>?
-    /// v3+.
+    /// v3+; float32 up to v5, u16 in v6.
     let snore: SleepSampleBlock<Float>?
+    /// v6: the sample blocks did not line up with the packet stream and were dropped.
+    let blocksError: String?
     let packets: [SleepPacket]
     /// From type-17 packets, in stream order.
     let stages: [SleepStageSample]
+    /// The night's stages: the band re-sends the whole night in a new type-17 packet with the
+    /// same ts as it goes (a v6 file had one at 06:59 and the final one at wake), so only the
+    /// last packet per ts counts. Ordered by packet ts.
+    let nightStages: [SleepStageSample]
     let summaries: [SleepSummaryPacket]
     let rrIntervals: [SleepRRPacket]
     /// Bytes skipped while looking for the packet magic.
@@ -875,9 +889,9 @@ struct SleepDetails: Equatable, Sendable {
             light = s.lightMinutes
             rem = s.remMinutes
             awake = s.awakeMinutes
-        } else if !stages.isEmpty {
+        } else if !nightStages.isEmpty {
             func total(_ stage: SleepStage) -> Int {
-                stages.filter { $0.stage == stage }.reduce(0) { $0 + ($1.durationMinutes ?? 0) }
+                nightStages.filter { $0.stage == stage }.reduce(0) { $0 + ($1.durationMinutes ?? 0) }
             }
             deep = total(.deep)
             light = total(.light)
@@ -885,7 +899,7 @@ struct SleepDetails: Equatable, Sendable {
             awake = total(.awake)
         }
         return SleepSession(bedTime: bedTime, wakeTime: wakeTime, deepMinutes: deep, lightMinutes: light,
-                            remMinutes: rem, awakeMinutes: awake, stages: stages)
+                            remMinutes: rem, awakeMinutes: awake, stages: nightStages)
     }
 
     private static func block<V: Equatable & Sendable>(_ version: UInt8, bedTime: UInt32, _ r: inout ActivityByteReader,
@@ -926,16 +940,33 @@ struct SleepDetails: Equatable, Sendable {
             wake2 = unixDate(Int64(try r.u32()))
             idx += 5
         }
-        var hr: SleepSampleBlock<Int>?
-        if bitValid(bitmap, idx) { hr = try block(v, bedTime: bed, &r) { Int(try $0.u8()) } }
-        idx += 1
-        var spo2: SleepSampleBlock<Int>?
-        if bitValid(bitmap, idx) { spo2 = try block(v, bedTime: bed, &r) { Int(try $0.u8()) } }
-        idx += 1
-        var snore: SleepSampleBlock<Float>?
-        if v >= 3 {
-            if bitValid(bitmap, idx) { snore = try block(v, bedTime: bed, &r) { try $0.f32() } }
+        var unknownV6: [UInt8]?
+        if v >= 6 { unknownV6 = try r.array(v6ExtraLength) }
+        let blocksStart = r
+        var hr: SleepSampleBlock<Int>?, spo2: SleepSampleBlock<Int>?, snore: SleepSampleBlock<Float>?
+        var blocksError: String?
+        do {
+            if bitValid(bitmap, idx) { hr = try block(v, bedTime: bed, &r) { Int(try $0.u8()) } }
             idx += 1
+            if bitValid(bitmap, idx) { spo2 = try block(v, bedTime: bed, &r) { Int(try $0.u8()) } }
+            idx += 1
+            if v >= 3 {
+                if bitValid(bitmap, idx) {
+                    snore = try block(v, bedTime: bed, &r) { v >= 6 ? Float(try $0.u16()) : try $0.f32() }
+                }
+                idx += 1
+            }
+            if v >= 6, r.remaining > 0, magic(in: body, from: r.position, end: r.end) != r.position {
+                throw ActivityParseError.malformed("sample blocks end at offset \(r.position), not at a packet")
+            }
+        } catch let error as ActivityParseError where v >= 6 {
+            // v6 field bits are a guess (spec section 6.3.1); keep the stream rather than lose the night
+            blocksError = error.description
+            warnings.append("sleep details v6: sample blocks dropped: \(error)")
+            hr = nil
+            spo2 = nil
+            snore = nil
+            r = blocksStart
         }
 
         let stream = scan(body, from: r.position, to: r.end)
@@ -943,9 +974,11 @@ struct SleepDetails: Equatable, Sendable {
         return SleepDetails(
             version: v, bitmap: bitmap, isAwake: isAwake,
             bedTime: unixDate(Int64(bed)), wakeTime: unixDate(Int64(wake)), sleepQuality: quality,
-            unknownV5: unknownV5, bedTime2: bed2, wakeTime2: wake2,
-            heartRate: hr, spo2: spo2, snore: snore,
-            packets: stream.packets, stages: stream.stages, summaries: stream.summaries, rrIntervals: stream.rr,
+            unknownV5: unknownV5, bedTime2: bed2, wakeTime2: wake2, unknownV6: unknownV6,
+            heartRate: hr, spo2: spo2, snore: snore, blocksError: blocksError,
+            packets: stream.packets, stages: stream.stages,
+            nightStages: stream.lastStagesByTs.keys.sorted().flatMap { stream.lastStagesByTs[$0] ?? [] },
+            summaries: stream.summaries, rrIntervals: stream.rr,
             skippedBytes: stream.skipped, trailingBytes: stream.trailing, streamError: stream.error
         )
     }
@@ -953,6 +986,7 @@ struct SleepDetails: Equatable, Sendable {
     private struct Stream {
         var packets: [SleepPacket] = []
         var stages: [SleepStageSample] = []
+        var lastStagesByTs: [Int64: [SleepStageSample]] = [:]
         var summaries: [SleepSummaryPacket] = []
         var rr: [SleepRRPacket] = []
         var skipped = 0
@@ -1009,14 +1043,17 @@ struct SleepDetails: Equatable, Sendable {
                 switch type {
                 case 17:  // stages: u16 BE words, stage = top 4 bits, minutes = low 12 bits
                     var t = ts
+                    var run: [SleepStageSample] = []
                     while p.remaining >= 2 {
                         let word = try p.u16BE()
                         let code = UInt8(truncatingIfNeeded: word >> 12)
                         let minutes = Int(word & 0x0FFF)
-                        s.stages.append(SleepStageSample(ts: unixDate(t), stage: SleepStage(detailsCode: code),
-                                                         raw: code, durationMinutes: minutes))
+                        run.append(SleepStageSample(ts: unixDate(t), stage: SleepStage(detailsCode: code),
+                                                    raw: code, durationMinutes: minutes))
                         t = t &+ Int64(minutes) &* 60
                     }
+                    s.stages += run
+                    s.lastStagesByTs[ts] = run
                 case 16 where length >= 13:  // summary
                     let b0 = try p.u8()
                     s.summaries.append(SleepSummaryPacket(

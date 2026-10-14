@@ -220,6 +220,203 @@
    }
   },
   {
+   "name": "sleep details v6 (Band 10 Pro shape): 3-byte bitmap, 24 unknown bytes, u16 snore, night sent twice",
+   "kind": "file",
+   "hex": "1076cd6a0c062100dffffc011076cd6a40a0cd6a004efc0300002c2e00001472cd6a40a0cd6a202122232425262728292a2b2c2d2e2f30313233343536373c000500c476cd6a3e000040003c000500c476cd6a000060006158020200e078cd6a39002d00fbfafcff11802e9532a10100000165000401030120fbfafcff11802e9532a101000001130001fbfafcff11802e9532a101000001140000fbfafcff11009023002ceddd1800120001fbfafcff11802e9532a101000000020000fbfafcff11800b0333a101000000030001fbfafcff111076cd6a000000000010000d100064000000500005000f1500fbfafcff111076cd6a0000000000110008103c200f30051014fbfafcff1100fa3933a101000000030006fbfafcff111076cd6a000000000010000d1100a000140073000f001e1600fbfafcff111076cd6a000000000011000e103c200f300510230014200f300a119bf2b0",
+   "synthetic": true,
+   "expect": {
+    "kind": "sleep_details",
+    "crc": {
+     "ok": true
+    },
+    "data": {
+     "is_awake": 1,
+     "bed_time": 1791850000,
+     "wakeup_time": 1791860800,
+     "sleep_quality": 0,
+     "bed_time2": 1791848980,
+     "wakeup_time2": 1791860800,
+     "v6_unknown_hex": "202122232425262728292a2b2c2d2e2f3031323334353637",
+     "hr": {
+      "unit": 60,
+      "count": 5,
+      "first_ts": 1791850180,
+      "values": [
+       62,
+       0,
+       0,
+       64,
+       0
+      ]
+     },
+     "spo2": {
+      "unit": 60,
+      "count": 5,
+      "first_ts": 1791850180,
+      "values": [
+       0,
+       0,
+       96,
+       0,
+       97
+      ]
+     },
+     "snore": {
+      "unit": 600,
+      "count": 2,
+      "first_ts": 1791850720,
+      "values": [
+       57,
+       45
+      ]
+     },
+     "skipped_bytes": 0,
+     "trailing_bytes": 0,
+     "packets": [
+      {
+       "type": 101,
+       "length": 4
+      },
+      {
+       "type": 19,
+       "flags": 1
+      },
+      {
+       "type": 20,
+       "length": 0
+      },
+      {
+       "type": 18,
+       "flags": 1
+      },
+      {
+       "type": 2,
+       "flags": 0
+      },
+      {
+       "type": 3,
+       "flags": 1
+      },
+      {
+       "type": 16
+      },
+      {
+       "type": 17
+      },
+      {
+       "type": 3,
+       "flags": 6
+      },
+      {
+       "type": 16
+      },
+      {
+       "type": 17
+      }
+     ],
+     "stages": [
+      {
+       "ts": 1791850000,
+       "stage": "light",
+       "duration_min": 60
+      },
+      {
+       "ts": 1791853600,
+       "stage": "deep",
+       "duration_min": 15
+      },
+      {
+       "ts": 1791854500,
+       "stage": "rem",
+       "duration_min": 5
+      },
+      {
+       "ts": 1791854800,
+       "stage": "light",
+       "duration_min": 20
+      },
+      {
+       "ts": 1791850000,
+       "stage": "light",
+       "duration_min": 60
+      },
+      {
+       "ts": 1791853600,
+       "stage": "deep",
+       "duration_min": 15
+      },
+      {
+       "ts": 1791854500,
+       "stage": "rem",
+       "duration_min": 5
+      },
+      {
+       "ts": 1791854800,
+       "stage": "light",
+       "duration_min": 35
+      },
+      {
+       "ts": 1791856900,
+       "stage": "awake",
+       "duration_min": 20
+      },
+      {
+       "ts": 1791858100,
+       "stage": "deep",
+       "duration_min": 15
+      },
+      {
+       "ts": 1791859000,
+       "stage": "rem",
+       "duration_min": 10
+      }
+     ],
+     "summaries": [
+      {
+       "sleep_index": 1,
+       "wake_count": 0,
+       "sleep_min": 100,
+       "awake_min": 0
+      },
+      {
+       "sleep_index": 1,
+       "wake_count": 1,
+       "sleep_min": 160,
+       "awake_min": 20,
+       "light_min": 115,
+       "rem_min": 15,
+       "deep_min": 30,
+       "flags": 22
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "sleep details v6, snore bit set but no snore block: blocks dropped, stream kept",
+   "kind": "file",
+   "hex": "1076cd6a0c062100dffffc011076cd6a40a0cd6a004efc0300002c2e00001472cd6a40a0cd6a202122232425262728292a2b2c2d2e2f30313233343536373c000500c476cd6a3e000040003c000500c476cd6a0000600061fbfafcff11802e9532a10100000165000401030120fbfafcff11802e9532a101000001130001fbfafcff11802e9532a101000001140000fbfafcff11009023002ceddd1800120001fbfafcff11802e9532a101000000020000fbfafcff11800b0333a101000000030001fbfafcff111076cd6a000000000010000d100064000000500005000f1500fbfafcff111076cd6a0000000000110008103c200f30051014fbfafcff1100fa3933a101000000030006fbfafcff111076cd6a000000000010000d1100a000140073000f001e1600fbfafcff111076cd6a000000000011000e103c200f300510230014200f300a02a5a645",
+   "synthetic": true,
+   "expect": {
+    "kind": "sleep_details",
+    "data": {
+     "bed_time": 1791850000,
+     "hr": null,
+     "spo2": null,
+     "snore": null,
+     "blocks_error": "",
+     "summaries": [
+      {
+       "sleep_min": 100
+      },
+      {
+       "sleep_min": 160
+      }
+     ]
+    }
+   }
+  },
+  {
    "name": "sleep details v2 (DETAILS), empty HR block, two stages",
    "kind": "file",
    "hex": "6044ed680c022000f0006044ed68285eed683c000000fbfafcff116044ed6800000000001100042032103ceca13039",
@@ -310,6 +507,46 @@
     "data": {
      "no_data": true,
      "stages": []
+    }
+   }
+  },
+  {
+   "name": "daily summary v5 ending after slot 29 (Band 10 Pro), slots 30-31 absent",
+   "kind": "file",
+   "hex": "504acd6a0c050100fffffffc39300000fa004b3cb4e8f4536537d0f8536550285a0a0101019808e0016063b8fc53655ca00054655f8200bc02020519281801031e8177de5a",
+   "synthetic": true,
+   "expect": {
+    "kind": "daily_summary",
+    "crc": {
+     "ok": true
+    },
+    "data": {
+     "steps": 12345,
+     "active_calories": 250,
+     "hr_resting": 60,
+     "hr_max": 180,
+     "hr_max_ts": 1700001000,
+     "hr_min": 55,
+     "hr_min_ts": 1700002000,
+     "hr_avg": 80,
+     "stress_avg": 40,
+     "stress_max": 90,
+     "stress_min": 10,
+     "standing": 65793,
+     "calories": 2200,
+     "recovery_hours": 480,
+     "spo2_max": 99,
+     "spo2_max_ts": 1700003000,
+     "spo2_min": 92,
+     "spo2_min_ts": 1700004000,
+     "spo2_avg": 95,
+     "training_load_day": 130,
+     "training_load_week": 700,
+     "training_load_level": 2,
+     "vitality_light": 5,
+     "vitality_moderate": 25,
+     "vitality_high": 40,
+     "vitality_current": 280
     }
    }
   },

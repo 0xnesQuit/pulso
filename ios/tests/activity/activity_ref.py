@@ -370,6 +370,9 @@ DAILY_SUMMARY_SLOTS = [
     ("vitality_current", 2), (None, 1), (None, 1), (None, 2), (None, 2),
 ]
 DAILY_SUMMARY_LAYOUT = {3: (3, 21), 4: (3, 21), 5: (4, 32)}  # version: (bitmap bytes, slots)
+# A Band 10 Pro v5 file stops after slot 29 (its bitmap marks 30 and 31 invalid), so slots past
+# the v3/v4 set may be missing when the body ends cleanly on a slot boundary.
+DAILY_SUMMARY_BASE_SLOTS = 21
 
 
 def parse_daily_summary(fid: FileId, body: bytes) -> dict:
@@ -380,6 +383,8 @@ def parse_daily_summary(fid: FileId, body: bytes) -> dict:
     bitmap = cur.take(bitmap_len)
     out = {"bitmap_hex": bitmap.hex()}
     for i in range(slots):
+        if i >= DAILY_SUMMARY_BASE_SLOTS and not cur.left():
+            break
         name, size = DAILY_SUMMARY_SLOTS[i]
         value = int.from_bytes(cur.take(size), "little")
         if name is None:
@@ -388,6 +393,9 @@ def parse_daily_summary(fid: FileId, body: bytes) -> dict:
     for name, _ in DAILY_SUMMARY_SLOTS[slots:]:
         if name is not None:
             out[name] = None
+    for name, _ in DAILY_SUMMARY_SLOTS[:slots]:
+        if name is not None:
+            out.setdefault(name, None)
     if out["standing"] is not None:
         out["standing_hours"] = [h for h in range(24) if out["standing"] >> h & 1]
     if cur.left():
@@ -398,10 +406,11 @@ def parse_daily_summary(fid: FileId, body: bytes) -> dict:
 # ---------------------------------------------------------------------------
 # sleep details (activity / sleep / any detail type)
 
-SLEEP_DETAILS_BITMAP = {1: 1, 2: 1, 3: 1, 4: 1, 5: 2}
+SLEEP_DETAILS_BITMAP = {1: 1, 2: 1, 3: 1, 4: 1, 5: 2, 6: 3}
+SLEEP_DETAILS_V6_EXTRA = 24  # unknown fields between wakeup_time2 and the HR block
 STAGE_MAGIC = b"\xfb\xfa\xfc\xff"
 STAGE_PACKET_HEADER = 17
-NO_DATA_PACKET_TYPES = {2, 3, 9, 12, 13, 14, 15}
+NO_DATA_PACKET_TYPES = {2, 3, 9, 12, 13, 14, 15, 18, 19}
 DETAIL_STAGE = {0: "awake", 1: "light", 2: "deep", 3: "rem", 4: "not_sleep"}
 
 
@@ -436,15 +445,29 @@ def parse_sleep_details(fid: FileId, body: bytes) -> dict:
         out["bed_time2"] = cur.u32()
         out["wakeup_time2"] = cur.u32()
         idx += 5
-    out["hr"] = _sample_block(v, out["bed_time"], cur, cur.u8) if bit_valid(bitmap, idx) else None
-    idx += 1
-    out["spo2"] = _sample_block(v, out["bed_time"], cur, cur.u8) if bit_valid(bitmap, idx) else None
-    idx += 1
-    out["snore"] = None
-    if v >= 3:
-        if bit_valid(bitmap, idx):
-            out["snore"] = _sample_block(v, out["bed_time"], cur, cur.f32)
+    if v >= 6:
+        out["v6_unknown_hex"] = cur.take(SLEEP_DETAILS_V6_EXTRA).hex()
+    blocks_at = cur.pos
+    try:
+        out["hr"] = _sample_block(v, out["bed_time"], cur, cur.u8) if bit_valid(bitmap, idx) else None
         idx += 1
+        out["spo2"] = _sample_block(v, out["bed_time"], cur, cur.u8) if bit_valid(bitmap, idx) else None
+        idx += 1
+        out["snore"] = None
+        if v >= 3:
+            if bit_valid(bitmap, idx):
+                # float32 up to v5; the one real v6 file has u16 values that end exactly at the stream
+                out["snore"] = _sample_block(v, out["bed_time"], cur, cur.u16 if v >= 6 else cur.f32)
+            idx += 1
+        if v >= 6 and cur.left() and cur.data[cur.pos:cur.pos + 4] != STAGE_MAGIC:
+            raise Truncated(f"sample blocks end at offset {cur.pos}, not at a packet")
+    except Truncated as e:
+        if v < 6:
+            raise
+        # v6 field bits are a guess; keep the stream rather than fail the night
+        out["blocks_error"] = str(e)
+        out["hr"] = out["spo2"] = out["snore"] = None
+        cur.pos = blocks_at
 
     packets, stages, summaries, rr = [], [], [], []
     out["skipped_bytes"] = 0
@@ -642,6 +665,8 @@ def _match(expected, actual, path="$") -> list[str]:
         for k, v in expected.items():
             if k not in actual:
                 errs.append(f"{path}.{k}: missing")
+            elif k == "blocks_error" and isinstance(v, str) and isinstance(actual[k], str):
+                continue  # free text, presence only
             else:
                 errs += _match(v, actual[k], f"{path}.{k}")
         return errs

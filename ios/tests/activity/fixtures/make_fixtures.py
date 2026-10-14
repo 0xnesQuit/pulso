@@ -364,6 +364,76 @@ def sd_v5() -> dict:
                 "rr": [{"ts_raw": bed * 1000, "rr_ms": [1000, 980, 1020, 950]}]}}}
 
 
+def sd_v6_body(bed: int, wake: int, snore_block: bool = True) -> bytes:
+    """Shaped like the Band 10 Pro v6 file of 2026-10-14 (values made up): 3-byte bitmap, the v5
+    fields, 24 unknown bytes, HR/SpO2 blocks with 0 for "no reading", u16 snore samples, then a
+    stream that sends the night twice (an interim 16/17 pair and the final one, same ts)."""
+    bitmap = bytes([0xDF, 0xFF, 0xFC])
+    body = bitmap + bytes([1]) + struct.pack("<II", bed, wake) + bytes([0])
+    body += bytes([0x4E]) + struct.pack("<II", 1020, wake - bed + 1020) + struct.pack("<II", bed - 1020, wake)
+    body += bytes(range(0x20, 0x38))  # 24 unknown bytes
+    body += struct.pack("<HHI", 60, 5, bed + 180) + bytes([62, 0, 0, 64, 0])
+    body += struct.pack("<HHI", 60, 5, bed + 180) + bytes([0, 0, 96, 0, 97])
+    if snore_block:
+        body += struct.pack("<HHI", 600, 2, bed + 720) + struct.pack("<HH", 57, 45)
+    body += stage_packet(101, bed * 1000, bytes([1, 3, 1, 0x20]), parity=1)
+    body += stage_packet(19, bed * 1000, length=1, parity=1)
+    body += stage_packet(20, bed * 1000, parity=1)
+    body += stage_packet(18, (bed - 1000) * 10**9, length=1)
+    body += stage_packet(2, bed * 1000)
+    body += stage_packet(3, (bed + 7200) * 1000, length=1)
+    body += stage_packet(16, bed, bytes([0x10]) + struct.pack(">HHHHH", 100, 0, 80, 5, 15) + bytes([0x15, 0]))
+    body += stage_packet(17, bed, stage_words([(1, 60), (2, 15), (3, 5), (1, 20)]))
+    body += stage_packet(3, wake * 1000, length=6)
+    body += stage_packet(16, bed, bytes([0x11]) + struct.pack(">HHHHH", 160, 20, 115, 15, 30) + bytes([0x16, 0]))
+    body += stage_packet(17, bed, stage_words([(1, 60), (2, 15), (3, 5), (1, 35), (0, 20), (2, 15), (3, 10)]))
+    return body
+
+
+def sd_v6() -> dict:
+    bed = 1791850000
+    wake = bed + 180 * 60
+    data = with_crc(file_id(bed, 12, 6, 0, 8, 1) + b"\x00" + sd_v6_body(bed, wake))
+    first = [(bed, "light", 60), (bed + 3600, "deep", 15), (bed + 4500, "rem", 5), (bed + 4800, "light", 20)]
+    final = [(bed, "light", 60), (bed + 3600, "deep", 15), (bed + 4500, "rem", 5), (bed + 4800, "light", 35),
+             (bed + 6900, "awake", 20), (bed + 8100, "deep", 15), (bed + 9000, "rem", 10)]
+    return {"name": "sleep details v6 (Band 10 Pro shape): 3-byte bitmap, 24 unknown bytes, u16 snore, night sent twice",
+            "kind": "file", "hex": data.hex(), "synthetic": True,
+            "expect": {"kind": "sleep_details", "crc": {"ok": True}, "data": {
+                "is_awake": 1, "bed_time": bed, "wakeup_time": wake, "sleep_quality": 0,
+                "bed_time2": bed - 1020, "wakeup_time2": wake, "v6_unknown_hex": bytes(range(0x20, 0x38)).hex(),
+                "hr": {"unit": 60, "count": 5, "first_ts": bed + 180, "values": [62, 0, 0, 64, 0]},
+                "spo2": {"unit": 60, "count": 5, "first_ts": bed + 180, "values": [0, 0, 96, 0, 97]},
+                "snore": {"unit": 600, "count": 2, "first_ts": bed + 720, "values": [57, 45]},
+                "skipped_bytes": 0, "trailing_bytes": 0,
+                "packets": [{"type": 101, "length": 4}, {"type": 19, "flags": 1}, {"type": 20, "length": 0},
+                            {"type": 18, "flags": 1}, {"type": 2, "flags": 0}, {"type": 3, "flags": 1},
+                            {"type": 16}, {"type": 17}, {"type": 3, "flags": 6}, {"type": 16}, {"type": 17}],
+                "stages": [{"ts": t, "stage": st, "duration_min": m} for t, st, m in first + final],
+                "summaries": [{"sleep_index": 1, "wake_count": 0, "sleep_min": 100, "awake_min": 0},
+                              {"sleep_index": 1, "wake_count": 1, "sleep_min": 160, "awake_min": 20,
+                               "light_min": 115, "rem_min": 15, "deep_min": 30, "flags": 0x16}]}}}
+
+
+def sd_v6_misaligned() -> dict:
+    bed = 1791850000
+    wake = bed + 180 * 60
+    data = with_crc(file_id(bed, 12, 6, 0, 8, 1) + b"\x00" + sd_v6_body(bed, wake, snore_block=False))
+    return {"name": "sleep details v6, snore bit set but no snore block: blocks dropped, stream kept",
+            "kind": "file", "hex": data.hex(), "synthetic": True,
+            "expect": {"kind": "sleep_details", "data": {
+                "bed_time": bed, "hr": None, "spo2": None, "snore": None, "blocks_error": "",
+                "summaries": [{"sleep_min": 100}, {"sleep_min": 160}]}}}
+
+
+def ds_v5_short() -> dict:
+    v5 = ds_body_v5()[:53]  # slots 0..29, as a Band 10 Pro sends them
+    data = with_crc(file_id(1791838800, 12, 5, 0, 0, 1) + b"\x00" + bytes([0xFF, 0xFF, 0xFF, 0xFC]) + v5)
+    return {"name": "daily summary v5 ending after slot 29 (Band 10 Pro), slots 30-31 absent",
+            "kind": "file", "hex": data.hex(), "synthetic": True,
+            "expect": {"kind": "daily_summary", "crc": {"ok": True}, "data": {**DS_ALL_V3, **DS_V5_ONLY}}}
+
+
 def sd_v2() -> dict:
     bed = 1760380000
     wake = bed + 110 * 60
@@ -467,7 +537,8 @@ def main(argv):
           "Gadgetbridge d4bd8367 " + T + "impl/WorkoutSummaryParserTest.java (captured SUMMARY files; only the "
           "envelope is checked, the workout payload is not parsed by activity_ref.py)", gb_workouts(blobs))
     write("synthetic.json", "SYNTHETIC: built by make_fixtures.py from docs/ACTIVITY.md; not device data",
-          [dd_v4(), dd_v2(), dd_v3_tail(), sd_v5(), sd_v2(), ss_v2(), ss_v2(empty=True), ms_v2()]
+          [dd_v4(), dd_v2(), dd_v3_tail(), sd_v5(), sd_v6(), sd_v6_misaligned(), sd_v2(), ss_v2(), ss_v2(empty=True),
+           ds_v5_short(), ms_v2()]
           + transport_cases(blobs))
 
 
