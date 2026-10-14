@@ -416,7 +416,10 @@ func builds() {
     guard let id = app()?["id"] as? String else { die("no app record") }
     for build in list("/v1/builds?filter[app]=\(id)&sort=-uploadedDate&limit=5") {
         let a = attributes(build)
-        print("build \(a["version"] ?? "?"): \(a["processingState"] ?? "?"), uploaded \(a["uploadedDate"] ?? "?")")
+        let buildID = build["id"] as? String ?? ""
+        let external = attributes(one("/v1/builds/\(buildID)/buildBetaDetail"))["externalBuildState"] as? String
+        let review = attributes(one("/v1/builds/\(buildID)/betaAppReviewSubmission"))["betaReviewState"] as? String
+        print("build \(a["version"] ?? "?"): \(a["processingState"] ?? "?"), uploaded \(a["uploadedDate"] ?? "?"), external \(external ?? "-"), beta review \(review ?? "-")")
     }
 }
 
