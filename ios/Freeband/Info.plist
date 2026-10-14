@@ -3,7 +3,7 @@
 <plist version="1.0">
 <dict>
 	<key>CFBundleDevelopmentRegion</key>
-	<string>tr</string>
+	<string>en</string>
 	<key>CFBundleDisplayName</key>
 	<string>Freeband</string>
 	<key>CFBundleExecutable</key>
@@ -14,6 +14,7 @@
 	<string>6.0</string>
 	<key>CFBundleLocalizations</key>
 	<array>
+		<string>en</string>
 		<string>tr</string>
 	</array>
 	<key>CFBundleName</key>
@@ -40,10 +41,9 @@
 	<key>LSApplicationCategoryType</key>
 	<string>public.app-category.healthcare-fitness</string>
 	<key>NSBluetoothAlwaysUsageDescription</key>
-	<string>Freeband bileğindeki bantla doğrudan konuşmak için Bluetooth kullanır.</string>
+	<string>Freeband uses Bluetooth to talk directly to the band on your wrist.</string>
 	<key>UIAppFonts</key>
 	<array>
-		<string>OpenSauceSans-Light.otf</string>
 		<string>OpenSauceSans-Regular.otf</string>
 		<string>OpenSauceSans-Medium.otf</string>
 		<string>OpenSauceSans-SemiBold.otf</string>
@@ -63,7 +63,5 @@
 	<array>
 		<string>UIInterfaceOrientationPortrait</string>
 	</array>
-	<key>UIUserInterfaceStyle</key>
-	<string>Dark</string>
 </dict>
 </plist>

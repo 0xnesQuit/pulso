@@ -19,6 +19,8 @@ enum DemoData {
         case full, empty, calibrating
     }
 
+    static var isActive: Bool { variant(ProcessInfo.processInfo.arguments) != nil }
+
     static func variant(_ arguments: [String]) -> Variant? {
         guard let i = arguments.firstIndex(of: "-freeband-demo") else { return nil }
         if i + 1 < arguments.count, let v = Variant(rawValue: arguments[i + 1].lowercased()) { return v }

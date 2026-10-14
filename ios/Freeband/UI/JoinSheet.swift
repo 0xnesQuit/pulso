@@ -9,66 +9,77 @@ struct JoinSheet: View {
     @State private var tried = false
 
     private var joined: Bool { tried && model.hubEnabled }
+    private var host: String { invite.hub.host ?? invite.hub.absoluteString }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            Text(joined ? "Katıldın." : "Web erişimine katıl")
-                .font(Theme.headline(34))
-                .foregroundStyle(Theme.ink)
-
-            if joined {
-                Text("Verilerin her senkrondan sonra \(invite.hub.host ?? "sunucuya") da gider. Panelini tarayıcıda açabilir, API anahtarını Ayarlar > Web erişimi'nden alabilirsin.")
-                    .foregroundStyle(Theme.ink)
-            } else if model.hubEnabled {
-                Text("Web erişimin zaten açık (\(model.hubURL.host ?? "")). Başka bir sunucuya geçmek için önce Ayarlar > Web erişimi'nden kapat.")
-                    .foregroundStyle(Theme.ink)
-            } else {
-                Text("Katılınca Freeband verilerini telefonun yanında bu sunucuya da gönderir; tarayıcıdan panelini görür, API ile verine ulaşırsın. İstediğin an kapatıp sunucudaki verini silebilirsin.")
-                    .foregroundStyle(Theme.ink)
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(invite.hub.host ?? invite.hub.absoluteString)
-                        .font(Theme.mono(18))
-                        .foregroundStyle(Theme.ink)
-                    Text("Davet kodu \(invite.code)")
-                        .font(.subheadline)
-                        .foregroundStyle(Theme.secondary)
+        VStack(alignment: .leading, spacing: 0) {
+            SheetHeader(title: joined ? String(localized: "You joined") : String(localized: "Join web access"))
+            ScrollView {
+                VStack(alignment: .leading, spacing: FBSpace.m) {
+                    if joined {
+                        paragraph(String(localized: "After every sync your data also goes to \(host). Open your panel in a browser; your API key is in Band › Freeband settings › Web access."))
+                    } else if model.hubEnabled {
+                        paragraph(String(localized: "Web access is already on (\(model.hubURL.host ?? "")). To switch servers, turn it off first in Band › Freeband settings › Web access."))
+                    } else {
+                        paragraph(String(localized: "When you join, Freeband also sends your data to this server. You can see your panel in a browser and reach your data through the API. Turn it off any time to delete your data there."))
+                        Card {
+                            VStack(alignment: .leading, spacing: FBSpace.xxs) {
+                                Text(verbatim: host)
+                                    .textStyle(.headline)
+                                    .foregroundStyle(.textPrimary)
+                                Text("Invite code \(invite.code)")
+                                    .textStyle(.subhead)
+                                    .foregroundStyle(.textSecondary)
+                            }
+                        }
+                        if !invite.isDefaultHub {
+                            ContextCard.alert(String(localized: "This isn't Freeband's default server. Your health data will go there; join only if the invite came from someone you trust."))
+                        }
+                        if tried, let status = model.hubStatus {
+                            ContextCard.alert(status)
+                        }
+                    }
                 }
-                if !invite.isDefaultHub {
-                    Text("Bu, Freeband'in varsayılan sunucusu değil. Sağlık verin buraya gidecek; yalnızca güvendiğin birinden geldiyse katıl.")
-                        .font(.callout)
-                        .foregroundStyle(Theme.pulse)
-                }
-                if tried, let status = model.hubStatus {
-                    Text(status).font(.callout).foregroundStyle(Theme.pulse)
-                }
-            }
-
-            Spacer()
-            if joined {
-                Button("Web panelini aç") {
-                    if let url = model.hub.panelURL() { openURL(url) }
-                }
-                .buttonStyle(PrimaryButtonStyle())
-                Button("Kapat") { dismiss() }
-                    .buttonStyle(QuietButtonStyle())
-            } else if model.hubEnabled {
-                Button("Kapat") { dismiss() }
-                    .buttonStyle(PrimaryButtonStyle())
-            } else {
-                Button {
-                    tried = true
-                    Task { await model.accept(invite) }
-                } label: {
-                    if model.hubBusy { ProgressView().tint(Theme.ground) } else { Text("Katıl") }
-                }
-                .buttonStyle(PrimaryButtonStyle())
-                .disabled(model.hubBusy)
-                Button("Vazgeç") { dismiss() }
-                    .buttonStyle(QuietButtonStyle(tint: Theme.secondary))
+                .padding(.horizontal, FBSpace.gutter)
+                .padding(.top, FBSpace.xs)
             }
         }
-        .padding(24)
-        .background(Theme.ground)
-        .presentationDetents([.large])
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            VStack(spacing: FBSpace.xs) {
+                if joined {
+                    Button(String(localized: "Open web panel")) {
+                        if let url = model.hub.panelURL() { openURL(url) }
+                    }
+                    .buttonStyle(.fbPrimary)
+                    Button(String(localized: "Close")) { dismiss() }
+                        .buttonStyle(.fbTertiary(fullWidth: true))
+                } else if model.hubEnabled {
+                    Button(String(localized: "Close")) { dismiss() }
+                        .buttonStyle(.fbSecondary(fullWidth: true))
+                } else {
+                    Button {
+                        tried = true
+                        Task { await model.accept(invite) }
+                    } label: {
+                        if model.hubBusy { ProgressView().tint(.onAction) } else { Text("Join") }
+                    }
+                    .buttonStyle(.fbPrimary)
+                    .disabled(model.hubBusy)
+                    Button(String(localized: "Cancel")) { dismiss() }
+                        .buttonStyle(.fbTertiary(fullWidth: true))
+                }
+            }
+            .padding(.horizontal, FBSpace.gutter)
+            .padding(.vertical, FBSpace.xs)
+            .background(.raised)
+        }
+        .fbSheet(.form)
+    }
+
+    private func paragraph(_ text: String) -> some View {
+        Text(text)
+            .textStyle(.body)
+            .foregroundStyle(.textBody)
+            .fixedSize(horizontal: false, vertical: true)
     }
 }

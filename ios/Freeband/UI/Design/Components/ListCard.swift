@@ -98,7 +98,6 @@ struct ListRow: View {
                     .textStyle(.body)
                     .foregroundStyle(.textSecondary)
                     .lineLimit(1)
-                    .layoutPriority(-1)
             }
         }
     }

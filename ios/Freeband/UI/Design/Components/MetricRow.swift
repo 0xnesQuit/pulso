@@ -73,7 +73,8 @@ struct MetricRow: View {
                     valueText
                         .frame(minWidth: valueWidth, alignment: .trailing)
                     deltaView
-                        .frame(width: deltaWidth, alignment: .leading)
+                        .frame(minWidth: deltaWidth, alignment: .leading)
+                        .fixedSize()
                     chevron
                 }
                 .padding(.vertical, FBSpace.xs)
