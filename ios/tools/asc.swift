@@ -489,14 +489,19 @@ func publicBeta(_ file: String, _ email: String) {
         print("beta description: \(locale)")
     }
 
+    // The API only takes the review contact together with a phone number, which stays out of this
+    // script: until it is in App Store Connect (TestFlight > Test Information), this step waits.
     let detail = one("/v1/apps/\(appID)/betaAppReviewDetail")
     guard let detailID = detail["id"] as? String else { die("no beta review detail") }
-    patch("betaAppReviewDetails", detailID, attributes: [
-        "contactFirstName": cfg["contactFirstName"] ?? "", "contactLastName": cfg["contactLastName"] ?? "",
-        "contactEmail": email, "demoAccountRequired": false, "notes": cfg["reviewNotes"] ?? "",
-    ])
-    let phone = attributes(one("/v1/apps/\(appID)/betaAppReviewDetail"))["contactPhone"] as? String
-    print("review contact and notes set\(phone == nil ? "; add the contact phone in App Store Connect" : "")")
+    if let phone = attributes(detail)["contactPhone"] as? String, !phone.isEmpty {
+        patch("betaAppReviewDetails", detailID, attributes: [
+            "contactFirstName": cfg["contactFirstName"] ?? "", "contactLastName": cfg["contactLastName"] ?? "",
+            "contactPhone": phone, "contactEmail": email, "demoAccountRequired": false, "notes": cfg["reviewNotes"] ?? "",
+        ])
+        print("review contact and notes set")
+    } else {
+        print("review contact skipped: add the contact phone in App Store Connect (TestFlight > Test Information), then run again")
+    }
 
     let name = cfg["groupName"] as? String ?? "Public beta"
     var group = list("/v1/apps/\(appID)/betaGroups?limit=200").first {
