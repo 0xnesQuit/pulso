@@ -349,6 +349,16 @@
         }
       }
     },
+    "30 made-up days. Your own data stays as it is.": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "30 günlük uydurma veri. Kendi verin olduğu gibi kalır."
+          }
+        }
+      }
+    },
     "30d": {
       "comment": "30 days, short",
       "localizations": {
@@ -5145,6 +5155,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Bant yanında değil mi? Uydurma 30 günlük veriyle bütün ekranları gör. Gerçek verine dokunulmaz."
+          }
+        }
+      }
+    },
+    "Demo data": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Demo veri"
           }
         }
       }

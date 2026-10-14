@@ -17,10 +17,15 @@ final class AppSession: ObservableObject {
         (container, model) = Self.make(demo: DemoMode.isOn)
     }
 
+    /// Demo mode never touches the real store or the onboarding flag; leaving it returns to the
+    /// app as it was, and to the app proper whenever a real band is already set up.
     func setDemo(_ on: Bool) {
         model.stop()
         DemoMode.isOn = on
         (container, model) = Self.make(demo: on)
+        if !on, ((try? container.mainContext.fetchCount(FetchDescriptor<Band>())) ?? 0) > 0 {
+            UserDefaults.standard.set(true, forKey: "onboarded")
+        }
         generation += 1
     }
 
@@ -42,7 +47,10 @@ final class AppSession: ObservableObject {
             DemoData.seed(container.mainContext, .full)
         } else {
             #if DEBUG
-            if let variant = DemoData.variant(ProcessInfo.processInfo.arguments) { DemoData.seed(container.mainContext, variant) }
+            if let variant = DemoData.variant(ProcessInfo.processInfo.arguments) {
+                DemoData.seed(container.mainContext, variant)
+                UserDefaults.standard.set(true, forKey: "onboarded")
+            }
             #endif
         }
         return (container, AppModel(context: container.mainContext, isDemo: demo))

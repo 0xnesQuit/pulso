@@ -38,8 +38,6 @@ enum DemoData {
         band.firmware = "3.1.42"
         band.hardwareModel = "Xiaomi Smart Band 10 Pro"
         context.insert(band)
-        UserDefaults.standard.set(true, forKey: "onboarded")
-        UserDefaults.standard.set(band.id.uuidString, forKey: "selectedBand")
 
         switch variant {
         case .empty:

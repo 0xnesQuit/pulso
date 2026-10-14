@@ -30,6 +30,7 @@ enum AppearanceSetting: String, CaseIterable, Identifiable {
 /// diagnostics and about.
 struct SettingsView: View {
     @EnvironmentObject private var model: AppModel
+    @EnvironmentObject private var session: AppSession
     @Environment(\.modelContext) private var context
     @Query(sort: \Band.addedAt) private var bands: [Band]
     @Query private var hooks: [Webhook]
@@ -70,10 +71,15 @@ struct SettingsView: View {
                         Button { Task { await model.reparseAll() } } label: {
                             ListRow(title: String(localized: "Parse all files again"),
                                     value: model.ingestBusy ? String(localized: "Working…") : nil,
-                                    systemImage: "arrow.clockwise", accessory: .none, showsDivider: false)
+                                    systemImage: "arrow.clockwise", accessory: .none)
                         }
                         .buttonStyle(.fbRow)
                         .disabled(model.ingestBusy)
+                        ListRow(title: String(localized: "Demo data"),
+                                subtitle: String(localized: "30 made-up days. Your own data stays as it is."),
+                                systemImage: "sparkles",
+                                accessory: .toggle(Binding(get: { session.isDemo }, set: { session.setDemo($0) })),
+                                showsDivider: false)
                     }
                     Footnote(exportError ?? String(localized: "\(FBFormat.number(sampleCount)) readings on this phone. Parsing again rebuilds sleep, minutes and scores from the stored raw files."))
                     FBDestructiveButton(title: String(localized: "Delete data on this phone"),
