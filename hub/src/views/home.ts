@@ -1,100 +1,239 @@
-// The public home page, in Turkish: the product first (one line, the app
-// screens, two actions), then four short sections.
+// The public home page in English ("/") and Turkish ("/tr"): the product first
+// (one line, the app screens, two actions), then four short sections.
 
-import { html, type Safe } from "./html";
+import { html, raw, type Safe } from "./html";
+import { localPath, type Lang, type Text } from "./i18n";
 import { GITHUB_URL } from "./layout";
 
-export const HOME_DESCRIPTION =
-  "Freeband, Xiaomi Smart Band 10 ve 10 Pro'yu Mi Fitness ve Xiaomi hesabı olmadan okuyan bir iPhone uygulaması. Verin telefonunda kalır.";
+export const HOME_TITLE: Text = {
+  en: "Freeband · Xiaomi Smart Band 10, no account",
+  tr: "Freeband · Xiaomi Smart Band 10, hesapsız",
+};
 
-const SHOTS: Array<{ file: string; name: string; alt: string }> = [
+export const HOME_DESCRIPTION: Text = {
+  en: "Freeband is an iPhone app that reads the Xiaomi Smart Band 10 and 10 Pro without Mi Fitness or a Xiaomi account. Your data stays on your phone.",
+  tr: "Freeband, Xiaomi Smart Band 10 ve 10 Pro'yu Mi Fitness ve Xiaomi hesabı olmadan okuyan bir iPhone uygulaması. Verin telefonunda kalır.",
+};
+
+export const HOME_IMAGE_ALT: Text = {
+  en: "The Today and Recovery screens of the Freeband app",
+  tr: "Freeband uygulamasının Bugün ve Toparlanma ekranları",
+};
+
+interface Shot {
+  file: string;
+  name: Text;
+  alt: Text;
+}
+
+const SHOTS: Shot[] = [
   {
     file: "today",
-    name: "Bugün",
-    alt: "Bugün ekranı: günün hükmü Dengeli; Uyku 74, Toparlanma 41 ve Yük 0,0 yayları; adım, dinlenik nabız ve uyku satırları.",
+    name: { en: "Today", tr: "Bugün" },
+    alt: {
+      en: "Today screen: the day's verdict, the Sleep, Recovery and Strain arcs, and rows for steps, resting heart rate and sleep.",
+      tr: "Bugün ekranı: günün hükmü; Uyku, Toparlanma ve Yük yayları; adım, dinlenik nabız ve uyku satırları.",
+    },
   },
   {
     file: "score-recovery",
-    name: "Toparlanma",
-    alt: "Toparlanma ayrıntısı: 41, orta; nabız değişkenliği 48 ms ve dinlenik nabız 52 bpm katkı satırları, normale göre konumlarıyla.",
+    name: { en: "Recovery", tr: "Toparlanma" },
+    alt: {
+      en: "Recovery detail: the score, a one-line explanation, and contributor rows for heart rate variability and resting heart rate against their usual range.",
+      tr: "Toparlanma ayrıntısı: skor, tek satırlık açıklama, nabız değişkenliği ve dinlenik nabız katkı satırları, normale göre konumlarıyla.",
+    },
   },
   {
     file: "sleep",
-    name: "Uyku",
-    alt: "Uyku ekranı: 4 sa. 55 dk., 22:23–3:27, %97 verimli; uyanık, REM, hafif ve derin evrelerin zaman çizelgesi ve süreleri.",
+    name: { en: "Sleep", tr: "Uyku" },
+    alt: {
+      en: "Sleep screen: time asleep, bed and wake times, efficiency, and a timeline of awake, REM, light and deep stages with their durations.",
+      tr: "Uyku ekranı: uyku süresi, yatış ve kalkış, verimlilik; uyanık, REM, hafif ve derin evrelerin zaman çizelgesi ve süreleri.",
+    },
   },
   {
     file: "band",
-    name: "Bant",
-    alt: "Bant ekranı: Band 10 Pro çizimi, %46 pil ve 1 dk önce senkronlandı; senkronla, bul, bildir ve canlı nabız düğmeleri.",
+    name: { en: "Band", tr: "Bant" },
+    alt: {
+      en: "Band screen: a drawing of the Band 10 Pro with its battery and last sync, and buttons to sync, find, notify and start live heart rate.",
+      tr: "Bant ekranı: Band 10 Pro çizimi, pil ve son senkron; senkronla, bul, bildir ve canlı nabız düğmeleri.",
+    },
   },
 ];
 
-export function homeBody(o: { deleted: boolean }): Safe {
+interface Card {
+  title: string;
+  text: string;
+  range?: string;
+  wide?: boolean;
+}
+
+interface Copy {
+  deleted: string;
+  h1: string;
+  lede: string;
+  story: string;
+  guide: string;
+  shotsCaption: string;
+  noAccount: { h: string; p: string; cards: Card[] };
+  scores: { h: string; p: string; cards: Card[] };
+  web: { h: string; p: string; cards: Card[]; note: Safe; docs: string; privacy: string };
+  status: { h: string; line: string; p: Safe };
+}
+
+const COPY: Record<Lang, Copy> = {
+  en: {
+    deleted: "Your account and all your data on this server have been deleted.",
+    h1: "An iPhone app for the Xiaomi Smart Band 10, no account needed",
+    lede: "Freeband reads your band without Mi Fitness or a Xiaomi account and works out your scores on the phone. Your data stays on your phone.",
+    story: "How we did it",
+    guide: "Try it yourself",
+    shotsCaption: "Screens show demo data.",
+    noAccount: {
+      h: "No Mi Fitness, no account",
+      p: "Freeband talks to the band directly over Bluetooth. There's no account to create; your steps, heart rate, sleep and scores stay on your phone.",
+      cards: [
+        { title: "The key stays on your phone", text: "Freeband reads the band's key once from Mi Fitness's folder on the phone and keeps it in the Keychain. It's never sent anywhere." },
+        { title: "Your history stays on the band", text: "Freeband never acknowledges the band's files (no ACK), so the band doesn't delete your history." },
+        { title: "Mi Fitness once, at setup", text: "A brand-new band still needs Mi Fitness for pairing, because the key is created on Xiaomi's server." },
+      ],
+    },
+    scores: {
+      h: "Your own scores, worked out in the open",
+      p: "Scores are calculated on the phone from the band's raw data. Each one shows why it has that value, through its contributors, and how far to trust it, through a confidence level.",
+      cards: [
+        { title: "Sleep", range: "0–100", text: "Duration, efficiency, deep sleep, REM, restfulness, regularity and the overnight heart rate dip." },
+        { title: "Recovery", range: "0–100", text: "Heart rate variability, resting heart rate, sleep and yesterday's strain, against your own last 14 days." },
+        { title: "Strain", range: "0–21", text: "Minutes in heart rate zones based on your heart rate reserve. Not good or bad, just how much." },
+        { title: "Confidence", wide: true, text: "High, medium, low or none, always with a reason, such as “no RR data” or “5 of 14 nights in the baseline”." },
+      ],
+    },
+    web: {
+      h: "Optional web access",
+      p: "This site is the Freeband hub. If you turn on Web access in the app, your phone sends your data here too. If you don't, nothing comes here.",
+      cards: [
+        { title: "Web panel", text: "See your day in the browser. Tap Open web panel in the app and the browser takes you straight to it." },
+        { title: "REST API", text: "Reach your data with your personal key. Endpoints and examples are in the API docs." },
+        { title: "Webhooks", text: "After every sync, your data also goes to your own server in a signed request." },
+        { title: "Export", text: "Download everything stored here as CSV or JSON." },
+      ],
+      note: html`To sign in from another computer, copy the key from the app and paste it on the <a href="/login">sign-in page</a>. The <a href="/privacy">privacy page</a> explains what is stored.`,
+      docs: "API docs",
+      privacy: "Privacy",
+    },
+    status: {
+      h: "Status",
+      line: "Internal testing on TestFlight",
+      p: html`Freeband is in internal testing for now and isn't on the App Store. The source code is <a href="${GITHUB_URL}">on GitHub</a>, <a href="/story">How we did it</a> tells how the band was worked out, and <a href="/guide">Try it yourself</a> shows how to build it for your own band.`,
+    },
+  },
+  tr: {
+    deleted: "Hesabın ve bu sunucudaki tüm verin silindi.",
+    h1: "Xiaomi Smart Band 10 için hesapsız bir iPhone uygulaması",
+    lede: "Freeband bandını Mi Fitness ve Xiaomi hesabı olmadan okur, skorlarını telefonda hesaplar. Verin telefonunda kalır.",
+    story: "Nasıl yaptık",
+    guide: "Kendin dene",
+    shotsCaption: "Ekranlar demo veriyle.",
+    noAccount: {
+      h: "Mi Fitness'sız, hesapsız",
+      p: "Freeband bandla Bluetooth üzerinden doğrudan konuşur. Hesap açmazsın; adım, nabız, uyku ve skorlar telefonda kalır.",
+      cards: [
+        { title: "Anahtar telefonda", text: "Bandın anahtarını Mi Fitness'ın telefondaki klasöründen bir kez okur ve Keychain'e yazar. Anahtar hiçbir yere gönderilmez." },
+        { title: "Veri bantta kalır", text: "Freeband dosyaları onaylamaz (ACK göndermez), bu yüzden bant geçmiş veriyi silmez." },
+        { title: "Kurulumda bir kez Mi Fitness", text: "Sıfır bir bandı eşlemek için Mi Fitness şart, çünkü anahtar Xiaomi sunucusunda üretiliyor." },
+      ],
+    },
+    scores: {
+      h: "Kendi skorların, açık hesapla",
+      p: "Skorlar telefonda, bandın ham verisinden hesaplanır. Her skor neden o değerde olduğunu katkı satırlarıyla, ne kadar güvenilir olduğunu güven düzeyiyle gösterir.",
+      cards: [
+        { title: "Uyku", range: "0–100", text: "Süre, verimlilik, derin uyku, REM, huzur, düzen ve gece nabız düşüşü." },
+        { title: "Toparlanma", range: "0–100", text: "Nabız değişkenliği, dinlenik nabız, uyku ve dünkü yük; son 14 günlük normaline göre." },
+        { title: "Yük", range: "0–21", text: "Nabız rezervine göre bölgelerde geçen dakikalar. İyi ya da kötü değil, yalnız ne kadar." },
+        { title: "Güven", wide: true, text: "Yüksek, orta, düşük ya da yok; her zaman gerekçesiyle, örneğin “RR yok” ya da “bazalde 5/14 gece”." },
+      ],
+    },
+    web: {
+      h: "İsteğe bağlı web erişimi",
+      p: "Bu sayfa Freeband hub'ı. Uygulamada Web erişimini açarsan telefon verini buraya da gönderir. Açmazsan buraya hiçbir şey gelmez.",
+      cards: [
+        { title: "Web paneli", text: "Günü tarayıcıdan gör. Uygulamada Web paneli aç'a dokun; tarayıcı seni doğrudan panele alır." },
+        { title: "REST API", text: "Verine kişisel anahtarınla ulaş. Uç noktalar ve örnekler API belgesinde." },
+        { title: "Webhook'lar", text: "Her senkronizasyondan sonra veri imzalı bir istekle kendi sunucuna da gider." },
+        { title: "Dışa aktarma", text: "Buradaki tüm verini CSV ya da JSON olarak indir." },
+      ],
+      note: html`Başka bir bilgisayardan girmek için anahtarı uygulamadan kopyala ve <a href="/login">giriş sayfasına</a> yapıştır. Neyin saklandığını <a href="/tr/privacy">gizlilik sayfası</a> anlatıyor.`,
+      docs: "API belgesi",
+      privacy: "Gizlilik",
+    },
+    status: {
+      h: "Durum",
+      line: "TestFlight'ta iç test",
+      p: html`Freeband şimdilik yalnız iç testte; App Store'da yok. Kaynak kodu <a href="${GITHUB_URL}">GitHub'da</a>, bandın nasıl çözüldüğü <a href="/tr/story">Nasıl yaptık</a> sayfasında, kendi bandın için nasıl kuracağın <a href="/tr/guide">Kendin dene</a> sayfasında.`,
+    },
+  },
+};
+
+function card(c: Card): Safe {
+  const head = c.range
+    ? html`<div class="score-head"><h3>${c.title}</h3><span class="range">${c.range}</span></div>`
+    : html`<h3>${c.title}</h3>`;
+  return html`<li class="card${c.wide ? " wide" : ""}">${head}<p>${c.text}</p></li>`;
+}
+
+export function homeBody(o: { deleted: boolean; lang: Lang }): Safe {
+  const t = COPY[o.lang];
+  const suffix = o.lang === "en" ? "" : `-${o.lang}`;
   return html`
-${o.deleted ? html`<p class="banner small" role="status">Hesabın ve bu sunucudaki tüm verin silindi.</p>` : ""}
+${o.deleted ? html`<p class="banner small" role="status">${t.deleted}</p>` : ""}
 <section class="hero">
-  <h1>Xiaomi Smart Band 10 için hesapsız bir iPhone uygulaması</h1>
-  <p class="lede">Freeband bandını Mi Fitness ve Xiaomi hesabı olmadan okur, skorlarını telefonda hesaplar. Verin telefonunda kalır.</p>
-  <div class="actions"><a class="btn" href="/story">Nasıl yaptık</a><a class="btn ghost" href="${GITHUB_URL}">GitHub</a></div>
+  <h1>${t.h1}</h1>
+  <p class="lede">${t.lede}</p>
+  <div class="actions"><a class="btn" href="${localPath(o.lang, "/story")}">${t.story}</a><a class="btn ghost" href="${localPath(o.lang, "/guide")}">${t.guide}</a><a class="btn ghost" href="${GITHUB_URL}">GitHub</a></div>
   <figure class="stage">
     <ul class="shots">${SHOTS.map(
       (s, i) =>
-        html`<li><img src="/img/${s.file}.webp" width="600" height="1300" alt="${s.alt}" ${i === 0 ? "" : html`loading="lazy" `}decoding="async"><span>${s.name}</span></li>`,
+        html`<li><img src="/img/${s.file}${suffix}.webp" width="600" height="1300" alt="${s.alt[o.lang]}" ${i === 0 ? "" : raw('loading="lazy" ')}decoding="async"><span>${s.name[o.lang]}</span></li>`,
     )}</ul>
-    <figcaption>Ekranlar demo veriyle.</figcaption>
+    <figcaption>${t.shotsCaption}</figcaption>
   </figure>
 </section>
 
 <section class="sect">
   <header>
-    <h2>Mi Fitness'sız, hesapsız</h2>
-    <p>Freeband bandla Bluetooth üzerinden doğrudan konuşur. Hesap açmazsın; adım, nabız, uyku ve skorlar telefonda kalır.</p>
+    <h2>${t.noAccount.h}</h2>
+    <p>${t.noAccount.p}</p>
   </header>
-  <ul class="cards c3">
-    <li class="card"><h3>Anahtar telefonda</h3><p>Bandın anahtarını Mi Fitness'ın telefondaki klasöründen bir kez okur ve Keychain'e yazar. Anahtar hiçbir yere gönderilmez.</p></li>
-    <li class="card"><h3>Veri bantta kalır</h3><p>Freeband dosyaları onaylamaz (ACK göndermez), bu yüzden bant geçmiş veriyi silmez.</p></li>
-    <li class="card"><h3>Kurulumda bir kez Mi Fitness</h3><p>Sıfır bir bandı eşlemek için Mi Fitness şart, çünkü anahtar Xiaomi sunucusunda üretiliyor.</p></li>
-  </ul>
+  <ul class="cards c3">${t.noAccount.cards.map(card)}</ul>
 </section>
 
 <section class="sect">
   <header>
-    <h2>Kendi skorların, açık hesapla</h2>
-    <p>Skorlar telefonda, bandın ham verisinden hesaplanır. Her skor neden o değerde olduğunu katkı satırlarıyla, ne kadar güvenilir olduğunu güven düzeyiyle gösterir.</p>
+    <h2>${t.scores.h}</h2>
+    <p>${t.scores.p}</p>
   </header>
-  <ul class="cards c3">
-    <li class="card"><div class="score-head"><h3>Uyku</h3><span class="range">0–100</span></div><p>Süre, verimlilik, derin uyku, REM, huzur, düzen ve gece nabız düşüşü.</p></li>
-    <li class="card"><div class="score-head"><h3>Toparlanma</h3><span class="range">0–100</span></div><p>Nabız değişkenliği, dinlenik nabız, uyku ve dünkü yük; son 14 günlük normaline göre.</p></li>
-    <li class="card"><div class="score-head"><h3>Yük</h3><span class="range">0–21</span></div><p>Nabız rezervine göre bölgelerde geçen dakikalar. İyi ya da kötü değil, yalnız ne kadar.</p></li>
-    <li class="card wide"><h3>Güven</h3><p>Yüksek, orta, düşük ya da yok; her zaman gerekçesiyle, örneğin “RR yok” ya da “bazalde 5/14 gece”.</p></li>
-  </ul>
+  <ul class="cards c3">${t.scores.cards.map(card)}</ul>
 </section>
 
 <section class="sect">
   <header>
-    <h2>İsteğe bağlı web erişimi</h2>
-    <p>Bu sayfa Freeband hub'ı. Uygulamada Web erişimini açarsan telefon verini buraya da gönderir. Açmazsan buraya hiçbir şey gelmez.</p>
+    <h2>${t.web.h}</h2>
+    <p>${t.web.p}</p>
   </header>
   <div>
-    <ul class="cards c2">
-      <li class="card"><h3>Web paneli</h3><p>Günü tarayıcıdan gör. Uygulamada Web paneli aç'a dokun; tarayıcı seni doğrudan panele alır.</p></li>
-      <li class="card"><h3>REST API</h3><p>Verine kişisel anahtarınla ulaş. Uç noktalar ve örnekler API belgesinde.</p></li>
-      <li class="card"><h3>Webhook'lar</h3><p>Her senkronizasyondan sonra veri imzalı bir istekle kendi sunucuna da gider.</p></li>
-      <li class="card"><h3>Dışa aktarma</h3><p>Buradaki tüm verini CSV ya da JSON olarak indir.</p></li>
-    </ul>
-    <p class="small muted note">Başka bir bilgisayardan girmek için anahtarı uygulamadan kopyala ve <a href="/login">giriş sayfasına</a> yapıştır. Neyin saklandığını <a href="/privacy">gizlilik sayfası</a> anlatıyor.</p>
-    <div class="actions"><a class="btn ghost" href="/docs">API belgesi</a><a class="btn ghost" href="/privacy">Gizlilik</a></div>
+    <ul class="cards c2">${t.web.cards.map(card)}</ul>
+    <p class="small muted note">${t.web.note}</p>
+    <div class="actions"><a class="btn ghost" href="/docs">${t.web.docs}</a><a class="btn ghost" href="${localPath(o.lang, "/privacy")}">${t.web.privacy}</a></div>
   </div>
 </section>
 
 <section class="sect">
   <header>
-    <h2>Durum</h2>
+    <h2>${t.status.h}</h2>
   </header>
   <div class="card">
-    <p class="status-line"><span class="dot" aria-hidden="true"></span>TestFlight'ta iç test</p>
-    <p>Freeband şimdilik yalnız iç testte; App Store'da yok. Kaynak kodu <a href="${GITHUB_URL}">GitHub'da</a>, bandın nasıl çözüldüğü <a href="/story">Nasıl yaptık</a> sayfasında.</p>
+    <p class="status-line"><span class="dot" aria-hidden="true"></span>${t.status.line}</p>
+    <p>${t.status.p}</p>
   </div>
 </section>`;
 }

@@ -11,7 +11,7 @@ Read your Xiaomi Smart Band 10 / 10 Pro on iPhone without Mi Fitness or a Xiaomi
 
 <sub>Screenshots use demo data.</sub>
 
-**Status:** early. Version 0.5 is in internal TestFlight testing and not on the App Store. Website: [freeband.cobanov.dev](https://freeband.cobanov.dev), including the story of how the protocol was worked out: [Nasıl yaptık](https://freeband.cobanov.dev/story), in Turkish.
+**Status:** early. Version 0.5 is in internal TestFlight testing and not on the App Store. Website: [freeband.cobanov.dev](https://freeband.cobanov.dev) ([Türkçe](https://freeband.cobanov.dev/tr)), including [How we did it](https://freeband.cobanov.dev/story), the story of how the protocol was worked out, and [Try it yourself](https://freeband.cobanov.dev/guide).
 
 ## What works
 
@@ -72,6 +72,31 @@ cd ios/tests/analytics && swiftc ../../Freeband/Analytics/*.swift main.swift -o 
 # hub
 cd hub && npm install && npx tsc --noEmit && npx vitest run
 ```
+
+## Try it yourself
+
+Freeband isn't on the App Store yet, so for now you build it from source. You need an iPhone with iOS 17 or later, a Band 10 or 10 Pro, and a Mac with Xcode 27 and a free Apple ID. The same guide with more detail is at [freeband.cobanov.dev/guide](https://freeband.cobanov.dev/guide).
+
+1. **Pair the band with Mi Fitness once**, if it isn't already, and let it sync. This is the only time you need Mi Fitness: Xiaomi's server creates the band's key during pairing.
+2. **Check the key folder.** In the Files app, On My iPhone should show a `Mi Fitness` folder.
+3. **Get the code:**
+   ```sh
+   git clone https://github.com/cobanov/freeband
+   cd freeband/ios
+   brew install xcodegen
+   ```
+4. **Sign it as yourself.** In `ios/project.yml`, set `DEVELOPMENT_TEAM` to your team ID and `PRODUCT_BUNDLE_IDENTIFIER` to an identifier of your own. With a free Apple ID the app runs for 7 days, then you build it again.
+5. **Generate the project and install it:**
+   ```sh
+   xcodegen generate
+   open Freeband.xcodeproj
+   ```
+   - Turn on Developer Mode on the iPhone.
+   - Pick the iPhone as the run destination and press Run.
+   - Trust your developer certificate under Settings → General → VPN & Device Management.
+6. **Read the key.** In Freeband, tap Get started, then Choose folder, then go to Browse → On My iPhone → Mi Fitness → Open.
+7. **Connect.** Close Mi Fitness from the app switcher, keep the band close and tap Connect.
+8. **Keep Mi Fitness out of the way.** Turn off its Background App Refresh or offload it (see below).
 
 ## Using it with your band
 

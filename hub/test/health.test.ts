@@ -701,7 +701,7 @@ describe("documentation", () => {
     for (const s of ["/v1/minutes", "/v1/sleep", "/v1/scores", "sync.partial", "sleep_minutes", "type=minute", "after=", "API anahtarını gir"]) {
       expect(docs, s).toContain(s);
     }
-    const privacy = await (await call("/privacy")).text();
+    const privacy = await (await call("/tr/privacy")).text();
     for (const s of ["Dakikalık veri", "Uyku", "Skorlar"]) expect(privacy, s).toContain(s);
   });
 });

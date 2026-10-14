@@ -14,9 +14,11 @@ import { html, raw, type Safe } from "../views/html";
 import { page, type OpenGraph } from "../views/layout";
 import { APP_JS, JOIN_JS, LOGIN_JS } from "../views/scripts";
 import { docsBody } from "../views/docs";
-import { privacyBody } from "../views/privacy";
-import { HOME_DESCRIPTION, homeBody } from "../views/home";
-import { STORY_DESCRIPTION, STORY_TITLE, storyBody } from "../views/story";
+import { PRIVACY_TITLE, privacyBody } from "../views/privacy";
+import { GUIDE_DESCRIPTION, GUIDE_TITLE, guideBody } from "../views/guide";
+import { HOME_DESCRIPTION, HOME_IMAGE_ALT, HOME_TITLE, homeBody } from "../views/home";
+import { alternates, localPath, type Lang } from "../views/i18n";
+import { STORY_DESCRIPTION, STORY_IMAGE_ALT, STORY_TITLE, storyBody } from "../views/story";
 
 export const pages = new Hono<AppEnv>();
 
@@ -32,7 +34,15 @@ function render(
   c: Context<AppEnv>,
   title: string,
   body: Safe,
-  extra: { script?: string; signedIn?: boolean; actions?: Safe; description?: string; og?: OpenGraph } = {},
+  extra: {
+    script?: string;
+    signedIn?: boolean;
+    actions?: Safe;
+    description?: string;
+    og?: OpenGraph;
+    lang?: Lang;
+    alternates?: Record<Lang, string>;
+  } = {},
 ) {
   return c.html(page({ title, nonce: c.get("nonce"), body, path: c.req.path, ...extra }));
 }
@@ -47,24 +57,54 @@ function og(c: Context<AppEnv>, path: string, image: string, imageAlt: string): 
   return { url: origin + path, image: `${origin}/img/${image}`, imageAlt };
 }
 
-pages.get("/", async (c) => {
-  const signedIn = (await pageSession(c)) !== null;
-  const body = homeBody({ deleted: c.req.query("silindi") === "1" });
-  return render(c, "Freeband · Xiaomi Smart Band 10, hesapsız", body, {
-    signedIn,
-    description: HOME_DESCRIPTION,
-    og: og(c, "/", "og-home.png", "Freeband uygulamasının Bugün ve Toparlanma ekranları"),
-  });
-});
+// Public pages in English (root) and Turkish (/tr).
+for (const lang of ["en", "tr"] as const) {
+  const suffix = lang === "en" ? "" : `-${lang}`;
 
-pages.get("/story", async (c) => {
-  const signedIn = (await pageSession(c)) !== null;
-  return render(c, `${STORY_TITLE} · Freeband`, storyBody(), {
-    signedIn,
-    description: STORY_DESCRIPTION,
-    og: og(c, "/story", "og-story.png", "Şifreli çerçeve düzeni: a5 a5, type, seq, len, crc16, payload"),
+  pages.get(localPath(lang, "/"), async (c) => {
+    const signedIn = (await pageSession(c)) !== null;
+    const deleted = c.req.query("silindi") === "1" || c.req.query("deleted") === "1";
+    return render(c, HOME_TITLE[lang], homeBody({ deleted, lang }), {
+      signedIn,
+      lang,
+      alternates: alternates("/"),
+      description: HOME_DESCRIPTION[lang],
+      og: og(c, localPath(lang, "/"), `og-home${suffix}.png`, HOME_IMAGE_ALT[lang]),
+    });
   });
-});
+
+  pages.get(localPath(lang, "/story"), async (c) => {
+    const signedIn = (await pageSession(c)) !== null;
+    return render(c, `${STORY_TITLE[lang]} · Freeband`, storyBody(lang), {
+      signedIn,
+      lang,
+      alternates: alternates("/story"),
+      description: STORY_DESCRIPTION[lang],
+      og: og(c, localPath(lang, "/story"), `og-story${suffix}.png`, STORY_IMAGE_ALT[lang]),
+    });
+  });
+
+  pages.get(localPath(lang, "/guide"), async (c) => {
+    const signedIn = (await pageSession(c)) !== null;
+    return render(c, `${GUIDE_TITLE[lang]} · Freeband`, guideBody(lang), {
+      signedIn,
+      lang,
+      alternates: alternates("/guide"),
+      description: GUIDE_DESCRIPTION[lang],
+      og: og(c, localPath(lang, "/guide"), `og-home${suffix}.png`, HOME_IMAGE_ALT[lang]),
+    });
+  });
+
+  pages.get(localPath(lang, "/privacy"), async (c) => {
+    const signedIn = (await pageSession(c)) !== null;
+    return render(c, PRIVACY_TITLE[lang], privacyBody(lang), {
+      signedIn,
+      lang,
+      alternates: alternates("/privacy"),
+      og: og(c, localPath(lang, "/privacy"), `og-home${suffix}.png`, HOME_IMAGE_ALT[lang]),
+    });
+  });
+}
 
 // ---------------------------------------------------------------------------
 
@@ -425,9 +465,4 @@ ${deviceSwitcher}
 pages.get("/docs", async (c) => {
   const signedIn = (await pageSession(c)) !== null;
   return render(c, "API belgesi", docsBody(new URL(c.req.url).origin), { signedIn });
-});
-
-pages.get("/privacy", async (c) => {
-  const signedIn = (await pageSession(c)) !== null;
-  return render(c, "Gizlilik", privacyBody(), { signedIn });
 });

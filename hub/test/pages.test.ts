@@ -9,7 +9,7 @@ function cspNonce(csp: string): string {
 
 describe("security headers", () => {
   it("sends a nonce-based CSP and hardening headers on HTML", async () => {
-    for (const path of ["/", "/story", "/login", "/join", "/docs", "/privacy", "/does-not-exist"]) {
+    for (const path of ["/", "/story", "/guide", "/tr", "/tr/story", "/tr/guide", "/tr/privacy", "/login", "/join", "/docs", "/privacy", "/does-not-exist"]) {
       const res = await call(path);
       expect(res.headers.get("content-type"), path).toContain("text/html");
       const csp = res.headers.get("content-security-policy") ?? "";
@@ -34,7 +34,9 @@ describe("security headers", () => {
       expect(htmlText).not.toMatch(/\sstyle\s*=/i);
       // No third-party resources (outbound links such as GitHub are fine).
       expect(htmlText).not.toMatch(/\ssrc="https?:\/\//);
-      expect(htmlText).not.toMatch(/<link\b[^>]*href="https?:\/\//);
+      // <link> may only point at this site (the hreflang alternates are absolute URLs).
+      const linked = [...htmlText.matchAll(/<link\b[^>]*href="(https?:\/\/[^"]+)"/g)].map((m) => m[1] ?? "");
+      expect(linked.filter((u) => !u.startsWith("https://freeband.cobanov.dev/")), path).toEqual([]);
     }
   });
 
@@ -58,43 +60,62 @@ describe("security headers", () => {
 });
 
 describe("pages", () => {
-  it("renders the home, docs and privacy pages in Turkish", async () => {
+  it("renders the home page in English at / and in Turkish at /tr", async () => {
     const res = await call("/");
     expect(res.status).toBe(200);
     const home = await res.text();
-    expect(home).toContain('lang="tr"');
-    expect(home).toContain("Web erişimi");
+    expect(home).toContain('<html lang="en">');
     expect(home).toContain('<meta name="color-scheme" content="light dark">');
     // The product first: screens, an honest caption and the two actions.
     for (const img of ["today", "score-recovery", "sleep", "band"]) expect(home).toContain(`src="/img/${img}.webp"`);
-    expect(home).toContain("Ekranlar demo veriyle");
-    expect(home).toMatch(/<a class="btn" href="\/story">Nasıl yaptık<\/a>/);
+    expect(home).toContain("Screens show demo data.");
+    expect(home).toMatch(/<a class="btn" href="\/story">How we did it<\/a>/);
     expect(home).toMatch(/<a class="btn ghost" href="https:\/\/github.com\/cobanov\/freeband">GitHub<\/a>/);
-    for (const s of ["Mi Fitness'sız, hesapsız", "Uyku", "Toparlanma", "Yük", "İsteğe bağlı web erişimi", "TestFlight", "App Store"]) {
+    for (const s of ["No Mi Fitness, no account", "Sleep", "Recovery", "Strain", "Optional web access", "TestFlight", "App Store"]) {
       expect(home).toContain(s);
     }
     // No TestFlight link, no old dial, no pixel wordmark.
     expect(home).not.toContain("testflight.apple.com");
     expect(home).not.toContain('class="dial"');
     expect(home).not.toContain('class="wordmark"');
-    // Open Graph and the trademark line.
+    // Open Graph, hreflang, the language switch and the trademark line.
     expect(home).toContain('<meta property="og:image" content="https://freeband.cobanov.dev/img/og-home.png">');
+    expect(home).toContain('<meta property="og:locale" content="en_US">');
     expect(home).toContain('<meta name="twitter:card" content="summary_large_image">');
-    expect(home).toContain("Xiaomi ile bağlantısı yoktur");
+    expect(home).toContain('<link rel="alternate" hreflang="tr" href="https://freeband.cobanov.dev/tr">');
+    expect(home).toContain('<link rel="alternate" hreflang="x-default" href="https://freeband.cobanov.dev/">');
+    expect(home).toContain('<a class="navlink" href="/tr" hreflang="tr" lang="tr">Türkçe</a>');
+    expect(home).toContain("is not affiliated with Xiaomi");
+
+    const tr = await (await call("/tr")).text();
+    expect(tr).toContain('<html lang="tr">');
+    for (const img of ["today", "score-recovery", "sleep", "band"]) expect(tr).toContain(`src="/img/${img}-tr.webp"`);
+    for (const s of ["Ekranlar demo veriyle", "Mi Fitness&#39;sız, hesapsız", "Toparlanma", "İsteğe bağlı web erişimi", "Xiaomi ile bağlantısı yoktur"]) {
+      expect(tr).toContain(s);
+    }
+    expect(tr).toMatch(/<a class="btn" href="\/tr\/story">Nasıl yaptık<\/a>/);
+    expect(tr).toContain('<meta property="og:image" content="https://freeband.cobanov.dev/img/og-home-tr.png">');
+    expect(tr).toContain('<meta property="og:locale" content="tr_TR">');
+    expect(tr).toContain('<a class="navlink" href="/" hreflang="en" lang="en">English</a>');
+  });
+
+  it("renders the docs and both privacy pages", async () => {
     const docs = await (await call("/docs")).text();
     expect(docs).toContain("X-Freeband-Signature");
     expect(docs).toContain("createHmac");
     expect(docs).toContain("hmac.new");
     expect(docs).toContain("curl");
     const privacy = await (await call("/privacy")).text();
-    for (const s of ["Cloudflare", "DELETE /v1/account", "Web erişimi", "SHA-256"]) expect(privacy).toContain(s);
+    for (const s of ["Cloudflare", "DELETE /v1/account", "Web access", "SHA-256", "Minute data"]) expect(privacy).toContain(s);
+    const gizlilik = await (await call("/tr/privacy")).text();
+    for (const s of ["Cloudflare", "DELETE /v1/account", "Web erişimi", "SHA-256", "Dakikalık veri"]) expect(gizlilik).toContain(s);
   });
 
-  it("renders the story page as a numbered timeline with diagrams", async () => {
+  it("renders the story page as a numbered timeline with diagrams, in both languages", async () => {
     const res = await call("/story");
     expect(res.status).toBe(200);
     const story = await res.text();
-    expect(story).toContain("<title>Xiaomi Smart Band 10&#39;u nasıl çözdük · Freeband</title>");
+    expect(story).toContain("<title>How we worked out the Xiaomi Smart Band 10 · Freeband</title>");
     expect(story).toMatch(/<meta name="description" content="[^"]+">/);
     expect(story).toContain('<meta property="og:url" content="https://freeband.cobanov.dev/story">');
     expect(story).toContain('<meta property="og:image" content="https://freeband.cobanov.dev/img/og-story.png">');
@@ -102,7 +123,7 @@ describe("pages", () => {
     expect(story.match(/<span class="step-n" aria-hidden="true">/g)).toHaveLength(14);
     expect(story).toContain(">14</span>");
     // Facts from docs/STORY.md, code terms in chips.
-    for (const s of ["%46", "13 test vektörüne", "147 test", "37 bin", "HKDF-SHA256", "AES-128-CTR", "AES-CCM", "Keychain", "Teşekkürler"]) {
+    for (const s of ["46%", "13 test vectors", "147 tests", "37,000", "HKDF-SHA256", "AES-128-CTR", "AES-CCM", "Keychain", "Thanks"]) {
       expect(story).toContain(s);
     }
     for (const s of ["FE95", "005E", "005F", "a5 a5", "2/110", "device_type = iOS"]) expect(story).toContain(`<code>${s}</code>`);
@@ -121,26 +142,58 @@ describe("pages", () => {
     ]) {
       expect(story).toContain(`href="${href}"`);
     }
+
+    const tr = await (await call("/tr/story")).text();
+    expect(tr).toContain("<title>Xiaomi Smart Band 10&#39;u nasıl çözdük · Freeband</title>");
+    expect(tr).toContain('<meta property="og:image" content="https://freeband.cobanov.dev/img/og-story-tr.png">');
+    expect(tr.match(/<span class="step-n" aria-hidden="true">/g)).toHaveLength(14);
+    for (const s of ["%46", "13 test vektörüne", "147 test", "37 bin", "Teşekkürler", "Telefon"]) expect(tr).toContain(s);
+    expect(tr.match(/<svg viewBox="[^"]+" role="img"/g)).toHaveLength(2);
   });
 
   it("has the shared nav on public pages and marks the current one", async () => {
-    for (const path of ["/", "/story", "/docs", "/privacy", "/join"]) {
+    // English pages link English pages; pages that exist only in Turkish link the Turkish ones.
+    const en = ["/", "/story", "/guide", '<a href="/privacy">Privacy</a>'] as const;
+    const tr = ["/tr", "/tr/story", "/tr/guide", '<a href="/tr/privacy">Gizlilik</a>'] as const;
+    const cases: Array<[path: string, links: readonly [string, string, string, string]]> = [
+      ["/", en], ["/story", en], ["/guide", en], ["/privacy", en],
+      ["/tr", tr], ["/tr/story", tr], ["/tr/guide", tr], ["/docs", tr], ["/join", tr],
+    ];
+    for (const [path, [home, story, guide, privacy]] of cases) {
       const page = await (await call(path)).text();
-      for (const href of ["/story", "/docs", "https://github.com/cobanov/freeband", "/login"]) {
+      for (const href of [story, guide, "/docs", "https://github.com/cobanov/freeband", "/login"]) {
         expect(page, `${path} → ${href}`).toContain(`class="navlink" href="${href}"`);
       }
-      expect(page).toContain('<a class="brand" href="/">Freeband</a>');
-      expect(page).toContain('<a href="/privacy">Gizlilik</a>');
+      expect(page, path).toContain(`<a class="brand" href="${home}">Freeband</a>`);
+      expect(page, path).toContain(privacy);
     }
-    const story = await (await call("/story")).text();
-    expect(story).toContain('href="/story" aria-current="page"');
+    expect(await (await call("/story")).text()).toContain('href="/story" aria-current="page"');
+    expect(await (await call("/tr/story")).text()).toContain('href="/tr/story" aria-current="page"');
+  });
+
+  it("renders the step-by-step guide in both languages", async () => {
+    const en = await (await call("/guide")).text();
+    expect(en).toContain("<title>Try Freeband with your own band · Freeband</title>");
+    expect(en.match(/<span class="step-n" aria-hidden="true">/g)).toHaveLength(9);
+    for (const s of ["git clone https://github.com/cobanov/freeband", "brew install xcodegen", "xcodegen generate", "DEVELOPMENT_TEAM", "Get started", "Choose folder", "Connect", "Offload App", "Never unpair the band"]) {
+      expect(en, s).toContain(s);
+    }
+    expect(en).toContain('<link rel="alternate" hreflang="tr" href="https://freeband.cobanov.dev/tr/guide">');
+    const tr = await (await call("/tr/guide")).text();
+    expect(tr.match(/<span class="step-n" aria-hidden="true">/g)).toHaveLength(9);
+    for (const s of ["Başlayalım", "Klasörü seç", "Bağlan", "Uygulamayı Boşalt", "eşleşmeden çıkarma"]) expect(tr, s).toContain(s);
+    // The home page links it.
+    expect(await (await call("/")).text()).toContain('<a class="btn ghost" href="/guide">Try it yourself</a>');
+    expect(await (await call("/tr")).text()).toContain('<a class="btn ghost" href="/tr/guide">Kendin dene</a>');
   });
 
   it("swaps the sign-in link for the panel when signed in", async () => {
     const { token } = await createAccount();
     const cookie = await login(token);
     const home = await (await call("/", { headers: { Cookie: cookie } })).text();
-    expect(home).toContain('<a class="navlink" href="/app">Panele git</a>');
+    expect(home).toContain('<a class="navlink" href="/app">Open panel</a>');
+    const tr = await (await call("/tr", { headers: { Cookie: cookie } })).text();
+    expect(tr).toContain('<a class="navlink" href="/app">Panele git</a>');
     expect(home).not.toContain('href="/login" aria-current');
   });
 

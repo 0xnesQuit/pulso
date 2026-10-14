@@ -4,6 +4,7 @@
 // Everything inline is covered by the per-response CSP nonce.
 
 import { html, raw, type Safe } from "./html";
+import { localPath, type Lang } from "./i18n";
 import { COLOR_VARS, TOKEN_CSS } from "./tokens";
 
 export const GITHUB_URL = "https://github.com/cobanov/freeband";
@@ -217,6 +218,11 @@ ol.timeline>li:last-child::before{display:none}
 .diagram .pay{fill:var(--text-primary)}
 .diagram .pay-t{fill:var(--canvas)}
 .story-more{margin-top:64px}
+.needs{max-width:560px}
+.needs h2{font:var(--type-headline);font-size:17px;margin:0 0 8px}
+.needs ul{margin:0}
+.step pre{margin:16px 0 0}
+.step pre code{padding:0;background:none;border-radius:0;font-size:inherit}
 .story-more h2{font:var(--type-headline);font-size:20px;margin-bottom:16px}
 .rows{list-style:none;padding:0;margin:0;display:grid;gap:2px;border-radius:var(--radius-card);overflow:hidden;max-width:none}
 .rows li{margin:0;padding:14px 16px;background:var(--surface)}
@@ -348,31 +354,64 @@ export interface PageOpts {
   /** Meta description; also the Open Graph description. */
   description?: string;
   og?: OpenGraph;
+  /** Page language; the chrome follows it. Pages without an English version stay "tr". */
+  lang?: Lang;
+  /** Both language versions of this page: adds the language switch and hreflang links. */
+  alternates?: Record<Lang, string>;
 }
+
+const CHROME = {
+  en: {
+    story: "How we did it", guide: "Try it", docs: "API docs", signIn: "Sign in", panel: "Open panel", privacy: "Privacy",
+    menu: "Menu", mainNav: "Main menu", footNav: "Footer menu", switchTo: "Türkçe", switchLang: "tr", locale: "en_US",
+    trademark: "Freeband is an independent project and is not affiliated with Xiaomi. Xiaomi, Mi Band and Mi Fitness are trademarks of Xiaomi Inc.",
+  },
+  tr: {
+    story: "Nasıl yaptık", guide: "Kendin dene", docs: "API belgesi", signIn: "Giriş yap", panel: "Panele git", privacy: "Gizlilik",
+    menu: "Menü", mainNav: "Ana menü", footNav: "Alt menü", switchTo: "English", switchLang: "en", locale: "tr_TR",
+    trademark: "Freeband bağımsız bir projedir, Xiaomi ile bağlantısı yoktur. Xiaomi, Mi Band ve Mi Fitness, Xiaomi Inc.'in ticari markalarıdır.",
+  },
+} as const;
 
 const current = (path: string | undefined, href: string): string => (path === href ? "page" : "false");
 
 function navLinks(o: PageOpts): Safe {
+  const lang = o.lang ?? "tr";
+  const s = CHROME[lang];
   const account = o.signedIn
-    ? html`<a class="navlink" href="/app">Panele git</a>`
-    : html`<a class="navlink" href="/login" aria-current="${current(o.path, "/login")}">Giriş yap</a>`;
-  return html`<a class="navlink" href="/story" aria-current="${current(o.path, "/story")}">Nasıl yaptık</a><a class="navlink" href="/docs" aria-current="${current(o.path, "/docs")}">API belgesi</a><a class="navlink" href="${GITHUB_URL}">GitHub</a>${account}`;
+    ? html`<a class="navlink" href="/app">${s.panel}</a>`
+    : html`<a class="navlink" href="/login" aria-current="${current(o.path, "/login")}">${s.signIn}</a>`;
+  const story = localPath(lang, "/story");
+  const guide = localPath(lang, "/guide");
+  const other = o.alternates?.[s.switchLang];
+  const switcher = other
+    ? html`<a class="navlink" href="${other}" hreflang="${s.switchLang}" lang="${s.switchLang}">${s.switchTo}</a>`
+    : "";
+  return html`<a class="navlink" href="${story}" aria-current="${current(o.path, story)}">${s.story}</a><a class="navlink" href="${guide}" aria-current="${current(o.path, guide)}">${s.guide}</a><a class="navlink" href="/docs" aria-current="${current(o.path, "/docs")}">${s.docs}</a><a class="navlink" href="${GITHUB_URL}">GitHub</a>${account}${switcher}`;
 }
 
 function header(o: PageOpts): Safe {
-  if (o.actions) return html`<nav class="links show" aria-label="Ana menü">${o.actions}</nav>`;
+  const s = CHROME[o.lang ?? "tr"];
+  if (o.actions) return html`<nav class="links show" aria-label="${s.mainNav}">${o.actions}</nav>`;
   const links = navLinks(o);
-  return html`<nav class="links" aria-label="Ana menü">${links}</nav>
-  <details class="menu"><summary class="navlink">Menü</summary><nav class="menu-panel" aria-label="Ana menü">${links}</nav></details>`;
+  return html`<nav class="links" aria-label="${s.mainNav}">${links}</nav>
+  <details class="menu"><summary class="navlink">${s.menu}</summary><nav class="menu-panel" aria-label="${s.mainNav}">${links}</nav></details>`;
 }
 
 function meta(o: PageOpts): Safe {
-  const desc = o.description ? html`<meta name="description" content="${o.description}">` : html``;
+  const s = CHROME[o.lang ?? "tr"];
+  const alt = o.alternates && o.og
+    ? html`
+<link rel="alternate" hreflang="en" href="${new URL(o.alternates.en, o.og.url).href}">
+<link rel="alternate" hreflang="tr" href="${new URL(o.alternates.tr, o.og.url).href}">
+<link rel="alternate" hreflang="x-default" href="${new URL(o.alternates.en, o.og.url).href}">`
+    : html``;
+  const desc = html`${o.description ? html`<meta name="description" content="${o.description}">` : ""}${alt}`;
   if (!o.og) return desc;
   return html`${desc}
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Freeband">
-<meta property="og:locale" content="tr_TR">
+<meta property="og:locale" content="${s.locale}">
 <meta property="og:title" content="${o.title}">
 ${o.description ? html`<meta property="og:description" content="${o.description}">` : ""}
 <meta property="og:url" content="${o.og.url}">
@@ -384,8 +423,10 @@ ${o.description ? html`<meta property="og:description" content="${o.description}
 }
 
 export function page(o: PageOpts): string {
+  const lang = o.lang ?? "tr";
+  const s = CHROME[lang];
   return html`<!doctype html>
-<html lang="tr">
+<html lang="${lang}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -403,7 +444,7 @@ ${meta(o)}
 <body>
 <header class="nav">
 <div class="wrap nav-in">
-  <a class="brand" href="${o.signedIn ? "/app" : "/"}">Freeband</a>
+  <a class="brand" href="${o.signedIn ? "/app" : localPath(lang, "/")}">Freeband</a>
   ${header(o)}
 </div>
 </header>
@@ -412,8 +453,8 @@ ${o.body}
 </main>
 <footer class="foot">
 <div class="wrap foot-in">
-  <p>Freeband bağımsız bir projedir, Xiaomi ile bağlantısı yoktur. Xiaomi, Mi Band ve Mi Fitness, Xiaomi Inc.'in ticari markalarıdır.</p>
-  <nav aria-label="Alt menü"><a href="/story">Nasıl yaptık</a><a href="/docs">API belgesi</a><a href="/privacy">Gizlilik</a><a href="${GITHUB_URL}">GitHub</a></nav>
+  <p>${s.trademark}</p>
+  <nav aria-label="${s.footNav}"><a href="${localPath(lang, "/story")}">${s.story}</a><a href="${localPath(lang, "/guide")}">${s.guide}</a><a href="/docs">${s.docs}</a><a href="${localPath(lang, "/privacy")}">${s.privacy}</a><a href="${GITHUB_URL}">GitHub</a></nav>
 </div>
 </footer>
 ${o.script ? html`<script nonce="${o.nonce}">${raw(o.script)}</script>` : ""}

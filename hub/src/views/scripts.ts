@@ -149,7 +149,7 @@ export const APP_JS = `
   if (delGo) delGo.addEventListener("click", async function () {
     var out = $("del-out");
     delGo.disabled = true;
-    try { await call("DELETE", "/v1/account"); location.href = "/?silindi=1"; }
+    try { await call("DELETE", "/v1/account"); location.href = "/tr?silindi=1"; }
     catch (err) { say(out, err.message, true); delGo.disabled = false; }
   });
 })();

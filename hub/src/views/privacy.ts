@@ -1,10 +1,54 @@
-// /privacy, in Turkish. Keep it short and accurate; update it whenever what
-// the hub stores or who processes it changes.
+// /privacy (English) and /tr/privacy (Turkish). Keep both short and accurate,
+// and update them together whenever what the hub stores or who processes it changes.
 
 import { html, type Safe } from "./html";
+import type { Lang } from "./i18n";
 
-export function privacyBody(): Safe {
-  return html`
+const EN = (): Safe =>
+  html`
+<p class="label">privacy</p>
+<h1>Privacy</h1>
+<p class="lede">Mert Çobanov runs this hub for personal use and for invited friends. It isn't a company service; because it carries health data, it was built to keep as little as possible.</p>
+
+<div class="topics">
+<section class="split"><h2>Optional</h2><div>
+<p>The Freeband app keeps your data on your phone. Nothing comes here unless you turn on Web access in the app. When you do, the app creates an account and sends your band's data here after every sync. Turning Web access off stops new uploads; to delete what is already here, delete the account.</p>
+</div></section>
+<section class="split"><h2>What is stored</h2><div>
+<ul>
+  <li>Account: a random account ID, the SHA-256 hash of your access key (not the key itself), your time zone, the device name given when the account was created, and when it was created.</li>
+  <li>Bands: a random ID the app makes for each band (not its MAC address or serial number), the band's name and model, the app version, and when the band was first and last seen.</li>
+  <li>Samples: time, steps, calories, heart rate, standing hours and battery percentage.</li>
+  <li>Minute data: steps, heart rate, blood oxygen (SpO2), stress, active calories and distance for each minute.</li>
+  <li>Sleep: bed and wake times, stages and their durations, number of wake-ups, efficiency, the night's lowest heart rate, SpO2 and heart rate variability (HRV).</li>
+  <li>Scores: the daily sleep, recovery and strain scores the app calculates on the phone, resting heart rate, confidence levels, contributors and the algorithm version.</li>
+  <li>Webhooks: the addresses you add, their encrypted secrets and the result of the last delivery.</li>
+  <li>Web sessions: a hash of your browser's cookie and when it expires (30 days at most).</li>
+  <li>Short-lived counters to limit abuse: a keyed hash of your IP address, not the raw IP. They are deleted within two days.</li>
+</ul>
+<p>Your name, email address, location, Xiaomi account and your band's encryption key are not stored here.</p>
+</div></section>
+<section class="split"><h2>Who can see it</h2><div>
+<p>Only you can see your data, with your key or your session; accounts can't see each other's data. The person running the hub can technically access the database. Your data is never sold or shared; there are no ads, analytics or tracking tools. Pages load nothing from other sites, the font included. The only cookie is the session cookie used for signing in.</p>
+</div></section>
+<section class="split"><h2>Cloudflare</h2><div>
+<p>The hub runs on Cloudflare Workers and Cloudflare D1. Cloudflare provides the infrastructure as a data processor: it handles requests and hosts the database. While handling requests it keeps technical logs such as the IP address and the requested URL, and deletes them within a few days. The hub never writes keys, cookies or health data to those logs.</p>
+</div></section>
+<section class="split"><h2>Webhooks</h2><div>
+<p>If you add a webhook, your data is also sent to the address you chose after every sync. Once it reaches that address, its owner is responsible for it.</p>
+</div></section>
+<section class="split"><h2>Deleting</h2><div>
+<p>Tap Delete account in the panel or call <code>DELETE /v1/account</code>. Your account, samples, minute data, sleep and score records, band records, webhooks and sessions are deleted immediately and permanently; this can't be undone. Deleted data may stay in Cloudflare D1's restore log for up to 30 more days; during that time it can't be reached from the panel or the API, and it disappears on its own when the time is up.</p>
+<p>The data on your phone isn't affected; remove it from the app, or by deleting the app.</p>
+</div></section>
+<section class="split"><h2>Questions</h2><div>
+<p>If something's wrong or you're curious about anything, write to whoever invited you, or to Mert Çobanov, who runs the hub.</p>
+</div></section>
+</div>
+`;
+
+const TR = (): Safe =>
+  html`
 <p class="label">gizlilik</p>
 <h1>Gizlilik</h1>
 <p class="lede">Bu hub'ı Mert Çobanov kendisi ve davet ettiği arkadaşları için işletiyor. Burası bir şirket hizmeti değil; sağlık verini taşıdığı için olabildiğince az şey tutacak şekilde yapıldı.</p>
@@ -45,4 +89,9 @@ export function privacyBody(): Safe {
 </div></section>
 </div>
 `;
+
+export const PRIVACY_TITLE: Record<Lang, string> = { en: "Privacy", tr: "Gizlilik" };
+
+export function privacyBody(lang: Lang): Safe {
+  return lang === "en" ? EN() : TR();
 }
