@@ -30,7 +30,9 @@ security unlock-keychain -p "$(cat "$KEYCHAIN_PASSWORD_FILE")" "$KEYCHAIN"
 ORIGINAL_LIST=$(security list-keychains -d user | tr -d '"' | grep -vF "$KEYCHAIN")
 restore_list() { security list-keychains -d user -s $ORIGINAL_LIST; }
 trap restore_list EXIT INT TERM
-security list-keychains -d user -s $ORIGINAL_LIST "$KEYCHAIN"
+# First in the list: other signing keychains (ghbar-signing) hold the same identity and may be
+# locked, and codesign takes the first match (errSecInternalComponent).
+security list-keychains -d user -s "$KEYCHAIN" $ORIGINAL_LIST
 
 cd "$IOS"
 xcodegen generate --quiet
