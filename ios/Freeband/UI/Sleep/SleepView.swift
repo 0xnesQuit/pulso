@@ -35,6 +35,7 @@ struct SleepNightScreen: View {
     let initialDay: DayKey?
 
     @State private var selected: DayKey?
+    @ScaledMetric(relativeTo: .body) private var chevronSize: CGFloat = 17
 
     private var nights: [DayKey] { history.nights }
     private var day: DayKey? { selected ?? initialDay ?? nights.last }
@@ -168,7 +169,7 @@ struct SleepNightScreen: View {
     private func pager(_ symbol: String, _ label: String, enabled: Bool, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Image(systemName: symbol)
-                .font(.system(size: 17))
+                .font(.system(size: min(chevronSize, 28)))
                 .foregroundStyle(enabled ? Color.textPrimary : Color.textTertiary)
                 .frame(width: FBSize.minTarget, height: FBSize.minTarget)
                 .contentShape(Rectangle())

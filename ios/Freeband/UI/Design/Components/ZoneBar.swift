@@ -114,7 +114,7 @@ struct ZoneBar: View {
     static func formatMinutes(_ minutes: Double, locale: Locale = .current) -> String {
         let whole = Int(minutes.rounded())
         if whole < 60 { return String(localized: "\(whole) min", comment: "Duration in minutes") }
-        return Duration.seconds(whole * 60).formatted(.units(allowed: [.hours, .minutes], width: .narrow).locale(locale))
+        return Duration.seconds(whole * 60).formatted(.units(allowed: [.hours, .minutes], width: .fb(locale)).locale(locale))
     }
 }
 

@@ -27,13 +27,14 @@ struct TrendsView: View {
                                         Card {
                                             TrendChart(metric: metric, points: history.points(metric, ending: today),
                                                        range: range, showsRangePicker: false, style: .compact)
+                                                .padding(.trailing, FBSpace.xs)
                                         }
                                         .overlay(alignment: .topTrailing) {
                                             Image(systemName: "chevron.right")
                                                 .font(.system(size: 12, weight: .medium))
                                                 .foregroundStyle(.textTertiary)
-                                                .padding(.top, FBSpace.s + 3)
-                                                .padding(.trailing, 6)
+                                                .padding(.top, FBSpace.m)
+                                                .padding(.trailing, FBSpace.s - 2)
                                                 .accessibilityHidden(true)
                                         }
                                         .contentShape(Rectangle())

@@ -57,6 +57,8 @@ private struct TodayContent: View {
     @EnvironmentObject private var link: BandLink
     @EnvironmentObject private var router: AppRouter
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @Environment(\.modelContext) private var context
+    @ScaledMetric(relativeTo: .body) private var chevronSize: CGFloat = 17
     @Query private var liveSamples: [Sample]
     @State private var dayOffset = DebugScreen.dayOffset
 
@@ -81,6 +83,33 @@ private struct TodayContent: View {
     }
 
     private var overrides: [DayKey: Double] { todaySteps.map { [today: $0] } ?? [:] }
+
+    /// Early in the day there is nothing fair to compare with yet.
+    private func hidesTodayDelta(_ metric: TodayMetric, _ averages: [TodayMetric: Double]) -> Bool {
+        switch metric {
+        case .activeMinutes: true
+        case .steps: (averages[.steps] ?? 0) < 500
+        default: false
+        }
+    }
+
+    /// Today is not over: steps compare with the last 7 days' steps by this time of day, from
+    /// their minute files. (Active minutes have no per-minute history, so today shows no delta.)
+    private var todayAverages: [TodayMetric: Double] {
+        let now = Date()
+        let minute = Int(now.timeIntervalSince(Calendar.current.startOfDay(for: now)) / 60)
+        let id = band.id
+        var totals: [Double] = []
+        for back in 1...7 {
+            let index = today.adding(days: -back).index
+            guard let row = try? context.fetch(FetchDescriptor<MinuteDay>(
+                predicate: #Predicate { $0.bandID == id && $0.dayIndex == index })).first else { continue }
+            let steps = row.series.steps.prefix(min(max(minute, 0), MinuteSeries.slots))
+            totals.append(Double(steps.reduce(0) { $0 + ($1 ?? 0) }))
+        }
+        guard !totals.isEmpty else { return [:] }
+        return [.steps: totals.reduce(0, +) / Double(totals.count)]
+    }
 
     var body: some View {
         ScrollView {
@@ -174,7 +203,7 @@ private struct TodayContent: View {
     private func pagerButton(_ symbol: String, label: String, enabled: Bool, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Image(systemName: symbol)
-                .font(.system(size: 17, weight: .regular))
+                .font(.system(size: min(chevronSize, 28), weight: .regular))
                 .foregroundStyle(enabled ? Color.textPrimary : Color.textTertiary)
                 .frame(width: FBSize.minTarget, height: FBSize.minTarget)
                 .contentShape(Rectangle())
@@ -256,9 +285,11 @@ private struct TodayContent: View {
         VStack(alignment: .leading, spacing: FBSpace.xs) {
             SectionHeader(title: isToday ? String(localized: "Today") : FBFormat.shortDay(day.noon))
             VStack(spacing: 0) {
+                let averages = isToday ? todayAverages : [:]
                 ForEach(TodayMetric.allCases) { metric in
                     NavigationLink(value: Route.trend(metric.trend, day: day.index)) {
-                        let reading = metric.reading(history: history, day: day, overrides: metric == .steps ? overrides : [:])
+                        let reading = metric.reading(history: history, day: day, overrides: metric == .steps ? overrides : [:],
+                                                     average: averages[metric], hidesDelta: isToday && hidesTodayDelta(metric, averages))
                         MetricRow(title: metric.title, value: reading.value, unit: reading.unit,
                                   trend: reading.trend, delta: reading.delta)
                     }
@@ -306,14 +337,15 @@ enum TodayMetric: String, CaseIterable, Identifiable {
     }
 
     @MainActor
-    func reading(history: HealthHistory, day: DayKey, overrides: [DayKey: Double]) -> Reading {
+    func reading(history: HealthHistory, day: DayKey, overrides: [DayKey: Double], average override: Double? = nil,
+                 hidesDelta: Bool = false) -> Reading {
         func value(_ d: DayKey) -> Double? { overrides[d] ?? history.value(trend, on: d) }
         let current = value(day)
         let week = (0..<7).reversed().map { value(day.adding(days: -$0)) }
         let previous = (1...7).compactMap { value(day.adding(days: -$0)) }
-        let average = previous.isEmpty ? nil : previous.reduce(0, +) / Double(previous.count)
+        let average = override ?? (previous.isEmpty ? nil : previous.reduce(0, +) / Double(previous.count))
         var delta: MetricDelta?
-        if let current, let average {
+        if !hidesDelta, let current, let average {
             delta = makeDelta(current - average, average: average)
         }
         switch self {

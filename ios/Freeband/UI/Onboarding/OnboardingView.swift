@@ -62,11 +62,13 @@ private struct StepTitle: View {
 
 private struct WelcomeStep: View {
     let next: () -> Void
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: FBSpace.m) {
-                BandRender(model: .band10Pro, state: .init(time: Date(), battery: nil), height: 200)
+                BandRender(model: .band10Pro, state: .init(time: Date(), battery: nil),
+                           height: dynamicTypeSize.isAccessibilitySize ? 120 : 200)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, FBSpace.m)
                     .accessibilityHidden(true)
@@ -246,6 +248,7 @@ private struct ConnectStep: View {
 
     @EnvironmentObject private var model: AppModel
     @EnvironmentObject private var link: BandLink
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @State private var tried = false
 
     private var band: Band? { bands.first }
@@ -255,7 +258,8 @@ private struct ConnectStep: View {
         ScrollView {
             VStack(alignment: .leading, spacing: FBSpace.m) {
                 BandRender(model: band.map(BandPresentation.model) ?? .band10Pro,
-                           state: .init(time: Date(), battery: succeeded ? link.battery : nil), height: 200)
+                           state: .init(time: Date(), battery: succeeded ? link.battery : nil),
+                           height: dynamicTypeSize.isAccessibilitySize ? 120 : 200)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, FBSpace.m)
                     .accessibilityHidden(true)

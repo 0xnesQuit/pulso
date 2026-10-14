@@ -52,6 +52,7 @@ private struct BandPage: View {
     @EnvironmentObject private var link: BandLink
     @EnvironmentObject private var router: AppRouter
     @State private var notifying = false
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     var body: some View {
         ScrollView {
@@ -60,7 +61,8 @@ private struct BandPage: View {
                     switcher
                 }
                 TimelineView(.everyMinute) { timeline in
-                    BandRender(model: BandPresentation.model(band), state: liveState(timeline.date), height: 220)
+                    BandRender(model: BandPresentation.model(band), state: liveState(timeline.date),
+                               height: dynamicTypeSize.isAccessibilitySize ? 150 : 220)
                         .frame(maxWidth: .infinity)
                         .padding(.top, FBSpace.xs)
                         .accessibilityElement(children: .ignore)

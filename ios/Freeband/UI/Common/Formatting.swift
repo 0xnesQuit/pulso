@@ -5,14 +5,16 @@ import SwiftUI
 enum FBFormat {
     static func duration(minutes: Double) -> String {
         Duration.seconds(max(0, minutes).rounded() * 60)
-            .formatted(.units(allowed: [.hours, .minutes], width: .narrow))
+            .formatted(.units(allowed: [.hours, .minutes], width: .fb()))
     }
 
     /// Short enough for a delta column: "26m", then "2.4h" ("26 dk", "2,4 sa").
     static func compactDuration(minutes: Double) -> String {
         if minutes < 60 { return duration(minutes: minutes) }
+        let turkish = Locale.current.language.languageCode == .turkish
         return Measurement(value: minutes / 60, unit: UnitDuration.hours)
-            .formatted(.measurement(width: .narrow, numberFormatStyle: .number.precision(.fractionLength(1))))
+            .formatted(.measurement(width: turkish ? .abbreviated : .narrow,
+                                    numberFormatStyle: .number.precision(.fractionLength(1))))
     }
 
     static func number(_ value: Double, fraction: Int = 0) -> String {
@@ -58,6 +60,14 @@ enum FBFormat {
     /// One sentence from a list: "a, b and c" / "a, b ve c".
     static func list(_ items: [String]) -> String {
         items.formatted(.list(type: .and))
+    }
+}
+
+extension Duration.UnitsFormatStyle.UnitWidth {
+    /// "7h 12m" in English. Turkish's narrow form ("7sa 12d") reads oddly, so Turkish gets the
+    /// abbreviated one ("7 sa. 12 dk.").
+    static func fb(_ locale: Locale = .current) -> Self {
+        locale.language.languageCode == .turkish ? .abbreviated : .narrow
     }
 }
 

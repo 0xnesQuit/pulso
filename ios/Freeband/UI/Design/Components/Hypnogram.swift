@@ -236,7 +236,7 @@ struct StageTable: View {
 
     /// "1h 32m", "24m".
     static func format(_ interval: TimeInterval, locale: Locale = .current) -> String {
-        Duration.seconds(Int(interval / 60) * 60).formatted(.units(allowed: [.hours, .minutes], width: .narrow).locale(locale))
+        Duration.seconds(Int(interval / 60) * 60).formatted(.units(allowed: [.hours, .minutes], width: .fb(locale)).locale(locale))
     }
 }
 
