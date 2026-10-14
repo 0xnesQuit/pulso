@@ -1,0 +1,60 @@
+{
+  "sourceLanguage": "en",
+  "strings": {
+    "CFBundleDisplayName": {
+      "comment": "Bundle display name",
+      "extractionState": "extracted_with_value",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "new",
+            "value": "Freeband"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Freeband"
+          }
+        }
+      }
+    },
+    "CFBundleName": {
+      "comment": "Bundle name",
+      "extractionState": "extracted_with_value",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "new",
+            "value": "Freeband"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Freeband"
+          }
+        }
+      }
+    },
+    "NSBluetoothAlwaysUsageDescription": {
+      "comment": "Privacy - Bluetooth Always Usage Description",
+      "extractionState": "extracted_with_value",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "new",
+            "value": "Freeband uses Bluetooth to talk directly to the band on your wrist."
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Freeband, bileğindeki bantla doğrudan konuşmak için Bluetooth kullanır."
+          }
+        }
+      }
+    }
+  },
+  "version": "1.0"
+}

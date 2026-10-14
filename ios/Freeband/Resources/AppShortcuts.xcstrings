@@ -1,0 +1,46 @@
+{
+  "sourceLanguage": "en",
+  "strings": {
+    "${applicationName} find my band": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bandımı bul ${applicationName}"
+          }
+        }
+      }
+    },
+    "Find my band with ${applicationName}": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "${applicationName} ile bandımı bul"
+          }
+        }
+      }
+    },
+    "Send a message to my band with ${applicationName}": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "${applicationName} ile bandıma mesaj gönder"
+          }
+        }
+      }
+    },
+    "Sync my band with ${applicationName}": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "${applicationName} ile bandımı senkronize et"
+          }
+        }
+      }
+    }
+  },
+  "version": "1.0"
+}
