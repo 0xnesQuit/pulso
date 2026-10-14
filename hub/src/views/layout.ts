@@ -79,6 +79,16 @@ header.nav{position:sticky;top:0;z-index:10;background:var(--canvas);background:
 .menu summary::-webkit-details-marker{display:none}
 .menu-panel{position:absolute;left:0;right:0;top:var(--nav-h);display:flex;flex-direction:column;gap:2px;padding:8px var(--gut) 16px;background:var(--canvas);border-bottom:1px solid var(--hairline)}
 .menu-panel .navlink{height:48px;font-size:16px}
+.nav-right{display:flex;align-items:center;gap:4px}
+.lang{position:relative}
+.lang summary{list-style:none;gap:6px;-webkit-user-select:none;user-select:none}
+.lang summary::-webkit-details-marker{display:none}
+.lang[open] summary{background:var(--surface)}
+.lang .globe{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.5}
+.lang-panel{position:absolute;right:0;top:calc(100% + 4px);min-width:160px;display:flex;flex-direction:column;gap:2px;padding:6px;background:var(--raised);border:1px solid var(--hairline);border-radius:var(--radius-card);z-index:20}
+.lang-panel a{display:flex;align-items:center;justify-content:space-between;height:40px;padding:0 12px;border-radius:var(--radius-control);color:var(--text-primary);text-decoration:none;font-size:15px}
+.lang-panel a:hover{background:var(--surface)}
+.lang-panel a[aria-current=true]::after{content:"✓";color:var(--text-secondary)}
 @media (min-width:720px){.links{display:flex}.menu{display:none}}
 main.wrap{display:block;flex:1 0 auto;padding-top:32px;padding-bottom:80px}
 @media (min-width:720px){main.wrap{padding-top:48px;padding-bottom:112px}}
@@ -363,12 +373,12 @@ export interface PageOpts {
 const CHROME = {
   en: {
     story: "How we did it", guide: "Try it", docs: "API docs", signIn: "Sign in", panel: "Open panel", privacy: "Privacy",
-    menu: "Menu", mainNav: "Main menu", footNav: "Footer menu", switchTo: "Türkçe", switchLang: "tr", locale: "en_US",
+    menu: "Menu", mainNav: "Main menu", footNav: "Footer menu", language: "Language", locale: "en_US", code: "EN",
     trademark: "Freeband is an independent project and is not affiliated with Xiaomi. Xiaomi, Mi Band and Mi Fitness are trademarks of Xiaomi Inc.",
   },
   tr: {
     story: "Nasıl yaptık", guide: "Kendin dene", docs: "API belgesi", signIn: "Giriş yap", panel: "Panele git", privacy: "Gizlilik",
-    menu: "Menü", mainNav: "Ana menü", footNav: "Alt menü", switchTo: "English", switchLang: "en", locale: "tr_TR",
+    menu: "Menü", mainNav: "Ana menü", footNav: "Alt menü", language: "Dil", locale: "tr_TR", code: "TR",
     trademark: "Freeband bağımsız bir projedir, Xiaomi ile bağlantısı yoktur. Xiaomi, Mi Band ve Mi Fitness, Xiaomi Inc.'in ticari markalarıdır.",
   },
 } as const;
@@ -379,23 +389,34 @@ function navLinks(o: PageOpts): Safe {
   const lang = o.lang ?? "tr";
   const s = CHROME[lang];
   const account = o.signedIn
-    ? html`<a class="navlink" href="/app">${s.panel}</a>`
-    : html`<a class="navlink" href="/login" aria-current="${current(o.path, "/login")}">${s.signIn}</a>`;
+    ? html`<a class="navlink" href="${localPath(lang, "/app")}">${s.panel}</a>`
+    : html`<a class="navlink" href="${localPath(lang, "/login")}" aria-current="${current(o.path, localPath(lang, "/login"))}">${s.signIn}</a>`;
   const story = localPath(lang, "/story");
   const guide = localPath(lang, "/guide");
-  const other = o.alternates?.[s.switchLang];
-  const switcher = other
-    ? html`<a class="navlink" href="${other}" hreflang="${s.switchLang}" lang="${s.switchLang}">${s.switchTo}</a>`
-    : "";
-  return html`<a class="navlink" href="${story}" aria-current="${current(o.path, story)}">${s.story}</a><a class="navlink" href="${guide}" aria-current="${current(o.path, guide)}">${s.guide}</a><a class="navlink" href="/docs" aria-current="${current(o.path, "/docs")}">${s.docs}</a><a class="navlink" href="${GITHUB_URL}">GitHub</a>${account}${switcher}`;
+  return html`<a class="navlink" href="${story}" aria-current="${current(o.path, story)}">${s.story}</a><a class="navlink" href="${guide}" aria-current="${current(o.path, guide)}">${s.guide}</a><a class="navlink" href="${localPath(lang, "/docs")}" aria-current="${current(o.path, localPath(lang, "/docs"))}">${s.docs}</a><a class="navlink" href="${GITHUB_URL}">GitHub</a>${account}`;
+}
+
+const GLOBE = raw(
+  '<svg class="globe" viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="7.5"/><path d="M2.5 10h15M10 2.5c2.1 2.1 3.2 4.6 3.2 7.5s-1.1 5.4-3.2 7.5M10 2.5C7.9 4.6 6.8 7.1 6.8 10s1.1 5.4 3.2 7.5"/></svg>',
+);
+
+/** The globe button: a small menu with both languages, each linking this page in that language. */
+function languagePicker(o: PageOpts): Safe {
+  if (!o.alternates) return html``;
+  const lang = o.lang ?? "tr";
+  const s = CHROME[lang];
+  const option = (l: Lang, name: string): Safe =>
+    html`<a href="${o.alternates![l]}" hreflang="${l}" lang="${l}" aria-current="${l === lang ? "true" : "false"}">${name}</a>`;
+  return html`<details class="lang"><summary class="navlink" aria-label="${s.language}: ${lang === "en" ? "English" : "Türkçe"}">${GLOBE}<span aria-hidden="true">${s.code}</span></summary><div class="lang-panel" role="group" aria-label="${s.language}">${option("en", "English")}${option("tr", "Türkçe")}</div></details>`;
 }
 
 function header(o: PageOpts): Safe {
   const s = CHROME[o.lang ?? "tr"];
-  if (o.actions) return html`<nav class="links show" aria-label="${s.mainNav}">${o.actions}</nav>`;
+  const picker = languagePicker(o);
+  if (o.actions) return html`<div class="nav-right"><nav class="links show" aria-label="${s.mainNav}">${o.actions}</nav>${picker}</div>`;
   const links = navLinks(o);
-  return html`<nav class="links" aria-label="${s.mainNav}">${links}</nav>
-  <details class="menu"><summary class="navlink">${s.menu}</summary><nav class="menu-panel" aria-label="${s.mainNav}">${links}</nav></details>`;
+  return html`<div class="nav-right"><nav class="links" aria-label="${s.mainNav}">${links}</nav>
+  <details class="menu"><summary class="navlink">${s.menu}</summary><nav class="menu-panel" aria-label="${s.mainNav}">${links}</nav></details>${picker}</div>`;
 }
 
 function meta(o: PageOpts): Safe {
@@ -444,7 +465,7 @@ ${meta(o)}
 <body>
 <header class="nav">
 <div class="wrap nav-in">
-  <a class="brand" href="${o.signedIn ? "/app" : localPath(lang, "/")}">Freeband</a>
+  <a class="brand" href="${o.signedIn ? localPath(lang, "/app") : localPath(lang, "/")}">Freeband</a>
   ${header(o)}
 </div>
 </header>
@@ -454,7 +475,7 @@ ${o.body}
 <footer class="foot">
 <div class="wrap foot-in">
   <p>${s.trademark}</p>
-  <nav aria-label="${s.footNav}"><a href="${localPath(lang, "/story")}">${s.story}</a><a href="${localPath(lang, "/guide")}">${s.guide}</a><a href="/docs">${s.docs}</a><a href="${localPath(lang, "/privacy")}">${s.privacy}</a><a href="${GITHUB_URL}">GitHub</a></nav>
+  <nav aria-label="${s.footNav}"><a href="${localPath(lang, "/story")}">${s.story}</a><a href="${localPath(lang, "/guide")}">${s.guide}</a><a href="${localPath(lang, "/docs")}">${s.docs}</a><a href="${localPath(lang, "/privacy")}">${s.privacy}</a><a href="${GITHUB_URL}">GitHub</a></nav>
 </div>
 </footer>
 ${o.script ? html`<script nonce="${o.nonce}">${raw(o.script)}</script>` : ""}

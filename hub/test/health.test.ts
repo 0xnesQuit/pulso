@@ -365,7 +365,7 @@ describe("account and device isolation", () => {
     const cExport = await getJson<{ minutes: unknown[]; sleep: unknown[]; scores: unknown[] }>(c.token, "/v1/export.json");
     expect([cExport.minutes, cExport.sleep, cExport.scores]).toEqual([[], [], []]);
     const cookieC = await login(c.token);
-    const page = await (await call("/app", { headers: { Cookie: cookieC } })).text();
+    const page = await (await call("/tr/app", { headers: { Cookie: cookieC } })).text();
     expect(page).toContain("Henüz veri gelmedi.");
 
     // Deleting A removes its health rows and leaves B's.
@@ -678,7 +678,7 @@ describe("heart rate readings are 30–220 bpm", () => {
     expect(days.days[0]).toMatchObject({ heart_rate_min: 75, heart_rate_max: 75, heart_rate_avg: 75 });
 
     const cookie = await login(token);
-    const page = await (await call("/app?date=2026-10-13", { headers: { Cookie: cookie } })).text();
+    const page = await (await call("/tr/app?date=2026-10-13", { headers: { Cookie: cookie } })).text();
     expect(page).toContain('<span class="label">nabız aralığı</span><span class="fig">75<span class="unit">bpm</span>');
     expect(page).toContain('class="hr"');
     // The last reading is 75 at 13:15 local, not the later 29.
@@ -688,7 +688,7 @@ describe("heart rate readings are 30–220 bpm", () => {
   it("panel tells where to enter a rotated key in the app", async () => {
     const { token } = await createAccount();
     const cookie = await login(token);
-    const page = await (await call("/app", { headers: { Cookie: cookie } })).text();
+    const page = await (await call("/tr/app", { headers: { Cookie: cookie } })).text();
     expect(page).toContain("Ayarlar → Web erişimi → API anahtarını gir");
     expect(page).toContain("Settings → Web access → Enter API key");
     expect(page).not.toContain("yeni anahtarı girene kadar");
@@ -697,7 +697,7 @@ describe("heart rate readings are 30–220 bpm", () => {
 
 describe("documentation", () => {
   it("documents the new types and endpoints on /docs and /privacy", async () => {
-    const docs = await (await call("/docs")).text();
+    const docs = await (await call("/tr/docs")).text();
     for (const s of ["/v1/minutes", "/v1/sleep", "/v1/scores", "sync.partial", "sleep_minutes", "type=minute", "after=", "API anahtarını gir"]) {
       expect(docs, s).toContain(s);
     }

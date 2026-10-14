@@ -25,6 +25,8 @@ export interface DialData {
   label: string;
   /** Live mode: the latest pulse pixel blinks. */
   live?: boolean;
+  /** Language of the hover titles; Turkish when absent. */
+  lang?: "en" | "tr";
 }
 
 const N = 72;
@@ -207,7 +209,7 @@ export function dial(d: DialData): Safe {
   const bars = layer(
     "bar",
     (h) => `bar h${h}`,
-    (h) => `<title>${pad2(h)}:00, ${d.hourlySteps[h] ?? 0} adım</title>`,
+    (h) => `<title>${pad2(h)}:00, ${d.hourlySteps[h] ?? 0} ${d.lang === "en" ? "steps" : "adım"}</title>`,
   );
   const hr = layer("hr", (h) => `rv h${h}`) + (runs.get("live") ?? []).join("").replace("<rect ", '<rect class="live" ');
   const now = runs.get("now");
@@ -232,7 +234,7 @@ export function dial(d: DialData): Safe {
 ${track ? raw(`<g class="trk">${track}</g>`) : ""}
 ${bars ? raw(`<g class="steps">${bars}</g>`) : ""}
 ${hr ? raw(`<g class="hr">${hr}</g>`) : ""}
-${now ? raw(`<g class="now"><title>Şimdi</title>${now.join("")}</g>`) : ""}
+${now ? raw(`<g class="now"><title>${d.lang === "en" ? "Now" : "Şimdi"}</title>${now.join("")}</g>`) : ""}
 ${raw(labels)}
 ${center}
 </svg>`;

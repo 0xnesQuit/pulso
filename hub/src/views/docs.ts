@@ -1,6 +1,8 @@
-// /docs: API reference with curl examples and signature verification snippets.
+// /docs (English) and /tr/docs (Turkish): API reference with curl examples and
+// signature verification snippets. Section anchors are the same in both languages.
 
 import { html, type Safe } from "./html";
+import type { Lang } from "./i18n";
 
 const NODE_VERIFY = `import { createHmac, timingSafeEqual } from "node:crypto";
 import http from "node:http";
@@ -90,7 +92,7 @@ const INGEST_BODY = `{
   ]
 }`;
 
-export function docsBody(origin: string): Safe {
+function docsTR(origin: string): Safe {
   const H = `-H "Authorization: Bearer $FREEBAND_TOKEN"`;
   return html`
 <div class="doc">
@@ -259,4 +261,191 @@ curl -X DELETE ${origin}/v1/webhooks/ID ${H}</pre>
 </article>
 </div>
 `;
+}
+
+const NODE_VERIFY_EN = NODE_VERIFY.replace("// imzayı ham gövde üzerinden doğrula", "// verify the signature over the raw body").replace(
+  "// Tanımadığın türleri atla; minute/sleep/score için son geleni sakla.",
+  "// Skip types you don't know; keep the latest minute/sleep/score.",
+);
+const PY_VERIFY_EN = PY_VERIFY.replace(
+  "# Tanımadığın türleri atla; minute/sleep/score için son geleni sakla.",
+  "# Skip types you don't know; keep the latest minute/sleep/score.",
+);
+const HEALTH_SAMPLES_EN = HEALTH_SAMPLES.replace('"note": "RR yok"', '"note": "no RR"');
+
+function docsEN(origin: string): Safe {
+  const H = `-H "Authorization: Bearer $FREEBAND_TOKEN"`;
+  return html`
+<div class="doc">
+<nav class="toc" aria-label="Sections">
+  <span class="label">sections</span>
+  <a href="#kimlik">Authentication</a><a href="#hesap">Account</a><a href="#gonderim">Sending data</a><a href="#saglik">Health data</a><a href="#okuma">Reading data</a><a href="#webhook">Webhooks</a><a href="#imza">Verifying signatures</a><a href="#oturum">Panel session</a>
+</nav>
+<article class="prose">
+<p class="label">freeband.v1</p>
+<h1>API docs</h1>
+<p class="lede">The Freeband hub opens your data through a REST API and signed webhooks. This page covers the hub's side of the contract (freeband.v1).</p>
+<p>All times are ISO 8601 UTC, for example <code>2026-10-13T20:59:41Z</code>. Base address: <code>${origin}</code></p>
+
+<h2 id="kimlik">Authentication</h2>
+<p>Every request carries your personal key: <code>Authorization: Bearer fb_...</code>. The app creates the key when you turn on Web access. The server keeps only its SHA-256 hash, not the key itself; if you lose the key, make a new one.</p>
+<pre>export FREEBAND_TOKEN=fb_...
+curl ${origin}/v1/me ${H}</pre>
+<p>Error responses always look the same: <code>{"error": "code", "message": "explanation"}</code>. Common codes: 400 <code>invalid_body</code> or <code>invalid_query</code>, 401 <code>unauthorized</code>, 403 <code>cross_origin</code>, 404 <code>not_found</code>, 409, 413, 415, 429 <code>rate_limited</code> (with a <code>Retry-After</code> header). Messages are in Turkish for now.</p>
+<p>The API isn't open to other websites calling it from a browser (no CORS headers). Call it from your own server, scripts or the command line.</p>
+
+<h2 id="hesap">Account</h2>
+<h3>Create an account</h3>
+<p>The app does this itself when you turn on Web access. The key comes back once, only in this response. Limited to 10 requests per IP per hour.</p>
+<pre>curl -X POST ${origin}/v1/accounts \\
+  -H "Content-Type: application/json" \\
+  -d '{"device_name": "Xiaomi Smart Band 10 Pro D9B9", "tz": "Europe/Istanbul"}'
+
+{"account_id": "…", "token": "fb_…", "web_url": "${origin}/login"}</pre>
+<p>To go straight to the web panel, add <code>#token=</code> and the key to the end of <code>web_url</code>. The key stays in the URL fragment (#), so it never reaches the server; the page turns it into a session cookie and removes it from the address bar.</p>
+
+<h3>Account details</h3>
+<pre>curl ${origin}/v1/me ${H}
+
+{"account_id": "…", "name": "…", "tz": "Europe/Istanbul", "created_at": "…",
+ "samples": {"live": 1520, "battery": 44, "minute": 8640, "sleep": 6, "score": 6, "total": 10216},
+ "devices": [{"id": "5B0E2C9A-…", "name": "Xiaomi Smart Band 10 Pro D9B9", "model": "band10pro", "last_seen": "…"}],
+ "webhooks": 1}</pre>
+
+<h3>Renew the key</h3>
+<p>Returns a new key; the old one stops working right away. Other web sessions end. Paste the new key into <strong>Settings → Web access → Enter API key</strong> in Freeband on your phone; until then the app can't send data.</p>
+<pre>curl -X POST ${origin}/v1/token/rotate ${H}</pre>
+
+<h3>Delete the account</h3>
+<p>Deletes the account, all samples, minute, sleep and score records, band records, webhooks and sessions for good.</p>
+<pre>curl -X DELETE ${origin}/v1/account ${H}</pre>
+
+<h2 id="gonderim">Sending data</h2>
+<p><code>POST /v1/ingest</code> is the endpoint the app uses. A body can be at most 512 KB and 5000 samples, and belongs to one band. Each sample is unique by <code>(device.id, type, ts)</code>. Repeated <code>live</code> and <code>battery</code> samples are counted but not stored; a repeated <code>minute</code>, <code>sleep</code> or <code>score</code> replaces the old one (below). Each account can send 120 requests per hour and 200,000 samples per day.</p>
+<pre>curl -X POST ${origin}/v1/ingest ${H} \\
+  -H "Content-Type: application/json" \\
+  --data-binary @sync.json
+
+{"accepted": 2, "duplicates": 0}</pre>
+<pre>${INGEST_BODY}</pre>
+<p>Validated fields: <code>schema</code> <code>freeband.v1</code>, <code>event</code> <code>sync.completed</code> or <code>sync.partial</code>, <code>device.id</code> a UUID, <code>device.model</code> <code>band10</code> or <code>band10pro</code>, <code>heart_rate</code> 0–250, <code>level</code> 0–100, <code>steps</code> 0–200,000, <code>calories</code> 0–50,000, <code>standing_hours</code> 0–24, <code>ts</code> at most 2 days in the future. An account can have at most 10 bands. If <code>device.tz</code> is present, the account's time zone follows it.</p>
+<p><code>sync.partial</code> is sent when a sync stops halfway (say, 12 of 20 files read). The samples in the body are valid and stored; the rest come with the next sync. Webhooks get it under the same event name.</p>
+<p>The contract only grows by adding. The hub doesn't reject samples of a type it doesn't know: it skips them and counts them in the response, <code>{"accepted": 1, "duplicates": 0, "ignored": 2}</code> (<code>ignored</code> appears only when above 0). One invalid field in a known type rejects the whole body with <code>400 invalid_body</code>; the message names the field's path (e.g. <code>samples[3].heart_rate</code>).</p>
+
+<h2 id="saglik">Health data: minutes, sleep, scores</h2>
+<p>Once the app has parsed the band's activity files, it sends three more types. All three are overwritten: if the same <code>(device.id, type, ts)</code> comes again, the latest wins and the whole row is replaced. A row that arrives unchanged counts as a duplicate and doesn't trigger webhooks again. Heart rate is 30–220, SpO2 70–100 and stress 1–100; an optional field that wasn't measured is left out or <code>null</code>.</p>
+<pre>${HEALTH_SAMPLES_EN}</pre>
+<ul>
+  <li><code>minute</code>: <code>ts</code> is the start of the minute (seconds 0). <code>steps</code> 0–1000; optional <code>heart_rate</code>, <code>spo2</code>, <code>stress</code>, <code>active_calories</code> (0–100 kcal), <code>distance_m</code> (0–1000). Only non-empty minutes are sent; at most one day per body is recommended.</li>
+  <li><code>sleep</code>: <code>ts</code> is bedtime, <code>end</code> wake time (at most 24 hours later). <code>minutes</code> holds minutes per stage, <code>efficiency</code> a percentage, <code>stages</code> triples of <code>[minutes since bedtime, stage, duration]</code> (<code>deep</code>, <code>light</code>, <code>rem</code>, <code>awake</code>). <code>hr_min</code>, <code>spo2_avg</code> and <code>spo2_min</code> are <code>null</code> when not measured; <code>hrv_rmssd</code> only when there is RR data. A night belongs to the day you wake up.</li>
+  <li><code>score</code>: <code>ts</code> is local midnight of <code>date</code>. <code>sleep</code> and <code>recovery</code> 0–100, <code>strain</code> 0–21, each may be <code>null</code>. <code>confidence</code> is <code>high</code>, <code>medium</code>, <code>low</code> or <code>none</code> per score. <code>contributors</code> are the contributor rows (<code>key</code> required; <code>score</code>, <code>weight</code>, <code>value</code>, <code>unit</code>, <code>subscore</code>, <code>baseline</code>, <code>note</code> optional). <code>algo</code> is the algorithm version.</li>
+</ul>
+
+<h2 id="okuma">Reading data</h2>
+<h3>Raw samples</h3>
+<p><code>GET /v1/samples</code> returns live and battery samples in ascending time. Parameters: <code>device</code> (band ID; all bands if left out), <code>type</code> (<code>live</code> or <code>battery</code>), <code>from</code>, <code>to</code>, <code>limit</code> (default 1000, at most 5000). <code>from</code> and <code>to</code> are either ISO 8601 times (<code>from</code> included, <code>to</code> excluded) or <code>YYYY-MM-DD</code> days in the account's time zone (both ends included). If <code>has_more</code> is true, use the last sample's time as the new <code>from</code>.</p>
+<pre>curl "${origin}/v1/samples?type=live&from=2026-10-13&to=2026-10-13" ${H}
+
+{"samples": [{"device_id": "5B0E2C9A-…", "type": "live", "ts": "2026-10-13T20:59:41Z",
+  "steps": 8421, "calories": 312, "heart_rate": 74, "standing_hours": 9}],
+ "has_more": false}</pre>
+
+<h3>Minutes</h3>
+<p><code>GET /v1/minutes</code> returns minutes in ascending time. Parameters: <code>device</code>, <code>from</code>, <code>to</code> (as for raw samples), <code>limit</code> (default 1440, at most 5000) and <code>after</code>. If <code>has_more</code> is true, repeat the request with <code>after=</code> set to the <code>next</code> value from the response; no row is skipped even when several bands share a minute.</p>
+<pre>curl "${origin}/v1/minutes?from=2026-10-13&to=2026-10-13" ${H}
+
+{"minutes": [{"device_id": "5B0E2C9A-…", "type": "minute", "ts": "2026-10-13T07:42:00Z",
+  "steps": 112, "heart_rate": 96, "spo2": 97, "stress": 34, "active_calories": 6, "distance_m": 84}],
+ "has_more": true, "next": "…"}
+
+curl "${origin}/v1/minutes?from=2026-10-13&to=2026-10-13&after=…" ${H}</pre>
+
+<h3>Sleep</h3>
+<p><code>GET /v1/sleep</code> returns sleep sessions. <code>from</code> and <code>to</code> apply to the wake time (<code>end</code>): <code>from=2026-10-13&amp;to=2026-10-13</code> gives the night from the 12th to the 13th and the naps on the 13th. <code>limit</code> defaults to 100, at most 1000; paging works as for minutes.</p>
+<pre>curl "${origin}/v1/sleep?from=2026-10-13&to=2026-10-13" ${H}
+
+{"sleep": [{"device_id": "5B0E2C9A-…", "type": "sleep", "ts": "2026-10-12T20:41:00Z", "end": "2026-10-13T04:12:00Z",
+  "is_nap": false, "minutes": {"deep": 82, "light": 241, "rem": 96, "awake": 32}, "wake_count": 3, "efficiency": 93,
+  "stages": [[0, "light", 14], [14, "deep", 38]], "hr_min": 48, "spo2_avg": 96.4, "spo2_min": 91, "hrv_rmssd": 42}],
+ "has_more": false, "next": null}</pre>
+
+<h3>Scores</h3>
+<p><code>GET /v1/scores</code> returns daily scores by their own <code>date</code>. <code>from</code> and <code>to</code> can only be <code>YYYY-MM-DD</code> (both ends included); without them there's no limit. <code>limit</code> defaults to 366, at most 1000; paging works as for minutes.</p>
+<pre>curl "${origin}/v1/scores?from=2026-10-01&to=2026-10-13" ${H}
+
+{"scores": [{"device_id": "5B0E2C9A-…", "type": "score", "ts": "2026-10-12T21:00:00Z", "date": "2026-10-13",
+  "sleep": 82, "recovery": 64, "strain": 11.4, "rhr": 54, "hrv_rmssd": 41.5,
+  "confidence": {"sleep": "high", "recovery": "medium", "strain": "low"},
+  "contributors": [{"score": "sleep", "key": "duration", "weight": 35, "value": 431, "unit": "min", "subscore": 88}],
+  "algo": "freeband-score/1"}],
+ "has_more": false, "next": null}</pre>
+
+<h3>Daily summary</h3>
+<p><code>GET /v1/days</code> returns one row per day and band; days follow the account's time zone. <code>steps</code> is the larger of the live samples' cumulative maximum and the sum of minute steps. <code>calories</code> comes from live samples. Heart rate summaries use live samples and minutes together and count only 30–220 bpm. When present, <code>sleep_minutes</code> (deep + light + REM minutes of the night ending that day), <code>nap_minutes</code> (naps ending that day) and <code>score</code> (that day's scores) are included. Days without any data aren't listed. The default range is the last 14 days including today, at most 366 days.</p>
+<pre>curl "${origin}/v1/days?from=2026-10-01&to=2026-10-13" ${H}
+
+{"tz": "Europe/Istanbul", "from": "2026-10-01", "to": "2026-10-13", "days": [
+  {"date": "2026-10-13", "device_id": "5B0E2C9A-…", "steps": 8421, "calories": 312,
+   "heart_rate_min": 52, "heart_rate_max": 131, "heart_rate_avg": 74, "battery_last": 46,
+   "sleep_minutes": 419, "nap_minutes": 35,
+   "score": {"sleep": 82, "recovery": 64, "strain": 11.4, "rhr": 54, "hrv_rmssd": 41.5,
+             "confidence": {"sleep": "high", "recovery": "medium", "strain": "low"}, "algo": "freeband-score/1"}}]}</pre>
+
+<h3>Export</h3>
+<p><code>GET /v1/export.csv</code> and <code>GET /v1/export.json</code> take the same <code>from</code>, <code>to</code> and <code>device</code> parameters as <code>/v1/samples</code>; <code>type</code> can be <code>live</code>, <code>battery</code>, <code>minute</code>, <code>sleep</code> or <code>score</code>. Without parameters you get everything. Every row carries <code>device_id</code>. At most 200,000 rows in total per call; split the range for more.</p>
+<p>JSON has every type: <code>samples</code> (live and battery), <code>minutes</code>, <code>sleep</code> and <code>scores</code> arrays, in the same shape as the read endpoints. CSV is a flat table, so each type has its own file: the default CSV is live and battery samples; <code>type=minute</code>, <code>type=sleep</code> and <code>type=score</code> come with their own columns. Sleep stages and score contributors are quoted JSON cells in the CSV.</p>
+<pre>curl -o freeband.csv "${origin}/v1/export.csv?from=2026-10-01" ${H}
+
+device_id,type,ts,steps,calories,heart_rate,standing_hours,level
+5B0E2C9A-…,battery,2026-10-13T20:59:40Z,,,,,46
+5B0E2C9A-…,live,2026-10-13T20:59:41Z,8421,312,74,9,
+
+curl -o minutes.csv "${origin}/v1/export.csv?type=minute&from=2026-10-01" ${H}
+
+device_id,type,ts,steps,heart_rate,spo2,stress,active_calories,distance_m
+5B0E2C9A-…,minute,2026-10-13T07:42:00Z,112,96,97,34,6,84
+
+curl -o sleep.csv "${origin}/v1/export.csv?type=sleep" ${H}
+curl -o scores.csv "${origin}/v1/export.csv?type=score" ${H}
+curl -o freeband.json "${origin}/v1/export.json" ${H}</pre>
+
+<h2 id="webhook">Webhooks</h2>
+<p>After every successful upload (with at least one new or changed row), the hub POSTs the validated body to the account's webhooks with the body's event (<code>sync.completed</code> or <code>sync.partial</code>). Types the hub doesn't know aren't forwarded. The address must be <code>https://</code>; the hub's own domain, IP addresses and local names aren't accepted. At most 5 webhooks per account. Redirects aren't followed, the timeout is 5 seconds, and there are no retries for now. The same sample can arrive twice; the receiver should dedupe by <code>(device.id, type, ts)</code>, keep the latest <code>minute</code>, <code>sleep</code> and <code>score</code>, and skip types it doesn't know.</p>
+<pre>curl -X POST ${origin}/v1/webhooks ${H} \\
+  -H "Content-Type: application/json" \\
+  -d '{"url": "https://example.com/freeband"}'
+
+{"id": "…", "url": "https://example.com/freeband", "secret": "fbwh_…", "created_at": "…"}</pre>
+<p>The secret comes back once, only in this response; the server keeps it encrypted and never shows it again.</p>
+<pre>curl ${origin}/v1/webhooks ${H}
+curl ${origin}/v1/webhooks/ID ${H}
+curl -X POST ${origin}/v1/webhooks/ID/test ${H}
+curl -X DELETE ${origin}/v1/webhooks/ID ${H}</pre>
+<p>The test request sends this body with <code>X-Freeband-Event: ping</code>: <code>{"schema": "freeband.v1", "event": "ping", "sent_at": "…", "webhook_id": "…"}</code>. The response is <code>{"delivered", "status", "error"}</code>.</p>
+
+<h3 id="imza">Verifying the signature</h3>
+<p>Every request comes with these headers:</p>
+<ul>
+  <li><code>Content-Type: application/json</code></li>
+  <li><code>X-Freeband-Event</code>: <code>sync.completed</code>, <code>sync.partial</code> or <code>ping</code></li>
+  <li><code>X-Freeband-Delivery</code>: a random UUID per delivery</li>
+  <li><code>X-Freeband-Signature</code>: <code>sha256=</code> and the HMAC-SHA256 of the body (lowercase hex). The key is the UTF-8 bytes of the secret.</li>
+</ul>
+<p>Verify the signature before parsing the body, over the raw bytes, with a constant-time comparison.</p>
+<p>Node.js:</p>
+<pre>${NODE_VERIFY_EN}</pre>
+<p>Python:</p>
+<pre>${PY_VERIFY_EN}</pre>
+
+<h2 id="oturum">Web panel session</h2>
+<p><code>POST /v1/session</code> with the body <code>{"token": "fb_…"}</code> gives a session cookie valid for 30 days (<code>HttpOnly; Secure; SameSite=Strict</code>). <code>DELETE /v1/session</code> signs out. Only the panel pages can call these two endpoints; requests that change data with the cookie must also come from the same origin.</p>
+</article>
+</div>
+`;
+}
+
+export const DOCS_TITLE: Record<Lang, string> = { en: "API docs", tr: "API belgesi" };
+
+export function docsBody(origin: string, lang: Lang): Safe {
+  return lang === "en" ? docsEN(origin) : docsTR(origin);
 }

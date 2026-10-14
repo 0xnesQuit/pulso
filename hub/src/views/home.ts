@@ -78,7 +78,7 @@ interface Copy {
   noAccount: { h: string; p: string; cards: Card[] };
   scores: { h: string; p: string; cards: Card[] };
   web: { h: string; p: string; cards: Card[]; note: Safe; docs: string; privacy: string };
-  status: { h: string; line: string; p: Safe };
+  status: { h: string; line: string; lineSoon: string; p: Safe; join: string };
 }
 
 const COPY: Record<Lang, Copy> = {
@@ -123,8 +123,10 @@ const COPY: Record<Lang, Copy> = {
     },
     status: {
       h: "Status",
-      line: "Internal testing on TestFlight",
-      p: html`Freeband is in internal testing for now and isn't on the App Store. The source code is <a href="${GITHUB_URL}">on GitHub</a>, <a href="/story">How we did it</a> tells how the band was worked out, and <a href="/guide">Try it yourself</a> shows how to build it for your own band.`,
+      line: "Public beta on TestFlight",
+      lineSoon: "Public beta on TestFlight soon, once Apple has reviewed the first build",
+      p: html`Freeband isn't on the App Store yet. The source code is <a href="${GITHUB_URL}">on GitHub</a>, <a href="/story">How we did it</a> tells how the band was worked out, and <a href="/guide">Try it yourself</a> shows how to set it up with your own band.`,
+      join: "Join the beta on TestFlight",
     },
   },
   tr: {
@@ -162,14 +164,16 @@ const COPY: Record<Lang, Copy> = {
         { title: "Webhook'lar", text: "Her senkronizasyondan sonra veri imzalı bir istekle kendi sunucuna da gider." },
         { title: "Dışa aktarma", text: "Buradaki tüm verini CSV ya da JSON olarak indir." },
       ],
-      note: html`Başka bir bilgisayardan girmek için anahtarı uygulamadan kopyala ve <a href="/login">giriş sayfasına</a> yapıştır. Neyin saklandığını <a href="/tr/privacy">gizlilik sayfası</a> anlatıyor.`,
+      note: html`Başka bir bilgisayardan girmek için anahtarı uygulamadan kopyala ve <a href="/tr/login">giriş sayfasına</a> yapıştır. Neyin saklandığını <a href="/tr/privacy">gizlilik sayfası</a> anlatıyor.`,
       docs: "API belgesi",
       privacy: "Gizlilik",
     },
     status: {
       h: "Durum",
-      line: "TestFlight'ta iç test",
-      p: html`Freeband şimdilik yalnız iç testte; App Store'da yok. Kaynak kodu <a href="${GITHUB_URL}">GitHub'da</a>, bandın nasıl çözüldüğü <a href="/tr/story">Nasıl yaptık</a> sayfasında, kendi bandın için nasıl kuracağın <a href="/tr/guide">Kendin dene</a> sayfasında.`,
+      line: "TestFlight'ta herkese açık beta",
+      lineSoon: "Apple ilk build'i inceleyince TestFlight'ta herkese açık beta",
+      p: html`Freeband henüz App Store'da değil. Kaynak kodu <a href="${GITHUB_URL}">GitHub'da</a>, bandın nasıl çözüldüğü <a href="/tr/story">Nasıl yaptık</a> sayfasında, kendi bandınla nasıl kuracağın <a href="/tr/guide">Kendin dene</a> sayfasında.`,
+      join: "TestFlight'ta betaya katıl",
     },
   },
 };
@@ -181,7 +185,7 @@ function card(c: Card): Safe {
   return html`<li class="card${c.wide ? " wide" : ""}">${head}<p>${c.text}</p></li>`;
 }
 
-export function homeBody(o: { deleted: boolean; lang: Lang }): Safe {
+export function homeBody(o: { deleted: boolean; lang: Lang; testflight: string }): Safe {
   const t = COPY[o.lang];
   const suffix = o.lang === "en" ? "" : `-${o.lang}`;
   return html`
@@ -223,7 +227,7 @@ ${o.deleted ? html`<p class="banner small" role="status">${t.deleted}</p>` : ""}
   <div>
     <ul class="cards c2">${t.web.cards.map(card)}</ul>
     <p class="small muted note">${t.web.note}</p>
-    <div class="actions"><a class="btn ghost" href="/docs">${t.web.docs}</a><a class="btn ghost" href="${localPath(o.lang, "/privacy")}">${t.web.privacy}</a></div>
+    <div class="actions"><a class="btn ghost" href="${localPath(o.lang, "/docs")}">${t.web.docs}</a><a class="btn ghost" href="${localPath(o.lang, "/privacy")}">${t.web.privacy}</a></div>
   </div>
 </section>
 
@@ -232,8 +236,9 @@ ${o.deleted ? html`<p class="banner small" role="status">${t.deleted}</p>` : ""}
     <h2>${t.status.h}</h2>
   </header>
   <div class="card">
-    <p class="status-line"><span class="dot" aria-hidden="true"></span>${t.status.line}</p>
+    <p class="status-line"><span class="dot" aria-hidden="true"></span>${o.testflight ? t.status.line : t.status.lineSoon}</p>
     <p>${t.status.p}</p>
+    ${o.testflight ? html`<div class="actions note"><a class="btn" href="${o.testflight}">${t.status.join}</a></div>` : ""}
   </div>
 </section>`;
 }

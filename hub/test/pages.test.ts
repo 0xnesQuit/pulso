@@ -9,7 +9,7 @@ function cspNonce(csp: string): string {
 
 describe("security headers", () => {
   it("sends a nonce-based CSP and hardening headers on HTML", async () => {
-    for (const path of ["/", "/story", "/guide", "/tr", "/tr/story", "/tr/guide", "/tr/privacy", "/login", "/join", "/docs", "/privacy", "/does-not-exist"]) {
+    for (const path of ["/", "/story", "/guide", "/tr", "/tr/story", "/tr/guide", "/tr/privacy", "/login", "/tr/login", "/join", "/tr/join", "/docs", "/tr/docs", "/privacy", "/does-not-exist", "/tr/does-not-exist"]) {
       const res = await call(path);
       expect(res.headers.get("content-type"), path).toContain("text/html");
       const csp = res.headers.get("content-security-policy") ?? "";
@@ -84,7 +84,10 @@ describe("pages", () => {
     expect(home).toContain('<meta name="twitter:card" content="summary_large_image">');
     expect(home).toContain('<link rel="alternate" hreflang="tr" href="https://freeband.cobanov.dev/tr">');
     expect(home).toContain('<link rel="alternate" hreflang="x-default" href="https://freeband.cobanov.dev/">');
-    expect(home).toContain('<a class="navlink" href="/tr" hreflang="tr" lang="tr">Türkçe</a>');
+    // The globe picker lists both languages and marks the current one.
+    expect(home).toContain('<details class="lang"><summary class="navlink" aria-label="Language: English">');
+    expect(home).toContain('<a href="/" hreflang="en" lang="en" aria-current="true">English</a>');
+    expect(home).toContain('<a href="/tr" hreflang="tr" lang="tr" aria-current="false">Türkçe</a>');
     expect(home).toContain("is not affiliated with Xiaomi");
 
     const slash = await call("/tr/", { redirect: "manual" });
@@ -99,11 +102,17 @@ describe("pages", () => {
     expect(tr).toMatch(/<a class="btn" href="\/tr\/story">Nasıl yaptık<\/a>/);
     expect(tr).toContain('<meta property="og:image" content="https://freeband.cobanov.dev/img/og-home-tr.png">');
     expect(tr).toContain('<meta property="og:locale" content="tr_TR">');
-    expect(tr).toContain('<a class="navlink" href="/" hreflang="en" lang="en">English</a>');
+    expect(tr).toContain('aria-label="Dil: Türkçe"');
+    expect(tr).toContain('<a href="/tr" hreflang="tr" lang="tr" aria-current="true">Türkçe</a>');
   });
 
   it("renders the docs and both privacy pages", async () => {
     const docs = await (await call("/docs")).text();
+    expect(docs).toContain("<h1>API docs</h1>");
+    expect(docs).toContain("verify the signature over the raw body");
+    const belge = await (await call("/tr/docs")).text();
+    expect(belge).toContain("<h1>API belgesi</h1>");
+    expect(belge).toContain('id="imza"');
     expect(docs).toContain("X-Freeband-Signature");
     expect(docs).toContain("createHmac");
     expect(docs).toContain("hmac.new");
@@ -159,12 +168,14 @@ describe("pages", () => {
     const en = ["/", "/story", "/guide", '<a href="/privacy">Privacy</a>'] as const;
     const tr = ["/tr", "/tr/story", "/tr/guide", '<a href="/tr/privacy">Gizlilik</a>'] as const;
     const cases: Array<[path: string, links: readonly [string, string, string, string]]> = [
-      ["/", en], ["/story", en], ["/guide", en], ["/privacy", en],
-      ["/tr", tr], ["/tr/story", tr], ["/tr/guide", tr], ["/docs", tr], ["/join", tr],
+      ["/", en], ["/story", en], ["/guide", en], ["/privacy", en], ["/docs", en], ["/join", en],
+      ["/tr", tr], ["/tr/story", tr], ["/tr/guide", tr], ["/tr/docs", tr], ["/tr/join", tr],
     ];
     for (const [path, [home, story, guide, privacy]] of cases) {
       const page = await (await call(path)).text();
-      for (const href of [story, guide, "/docs", "https://github.com/cobanov/freeband", "/login"]) {
+      const docs = home === "/" ? "/docs" : "/tr/docs";
+      const login = home === "/" ? "/login" : "/tr/login";
+      for (const href of [story, guide, docs, "https://github.com/cobanov/freeband", login]) {
         expect(page, `${path} → ${href}`).toContain(`class="navlink" href="${href}"`);
       }
       expect(page, path).toContain(`<a class="brand" href="${home}">Freeband</a>`);
@@ -177,13 +188,17 @@ describe("pages", () => {
   it("renders the step-by-step guide in both languages", async () => {
     const en = await (await call("/guide")).text();
     expect(en).toContain("<title>Try Freeband with your own band · Freeband</title>");
-    expect(en.match(/<span class="step-n" aria-hidden="true">/g)).toHaveLength(9);
+    // Seven steps with TestFlight, then three for building from source.
+    expect(en.match(/<span class="step-n" aria-hidden="true">/g)).toHaveLength(10);
+    expect(en).toContain("Install Freeband from TestFlight");
+    expect(en).toContain("The public TestFlight link opens once Apple has reviewed the first build.");
     for (const s of ["git clone https://github.com/cobanov/freeband", "brew install xcodegen", "xcodegen generate", "DEVELOPMENT_TEAM", "Get started", "Choose folder", "Connect", "Offload App", "Never unpair the band"]) {
       expect(en, s).toContain(s);
     }
     expect(en).toContain('<link rel="alternate" hreflang="tr" href="https://freeband.cobanov.dev/tr/guide">');
     const tr = await (await call("/tr/guide")).text();
-    expect(tr.match(/<span class="step-n" aria-hidden="true">/g)).toHaveLength(9);
+    expect(tr.match(/<span class="step-n" aria-hidden="true">/g)).toHaveLength(10);
+    expect(tr).toContain("TestFlight&#39;tan kur");
     for (const s of ["Başlayalım", "Klasörü seç", "Bağlan", "Uygulamayı Boşalt", "eşleşmeden çıkarma"]) expect(tr, s).toContain(s);
     // The home page links it.
     expect(await (await call("/")).text()).toContain('<a class="btn ghost" href="/guide">Try it yourself</a>');
@@ -196,7 +211,7 @@ describe("pages", () => {
     const home = await (await call("/", { headers: { Cookie: cookie } })).text();
     expect(home).toContain('<a class="navlink" href="/app">Open panel</a>');
     const tr = await (await call("/tr", { headers: { Cookie: cookie } })).text();
-    expect(tr).toContain('<a class="navlink" href="/app">Panele git</a>');
+    expect(tr).toContain('<a class="navlink" href="/tr/app">Panele git</a>');
     expect(home).not.toContain('href="/login" aria-current');
   });
 
@@ -205,7 +220,7 @@ describe("pages", () => {
     const evil = `<script>alert(1)</script>"'&`;
     await ingest(token, syncBody([live("2026-10-13T10:00:00Z", 4200, 77)], { name: evil }));
     const cookie = await login(token);
-    const page = await (await call("/app?date=2026-10-13", { headers: { Cookie: cookie } })).text();
+    const page = await (await call("/tr/app?date=2026-10-13", { headers: { Cookie: cookie } })).text();
     expect(page).toContain('<svg class="dial"');
     expect(page).toContain('class="bar h13"'); // 10:00Z = 13:00 Istanbul
     expect(page).toContain('class="hr"');
@@ -222,18 +237,21 @@ describe("pages", () => {
     await ingest(token, syncBody([live("2026-10-13T10:00:00Z", 1)]));
     await ingest(token, syncBody([live("2026-10-13T10:00:00Z", 2)], { id: DEV_B, name: "Band 10 4F21", model: "band10" }));
     const cookie = await login(token);
-    const page = await (await call(`/app?device=${DEV_B}&date=2026-10-13`, { headers: { Cookie: cookie } })).text();
+    const page = await (await call(`/tr/app?device=${DEV_B}&date=2026-10-13`, { headers: { Cookie: cookie } })).text();
     expect(page).toContain('class="devices"');
-    expect(page).toMatch(new RegExp(`href="/app\\?device=${DEV_B}&amp;date=2026-10-13" aria-current="true"`));
+    expect(page).toMatch(new RegExp(`href="/tr/app\\?device=${DEV_B}&amp;date=2026-10-13" aria-current="true"`));
     expect(page).toContain("Band 10 4F21");
   });
 
   it("shows an empty state when there is no data", async () => {
     const { token } = await createAccount();
     const cookie = await login(token);
-    const page = await (await call("/app", { headers: { Cookie: cookie } })).text();
+    const page = await (await call("/tr/app", { headers: { Cookie: cookie } })).text();
     expect(page).toContain('<svg class="dial"');
     expect(page).toContain("Henüz veri gelmedi.");
+    const en = await (await call("/app", { headers: { Cookie: cookie } })).text();
+    expect(en).toContain("No data yet. Open Freeband on your phone and tap Sync.");
+    expect(en).toContain('<a href="/tr/app" hreflang="tr" lang="tr" aria-current="false">Türkçe</a>');
     expect(page).not.toContain('class="bar');
   });
 

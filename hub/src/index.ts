@@ -53,17 +53,28 @@ app.route("/", pages);
 
 const isApi = (path: string): boolean => path === "/v1" || path.startsWith("/v1/");
 
-function errorPage(nonce: string, title: string, text: string): string {
+/** Error pages are Turkish under /tr and English elsewhere. */
+function errorPage(nonce: string, path: string, title: { en: string; tr: string }, text: { en: string; tr: string }): string {
+  const lang = path === "/tr" || path.startsWith("/tr/") ? "tr" : "en";
+  const home = lang === "en" ? "/" : "/tr";
+  const label = lang === "en" ? "error" : "hata";
+  const back = lang === "en" ? "Back to the home page" : "Ana sayfaya dön";
   return page({
-    title,
+    title: title[lang],
     nonce,
-    body: html`<section class="narrow"><p class="label">hata</p><h1>${title}</h1><p class="lede">${text}</p><a class="btn ghost" href="/">Ana sayfaya dön</a></section>`,
+    lang,
+    body: html`<section class="narrow"><p class="label">${label}</p><h1>${title[lang]}</h1><p class="lede">${text[lang]}</p><a class="btn ghost" href="${home}">${back}</a></section>`,
   });
 }
 
+const PROBLEM = { en: "Something went wrong", tr: "Bir sorun var" };
+
 app.notFound((c) => {
   if (isApi(c.req.path)) return c.json(errorBody("not_found", "Böyle bir uç nokta yok."), 404);
-  return c.html(errorPage(c.get("nonce"), "Sayfa bulunamadı", "Aradığın sayfa burada değil."), 404);
+  return c.html(
+    errorPage(c.get("nonce"), c.req.path, { en: "Page not found", tr: "Sayfa bulunamadı" }, { en: "The page you're looking for isn't here.", tr: "Aradığın sayfa burada değil." }),
+    404,
+  );
 });
 
 app.onError((err, c) => {
@@ -72,7 +83,7 @@ app.onError((err, c) => {
     if (isApi(c.req.path)) {
       return c.json(errorBody(err.code, err.message), err.status as 400);
     }
-    return c.html(errorPage(c.get("nonce"), "Bir sorun var", err.message), err.status as 400);
+    return c.html(errorPage(c.get("nonce"), c.req.path, PROBLEM, { en: err.message, tr: err.message }), err.status as 400);
   }
   if (err instanceof ConfigError) {
     console.error(JSON.stringify({ message: "configuration error", error: err.message }));
@@ -88,7 +99,10 @@ app.onError((err, c) => {
     }),
   );
   if (isApi(c.req.path)) return c.json(errorBody("internal", "Beklenmeyen bir hata oldu. Tekrar dene."), 500);
-  return c.html(errorPage(c.get("nonce"), "Bir sorun var", "Beklenmeyen bir hata oldu. Biraz sonra tekrar dene."), 500);
+  return c.html(
+    errorPage(c.get("nonce"), c.req.path, PROBLEM, { en: "Something unexpected went wrong. Try again in a little while.", tr: "Beklenmeyen bir hata oldu. Biraz sonra tekrar dene." }),
+    500,
+  );
 });
 
 export default {

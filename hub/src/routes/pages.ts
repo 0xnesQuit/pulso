@@ -9,11 +9,11 @@ import { addDays, isDate, localDate, localHourOfDay, startOfLocalDay } from "../
 import { isHeartRate } from "../lib/validate";
 import { MAX_WEBHOOKS } from "../lib/webhooks";
 import { dial, heartBuckets, hourlyFromCumulative, pulseCurve } from "../views/dial";
-import { clock, dayLabel, num, shortDay } from "../views/format";
+import { clock, dayLabel, num, percent, shortDay } from "../views/format";
 import { html, raw, type Safe } from "../views/html";
 import { page, type OpenGraph } from "../views/layout";
 import { APP_JS, JOIN_JS, LOGIN_JS } from "../views/scripts";
-import { docsBody } from "../views/docs";
+import { DOCS_TITLE, docsBody } from "../views/docs";
 import { PRIVACY_TITLE, privacyBody } from "../views/privacy";
 import { GUIDE_DESCRIPTION, GUIDE_TITLE, guideBody } from "../views/guide";
 import { HOME_DESCRIPTION, HOME_IMAGE_ALT, HOME_TITLE, homeBody } from "../views/home";
@@ -47,7 +47,23 @@ function render(
   return c.html(page({ title, nonce: c.get("nonce"), body, path: c.req.path, ...extra }));
 }
 
-const legend = html`<ul class="legend" aria-hidden="true"><li><i class="sw sw-step"></i>saatlik adım</li><li><i class="sw sw-hr"></i>nabız</li><li><i class="sw sw-now"></i>şimdi</li><li><i class="sw sw-night"></i>gece, 22–06</li></ul>`;
+const legend = (lang: Lang): Safe =>
+  lang === "en"
+    ? html`<ul class="legend" aria-hidden="true"><li><i class="sw sw-step"></i>steps per hour</li><li><i class="sw sw-hr"></i>heart rate</li><li><i class="sw sw-now"></i>now</li><li><i class="sw sw-night"></i>night, 22–06</li></ul>`
+    : html`<ul class="legend" aria-hidden="true"><li><i class="sw sw-step"></i>saatlik adım</li><li><i class="sw sw-hr"></i>nabız</li><li><i class="sw sw-now"></i>şimdi</li><li><i class="sw sw-night"></i>gece, 22–06</li></ul>`;
+
+/** True when the browser's first language is Turkish (for entry points the app and invites open). */
+function prefersTurkish(c: Context<AppEnv>): boolean {
+  const first = (c.req.header("accept-language") ?? "").split(",")[0]?.trim().toLowerCase() ?? "";
+  return first === "tr" || first.startsWith("tr-");
+}
+
+/** Redirect an English entry page to its Turkish version for Turkish browsers, keeping the query. */
+function turkishRedirect(c: Context<AppEnv>, lang: Lang, path: string): Response | null {
+  if (lang !== "en" || !prefersTurkish(c)) return null;
+  const q = new URL(c.req.url).search;
+  return c.redirect(localPath("tr", path) + q, 302);
+}
 
 // ---------------------------------------------------------------------------
 
@@ -65,7 +81,7 @@ for (const lang of ["en", "tr"] as const) {
   pages.get(localPath(lang, "/"), async (c) => {
     const signedIn = (await pageSession(c)) !== null;
     const deleted = c.req.query("silindi") === "1" || c.req.query("deleted") === "1";
-    return render(c, HOME_TITLE[lang], homeBody({ deleted, lang }), {
+    return render(c, HOME_TITLE[lang], homeBody({ deleted, lang, testflight: c.env.TESTFLIGHT_URL }), {
       signedIn,
       lang,
       alternates: alternates("/"),
@@ -87,7 +103,7 @@ for (const lang of ["en", "tr"] as const) {
 
   pages.get(localPath(lang, "/guide"), async (c) => {
     const signedIn = (await pageSession(c)) !== null;
-    return render(c, `${GUIDE_TITLE[lang]} · Freeband`, guideBody(lang), {
+    return render(c, `${GUIDE_TITLE[lang]} · Freeband`, guideBody(lang, c.env.TESTFLIGHT_URL), {
       signedIn,
       lang,
       alternates: alternates("/guide"),
@@ -109,51 +125,61 @@ for (const lang of ["en", "tr"] as const) {
 
 // ---------------------------------------------------------------------------
 
-pages.get("/login", (c) => {
-  const body = html`
+for (const lang of ["en", "tr"] as const) {
+  const T = (en: string, tr: string): string => (lang === "en" ? en : tr);
+
+  pages.get(localPath(lang, "/login"), (c) => {
+    const away = turkishRedirect(c, lang, "/login");
+    if (away) return away;
+    const body = html`
 <section class="narrow">
-  <p class="label">web paneli</p>
-  <h1>Panele giriş</h1>
-  <p class="lede">Uygulamada Web paneli aç'a dokunduğunda buraya kendiliğinden girersin. Başka bir bilgisayardaysan anahtarı yapıştır.</p>
+  <p class="label">${T("web panel", "web paneli")}</p>
+  <h1>${T("Sign in to the panel", "Panele giriş")}</h1>
+  <p class="lede">${T("When you tap Open web panel in the app, you're signed in here automatically. On another computer, paste your key.", "Uygulamada Web paneli aç'a dokunduğunda buraya kendiliğinden girersin. Başka bir bilgisayardaysan anahtarı yapıştır.")}</p>
   <div class="box">
     <p id="login-status" role="status" aria-live="polite"></p>
-    <noscript><p class="error">Giriş için tarayıcında JavaScript açık olmalı.</p></noscript>
+    <noscript><p class="error">${T("Signing in needs JavaScript turned on in your browser.", "Giriş için tarayıcında JavaScript açık olmalı.")}</p></noscript>
     <form id="login-form" class="stack" hidden autocomplete="off">
       <div>
-        <label for="token">Erişim anahtarı</label>
+        <label for="token">${T("Access key", "Erişim anahtarı")}</label>
         <input id="token" name="token" type="password" placeholder="fb_..." spellcheck="false" autocapitalize="off" required>
       </div>
-      <button type="submit">Giriş yap</button>
+      <button type="submit">${T("Sign in", "Giriş yap")}</button>
     </form>
   </div>
-  <p class="small muted">Anahtarı uygulamada Ayarlar'daki Web erişimi bölümünde bulursun. Anahtar tarayıcıda saklanmaz; yalnız oturum açmak için bir kez sunucuya gider ve yerine 30 gün geçerli bir oturum çerezi alırsın.</p>
+  <p class="small muted">${T("You'll find the key in the app under Settings, in the Web access section. The key isn't kept in the browser; it goes to the server once to sign you in, and you get a session cookie that lasts 30 days instead.", "Anahtarı uygulamada Ayarlar'daki Web erişimi bölümünde bulursun. Anahtar tarayıcıda saklanmaz; yalnız oturum açmak için bir kez sunucuya gider ve yerine 30 gün geçerli bir oturum çerezi alırsın.")}</p>
 </section>`;
-  return render(c, "Giriş", body, { script: LOGIN_JS });
-});
+    return render(c, T("Sign in", "Giriş"), body, { script: LOGIN_JS, lang, alternates: alternates("/login") });
+  });
 
-pages.get("/join", (c) => {
-  const testflight = c.env.TESTFLIGHT_URL;
-  const install = testflight
-    ? html`<a href="${testflight}">Freeband'i TestFlight'tan kur</a>. Önce App Store'dan TestFlight uygulamasını kurman istenebilir.`
-    : html`Seni davet edenden Freeband'in TestFlight bağlantısını iste.`;
-  const body = html`
+  pages.get(localPath(lang, "/join"), (c) => {
+    const away = turkishRedirect(c, lang, "/join");
+    if (away) return away;
+    const testflight = c.env.TESTFLIGHT_URL;
+    const install = testflight
+      ? lang === "en"
+        ? html`<a href="${testflight}">Install Freeband from TestFlight</a>. You may be asked to install the TestFlight app from the App Store first.`
+        : html`<a href="${testflight}">Freeband'i TestFlight'tan kur</a>. Önce App Store'dan TestFlight uygulamasını kurman istenebilir.`
+      : html`${T("Ask the person who invited you for Freeband's TestFlight link.", "Seni davet edenden Freeband'in TestFlight bağlantısını iste.")}`;
+    const body = html`
 <section>
-  <p class="label">davet</p>
-  <h1>Freeband'e katıl</h1>
-  <p class="lede">Bileğindeki Xiaomi Smart Band 10 ya da 10 Pro'yu Xiaomi hesabı olmadan kullanırsın; verilerin telefonunda kalır. Web erişimini açınca bu sunucudan panelini görebilir, API ile verine ulaşabilirsin.</p>
+  <p class="label">${T("invite", "davet")}</p>
+  <h1>${T("Join Freeband", "Freeband'e katıl")}</h1>
+  <p class="lede">${T("Use the Xiaomi Smart Band 10 or 10 Pro on your wrist without a Xiaomi account; your data stays on your phone. With Web access on, you can see your panel on this server and reach your data through the API.", "Bileğindeki Xiaomi Smart Band 10 ya da 10 Pro'yu Xiaomi hesabı olmadan kullanırsın; verilerin telefonunda kalır. Web erişimini açınca bu sunucudan panelini görebilir, API ile verine ulaşabilirsin.")}</p>
   <ol class="grid g2 steps">
-    <li><h3>Uygulamayı kur.</h3><p class="muted">${install}</p></li>
-    <li><h3>Bandını Mi Fitness'la bir kez eşle.</h3><p class="muted">Freeband bandın anahtarını oradan okur. Mi Fitness'ı silme.</p></li>
-    <li><h3>Freeband'i aç ve ilk kurulumu bitir.</h3><p class="muted">Uygulama seni adım adım götürür.</p></li>
-    <li><h3>Web erişimine katıl.</h3><p class="muted">Bu sayfa telefonunda açıksa düğmeye dokun; Freeband davet kodu dolu açılır.</p>
-      <p><a id="join-link" class="btn" href="#">Freeband'de aç ${CHEV_R}</a></p>
-      <p class="small muted">Davet kodu: <code id="join-code">…</code></p>
+    <li><h3>${T("Install the app.", "Uygulamayı kur.")}</h3><p class="muted">${install}</p></li>
+    <li><h3>${T("Pair your band with Mi Fitness once.", "Bandını Mi Fitness'la bir kez eşle.")}</h3><p class="muted">${T("Freeband reads the band's key from there. Don't delete Mi Fitness.", "Freeband bandın anahtarını oradan okur. Mi Fitness'ı silme.")}</p></li>
+    <li><h3>${T("Open Freeband and finish the setup.", "Freeband'i aç ve ilk kurulumu bitir.")}</h3><p class="muted">${T("The app walks you through it.", "Uygulama seni adım adım götürür.")}</p></li>
+    <li><h3>${T("Join web access.", "Web erişimine katıl.")}</h3><p class="muted">${T("If this page is open on your phone, tap the button; Freeband opens with the invite code filled in.", "Bu sayfa telefonunda açıksa düğmeye dokun; Freeband davet kodu dolu açılır.")}</p>
+      <p><a id="join-link" class="btn" href="#">${T("Open in Freeband", "Freeband'de aç")} ${CHEV_R}</a></p>
+      <p class="small muted">${T("Invite code", "Davet kodu")}: <code id="join-code">…</code></p>
     </li>
   </ol>
-  <p class="note small muted">Davet kodu bağlantının # sonrasında durur ve bu sayfadan sunucuya gönderilmez.</p>
+  <p class="note small muted">${T("The invite code sits after the # in the link and is never sent to the server from this page.", "Davet kodu bağlantının # sonrasında durur ve bu sayfadan sunucuya gönderilmez.")}</p>
 </section>`;
-  return render(c, "Freeband'e katıl", body, { script: JOIN_JS });
-});
+    return render(c, T("Join Freeband", "Freeband'e katıl"), body, { script: JOIN_JS, lang, alternates: alternates("/join") });
+  });
+}
 
 // ---------------------------------------------------------------------------
 
@@ -217,12 +243,13 @@ async function loadDay(db: D1Database, accountId: string, tz: string, device: De
   };
 }
 
-function appHref(device: string | null, date: string | null): string {
+function appHref(lang: Lang, device: string | null, date: string | null): string {
   const p = new URLSearchParams();
   if (device) p.set("device", device);
   if (date) p.set("date", date);
   const s = p.toString();
-  return s ? `/app?${s}` : "/app";
+  const path = localPath(lang, "/app");
+  return s ? `${path}?${s}` : path;
 }
 
 /** One reading in the panel grid: a small label over a figure, "–" when missing. */
@@ -232,9 +259,12 @@ function reading(cls: string, label: string, value: string | null, unit = ""): S
   }</div>`;
 }
 
-pages.get("/app", async (c) => {
+for (const lang of ["en", "tr"] as const) {
+const T = (en: string, tr: string): string => (lang === "en" ? en : tr);
+
+pages.get(localPath(lang, "/app"), async (c) => {
   const s = await pageSession(c);
-  if (!s) return c.redirect("/", 303);
+  if (!s) return c.redirect(localPath(lang, "/"), 303);
   const a = s.account;
   const db = c.env.DB;
   const now = Date.now();
@@ -264,9 +294,9 @@ pages.get("/app", async (c) => {
   const liveNow = !!day?.lastHr && isToday && now - day.lastHr.ts <= NOW_WINDOW_MS;
   let caption: string | null = null;
   if (day?.lastHr) {
-    caption = liveNow ? "bpm, şimdi" : `bpm, ${clock(day.lastHr.ts, a.tz)}`;
+    caption = liveNow ? T("bpm, now", "bpm, şimdi") : `bpm, ${clock(day.lastHr.ts, a.tz)}`;
   } else if (day?.hasData) {
-    caption = "nabız ölçülmedi";
+    caption = T("no heart rate", "nabız ölçülmedi");
   }
   const dialSvg = dial({
     hourlySteps: day?.hourly ?? new Array(24).fill(0),
@@ -274,16 +304,17 @@ pages.get("/app", async (c) => {
     nowHour: isToday ? localHourOfDay(now, a.tz) : null,
     centerValue: day?.lastHr ? String(day.lastHr.bpm) : day?.hasData ? "–" : null,
     centerCaption: caption,
-    label: `${dayLabel(date)}: ${day?.steps !== null && day?.steps !== undefined ? `${day.steps} adım` : "adım yok"}, ${day?.lastHr ? `son nabız ${day.lastHr.bpm}` : "nabız yok"}`,
+    label: `${dayLabel(date, lang)}: ${day?.steps !== null && day?.steps !== undefined ? `${day.steps} ${T("steps", "adım")}` : T("no steps", "adım yok")}, ${day?.lastHr ? `${T("last heart rate", "son nabız")} ${day.lastHr.bpm}` : T("no heart rate", "nabız yok")}`,
+    lang,
     live: liveNow,
   });
 
   const emptyText = !device
-    ? "Henüz veri gelmedi. Telefonda Freeband'i açıp Senkronize et'e dokun."
+    ? T("No data yet. Open Freeband on your phone and tap Sync.", "Henüz veri gelmedi. Telefonda Freeband'i açıp Senkronize et'e dokun.")
     : !day?.hasData
       ? isToday
-        ? "Bugün için veri yok. Telefonda Freeband'i açıp Senkronize et'e dokun."
-        : "Bu gün için veri yok. Başka bir gün seç."
+        ? T("No data for today. Open Freeband on your phone and tap Sync.", "Bugün için veri yok. Telefonda Freeband'i açıp Senkronize et'e dokun.")
+        : T("No data for this day. Pick another day.", "Bu gün için veri yok. Başka bir gün seç.")
       : null;
 
   const lastSync = device ? Date.parse(device.last_seen) : null;
@@ -292,37 +323,37 @@ pages.get("/app", async (c) => {
       ? null
       : localDate(lastSync, a.tz) === today
         ? clock(lastSync, a.tz)
-        : `${shortDay(localDate(lastSync, a.tz))} ${clock(lastSync, a.tz)}`;
+        : `${shortDay(localDate(lastSync, a.tz), lang)} ${clock(lastSync, a.tz)}`;
   const fresh = lastSync !== null && now - lastSync <= NOW_WINDOW_MS;
 
   const deviceSwitcher = multi
-    ? html`<nav class="devices" aria-label="Bantlar">${devices.map(
+    ? html`<nav class="devices" aria-label="${T("Bands", "Bantlar")}">${devices.map(
         (d) =>
-          html`<a href="${appHref(d.id, date)}" aria-current="${d.id === device?.id ? "true" : "false"}">${d.name}<span class="muted"> ${MODEL_NAMES[d.model] ? `(${MODEL_NAMES[d.model]})` : ""}</span></a>`,
+          html`<a href="${appHref(lang, d.id, date)}" aria-current="${d.id === device?.id ? "true" : "false"}">${d.name}<span class="muted"> ${MODEL_NAMES[d.model] ? `(${MODEL_NAMES[d.model]})` : ""}</span></a>`,
       )}</nav>`
     : "";
 
   const status = device
     ? html`<p class="status"><span>${device.name}</span>${
-        lastSyncText ? html`<span class="sync"><span class="dot${fresh ? " on" : ""}" aria-hidden="true"></span>son senkron ${lastSyncText}</span>` : ""
+        lastSyncText ? html`<span class="sync"><span class="dot${fresh ? " on" : ""}" aria-hidden="true"></span>${T("last sync", "son senkron")} ${lastSyncText}</span>` : ""
       }</p>`
-    : html`<p class="status"><span class="sync"><span class="dot" aria-hidden="true"></span>Henüz bant yok</span></p>`;
+    : html`<p class="status"><span class="sync"><span class="dot" aria-hidden="true"></span>${T("No band yet", "Henüz bant yok")}</span></p>`;
 
   // --- readings
   const hrRange =
     day?.hrMin != null && day.hrMax != null ? (day.hrMin === day.hrMax ? `${day.hrMin}` : `${day.hrMin}–${day.hrMax}`) : null;
   const activeHours = day ? day.hourly.filter((n) => n > ACTIVE_HOUR_STEPS).length : 0;
-  const curve = day ? pulseCurve(day.heart, `${dayLabel(date)} nabız eğrisi: en düşük ${day.hrMin ?? "–"}, en yüksek ${day.hrMax ?? "–"}`) : null;
+  const curve = day ? pulseCurve(day.heart, `${dayLabel(date, lang)} ${T("heart rate curve: lowest", "nabız eğrisi: en düşük")} ${day.hrMin ?? "–"}, ${T("highest", "en yüksek")} ${day.hrMax ?? "–"}`) : null;
 
   // --- 14-day list
   const byDate = new Map(list.map((r) => [r.date, r]));
   const rows14 = Array.from({ length: 14 }, (_, i) => addDays(today, -i)).map((d) => {
     const r = byDate.get(d);
     return html`<tr aria-current="${d === date ? "true" : "false"}">
-  <td><a href="${appHref(devParam, d)}">${d === today ? "Bugün" : dayLabel(d)}</a></td>
-  <td class="n">${r?.steps != null ? num(r.steps) : "–"}</td>
-  <td class="n">${r?.heart_rate_avg != null ? num(r.heart_rate_avg) : "–"}</td>
-  <td class="n hide-s">${r?.battery_last != null ? `%${r.battery_last}` : "–"}</td>
+  <td><a href="${appHref(lang, devParam, d)}">${d === today ? T("Today", "Bugün") : dayLabel(d, lang)}</a></td>
+  <td class="n">${r?.steps != null ? num(r.steps, lang) : "–"}</td>
+  <td class="n">${r?.heart_rate_avg != null ? num(r.heart_rate_avg, lang) : "–"}</td>
+  <td class="n hide-s">${r?.battery_last != null ? percent(r.battery_last, lang) : "–"}</td>
 </tr>`;
   });
 
@@ -330,14 +361,14 @@ pages.get("/app", async (c) => {
   const hookItems = hooks.results.map((h) => {
     const status =
       h.last_delivery_at === null
-        ? "Henüz gönderim yapılmadı."
-        : `Son gönderim ${shortDay(localDate(h.last_delivery_at, a.tz))} ${clock(h.last_delivery_at, a.tz)}: ${
-            h.last_error === null ? `ulaştı (HTTP ${h.last_status})` : `ulaşmadı (${h.last_error})`
+        ? T("Nothing sent yet.", "Henüz gönderim yapılmadı.")
+        : `${T("Last delivery", "Son gönderim")} ${shortDay(localDate(h.last_delivery_at, a.tz), lang)} ${clock(h.last_delivery_at, a.tz)}: ${
+            h.last_error === null ? `${T("delivered", "ulaştı")} (HTTP ${h.last_status})` : `${T("not delivered", "ulaşmadı")} (${h.last_error})`
           }.`;
     return html`<li>
   <div class="url">${h.url}</div>
   <div id="wh-status-${h.id}" class="small ${h.last_error ? "error" : "muted"}" role="status">${status}</div>
-  <div class="row"><button type="button" class="ghost sm" data-action="test" data-id="${h.id}">Test et</button><button type="button" class="ghost danger sm" data-action="delete" data-id="${h.id}">Sil</button></div>
+  <div class="row"><button type="button" class="ghost sm" data-action="test" data-id="${h.id}">${T("Test", "Test et")}</button><button type="button" class="ghost danger sm" data-action="delete" data-id="${h.id}">${T("Delete", "Sil")}</button></div>
 </li>`;
   });
   const canAddHook = hooks.results.length < MAX_WEBHOOKS;
@@ -348,18 +379,18 @@ pages.get("/app", async (c) => {
   const body = html`
 <div class="dayhead">
   <div>
-    <p class="label">${isToday ? "bugün" : "geçmiş bir gün"}</p>
-    <h1>${dayLabel(date)}</h1>
+    <p class="label">${isToday ? T("today", "bugün") : T("a past day", "geçmiş bir gün")}</p>
+    <h1>${dayLabel(date, lang)}</h1>
     ${status}
   </div>
-  <form class="picker" method="get" action="/app">
+  <form class="picker" method="get" action="${localPath(lang, "/app")}">
     ${devParam ? html`<input type="hidden" name="device" value="${devParam}">` : ""}
-    <a class="btn ghost sq" href="${appHref(devParam, prev)}" aria-label="Önceki gün" title="Önceki gün">${CHEV_L}</a>
-    <label class="sr" for="date">Gün</label>
+    <a class="btn ghost sq" href="${appHref(lang, devParam, prev)}" aria-label="${T("Previous day", "Önceki gün")}" title="${T("Previous day", "Önceki gün")}">${CHEV_L}</a>
+    <label class="sr" for="date">${T("Day", "Gün")}</label>
     <input id="date" name="date" type="date" value="${date}" max="${today}">
-    <button type="submit" class="ghost">Göster</button>
-    ${next <= today ? html`<a class="btn ghost sq" href="${appHref(devParam, next)}" aria-label="Sonraki gün" title="Sonraki gün">${CHEV_R}</a>` : ""}
-    ${isToday ? "" : html`<a class="btn" href="${appHref(devParam, null)}">Bugüne dön</a>`}
+    <button type="submit" class="ghost">${T("Show", "Göster")}</button>
+    ${next <= today ? html`<a class="btn ghost sq" href="${appHref(lang, devParam, next)}" aria-label="${T("Next day", "Sonraki gün")}" title="${T("Next day", "Sonraki gün")}">${CHEV_R}</a>` : ""}
+    ${isToday ? "" : html`<a class="btn" href="${appHref(lang, devParam, null)}">${T("Back to today", "Bugüne dön")}</a>`}
   </form>
 </div>
 ${deviceSwitcher}
@@ -367,86 +398,86 @@ ${deviceSwitcher}
 <div class="grid board">
   <div class="dialcell">
     ${dialSvg}
-    ${emptyText ? html`<p class="empty">${emptyText}</p>` : legend}
+    ${emptyText ? html`<p class="empty">${emptyText}</p>` : legend(lang)}
   </div>
-  ${reading("metric m-steps", "adım", day?.steps != null ? num(day.steps) : null)}
-  ${reading("metric m-cal", "kalori", day?.calories != null ? num(day.calories) : null, "kcal")}
-  ${reading("metric m-bat", "pil", day?.battery != null ? `%${day.battery}` : null)}
-  ${reading("fact", "nabız aralığı", hrRange, "bpm")}
-  ${reading("fact", "ayakta", day?.standing != null ? String(day.standing) : null, "saat")}
-  ${reading("fact", "aktif saat", activeHours > 0 ? String(activeHours) : null, "saat")}
-  ${reading("fact", "son ölçüm", day?.lastHr ? clock(day.lastHr.ts, a.tz) : null)}
+  ${reading("metric m-steps", T("steps", "adım"), day?.steps != null ? num(day.steps, lang) : null)}
+  ${reading("metric m-cal", T("calories", "kalori"), day?.calories != null ? num(day.calories, lang) : null, "kcal")}
+  ${reading("metric m-bat", T("battery", "pil"), day?.battery != null ? percent(day.battery, lang) : null)}
+  ${reading("fact", T("heart rate range", "nabız aralığı"), hrRange, "bpm")}
+  ${reading("fact", T("standing", "ayakta"), day?.standing != null ? String(day.standing) : null, T("h", "saat"))}
+  ${reading("fact", T("active hours", "aktif saat"), activeHours > 0 ? String(activeHours) : null, T("h", "saat"))}
+  ${reading("fact", T("last reading", "son ölçüm"), day?.lastHr ? clock(day.lastHr.ts, a.tz) : null)}
   <div class="curvecell">
-    <span class="label">${isToday ? "nabız, bugün" : `nabız, ${shortDay(date)}`}</span>
-    ${curve ?? html`<p class="small muted">${isToday ? "Canlı nabzı açtıkça ya da senkronize ettikçe günün nabız eğrisi burada belirir." : "Bu gün için nabız eğrisi yok."}</p>`}
+    <span class="label">${isToday ? T("heart rate, today", "nabız, bugün") : `${T("heart rate", "nabız")}, ${shortDay(date, lang)}`}</span>
+    ${curve ?? html`<p class="small muted">${isToday ? T("The day's heart rate curve shows up here as you use live heart rate or sync.", "Canlı nabzı açtıkça ya da senkronize ettikçe günün nabız eğrisi burada belirir.") : T("No heart rate curve for this day.", "Bu gün için nabız eğrisi yok.")}</p>`}
   </div>
 </div>
 
 <section>
-  <h2>Son 14 gün. <span class="muted">Bir güne dokunursan yukarıda açılır.</span></h2>
+  <h2>${T("The last 14 days.", "Son 14 gün.")} <span class="muted">${T("Tap a day to open it above.", "Bir güne dokunursan yukarıda açılır.")}</span></h2>
   ${device
     ? html`<div class="tablewrap"><table class="days">
-<thead><tr><th>Gün</th><th class="n">Adım</th><th class="n">Ortalama nabız</th><th class="n hide-s">Pil</th></tr></thead>
+<thead><tr><th>${T("Day", "Gün")}</th><th class="n">${T("Steps", "Adım")}</th><th class="n">${T("Average heart rate", "Ortalama nabız")}</th><th class="n hide-s">${T("Battery", "Pil")}</th></tr></thead>
 <tbody>${rows14}</tbody>
 </table></div>`
-    : html`<p class="muted">İlk senkronizasyondan sonra günlerin burada listelenir.</p>`}
+    : html`<p class="muted">${T("After the first sync, your days are listed here.", "İlk senkronizasyondan sonra günlerin burada listelenir.")}</p>`}
 </section>
 
 <section>
-  <h2>Verini taşı. <span class="muted">İndir ya da her senkronizasyondan sonra kendi sunucuna gönder.</span></h2>
+  <h2>${T("Take your data with you.", "Verini taşı.")} <span class="muted">${T("Download it, or send it to your own server after every sync.", "İndir ya da her senkronizasyondan sonra kendi sunucuna gönder.")}</span></h2>
   <div class="grid g3">
     <div>
-      <h3>Dışa aktar</h3>
-      <p class="muted">Buradaki tüm verini indir. Her satırda hangi banttan geldiği yazar. JSON her şeyi içerir; CSV canlı örnekler ve pil içindir, diğer türlerin kendi CSV'leri var.</p>
-      <div class="row"><a class="btn ghost" href="/v1/export.csv" download>CSV indir</a><a class="btn ghost" href="/v1/export.json" download>JSON indir</a></div>
-      <p class="small muted">Diğer CSV'ler: <a href="/v1/export.csv?type=minute" download>dakikalar</a>, <a href="/v1/export.csv?type=sleep" download>uyku</a>, <a href="/v1/export.csv?type=score" download>skorlar</a>.</p>
+      <h3>${T("Export", "Dışa aktar")}</h3>
+      <p class="muted">${T("Download everything stored here. Each row says which band it came from. JSON has everything; the CSV is for live samples and battery, and the other kinds have their own CSVs.", "Buradaki tüm verini indir. Her satırda hangi banttan geldiği yazar. JSON her şeyi içerir; CSV canlı örnekler ve pil içindir, diğer türlerin kendi CSV'leri var.")}</p>
+      <div class="row"><a class="btn ghost" href="/v1/export.csv" download>${T("Download CSV", "CSV indir")}</a><a class="btn ghost" href="/v1/export.json" download>${T("Download JSON", "JSON indir")}</a></div>
+      <p class="small muted">${T("Other CSVs", "Diğer CSV'ler")}: <a href="/v1/export.csv?type=minute" download>${T("minutes", "dakikalar")}</a>, <a href="/v1/export.csv?type=sleep" download>${T("sleep", "uyku")}</a>, <a href="/v1/export.csv?type=score" download>${T("scores", "skorlar")}</a>.</p>
     </div>
     <div class="span2">
-      <h3>Webhook'lar</h3>
-      <p class="muted">Her senkronizasyondan sonra veri, imzalı bir istekle kendi sunucuna da gönderilir. Adres https:// ile başlamalı; en fazla ${MAX_WEBHOOKS} adres ekleyebilirsin. İmzayı doğrulamayı <a href="/docs#imza">API belgesi</a> anlatıyor.</p>
-      ${hookItems.length ? html`<ul id="wh-list" class="hooks">${hookItems}</ul>` : html`<p class="small muted">Henüz webhook yok.</p>`}
+      <h3>${T("Webhooks", "Webhook'lar")}</h3>
+      <p class="muted">${T("After every sync, your data also goes to your own server in a signed request. The address must start with https://, and you can add up to", "Her senkronizasyondan sonra veri, imzalı bir istekle kendi sunucuna da gönderilir. Adres https:// ile başlamalı; en fazla")} ${MAX_WEBHOOKS} ${T("addresses. The", "adres ekleyebilirsin. İmzayı doğrulamayı")} <a href="${localPath(lang, "/docs")}#imza">${T("API docs", "API belgesi")}</a> ${T("explain how to verify the signature.", "anlatıyor.")}</p>
+      ${hookItems.length ? html`<ul id="wh-list" class="hooks">${hookItems}</ul>` : html`<p class="small muted">${T("No webhooks yet.", "Henüz webhook yok.")}</p>`}
       ${canAddHook
         ? html`<form id="wh-form" class="stack" autocomplete="off">
-        <div><label for="wh-url">Adres</label><input id="wh-url" name="url" type="url" placeholder="https://ornek.com/freeband" required></div>
-        <button type="submit">Webhook ekle</button>
+        <div><label for="wh-url">${T("Address", "Adres")}</label><input id="wh-url" name="url" type="url" placeholder="${T("https://example.com/freeband", "https://ornek.com/freeband")}" required></div>
+        <button type="submit">${T("Add webhook", "Webhook ekle")}</button>
         <p id="wh-out" class="small" role="status"></p>
       </form>`
-        : html`<p class="muted small">En fazla ${MAX_WEBHOOKS} webhook ekleyebilirsin. Yenisi için önce birini sil.</p>`}
+        : html`<p class="muted small">${T("You can add up to", "En fazla")} ${MAX_WEBHOOKS} ${T("webhooks. Delete one to add a new one.", "webhook ekleyebilirsin. Yenisi için önce birini sil.")}</p>`}
       <div id="wh-created" hidden>
-        <p>Webhook eklendi. Bu gizli değeri şimdi kopyala; bir daha gösterilmeyecek. Sunucun gelen isteklerin imzasını bununla doğrular.</p>
+        <p>${T("Webhook added. Copy this secret now; it won't be shown again. Your server checks the signature of incoming requests with it.", "Webhook eklendi. Bu gizli değeri şimdi kopyala; bir daha gösterilmeyecek. Sunucun gelen isteklerin imzasını bununla doğrular.")}</p>
         <code id="wh-secret" class="secret"></code>
-        <div class="row"><button type="button" id="wh-copy">Kopyala</button><button type="button" class="ghost" id="wh-done">Tamam</button></div>
+        <div class="row"><button type="button" id="wh-copy">${T("Copy", "Kopyala")}</button><button type="button" class="ghost" id="wh-done">${T("Done", "Tamam")}</button></div>
       </div>
     </div>
   </div>
 </section>
 
 <section>
-  <h2>Hesap. <span class="muted">Anahtarını yenile ya da her şeyi sil.</span></h2>
+  <h2>${T("Account.", "Hesap.")} <span class="muted">${T("Renew your key, or delete everything.", "Anahtarını yenile ya da her şeyi sil.")}</span></h2>
   <div class="grid g2">
     <div>
-      <h3>Erişim anahtarı</h3>
-      <p class="muted">Uygulama veriyi bu anahtarla gönderir. Anahtarın başkasının eline geçtiğini düşünüyorsan yenisini oluştur.</p>
-      <button type="button" class="ghost" id="rot-start">Yeni anahtar oluştur</button>
+      <h3>${T("Access key", "Erişim anahtarı")}</h3>
+      <p class="muted">${T("The app sends your data with this key. If you think someone else has it, make a new one.", "Uygulama veriyi bu anahtarla gönderir. Anahtarın başkasının eline geçtiğini düşünüyorsan yenisini oluştur.")}</p>
+      <button type="button" class="ghost" id="rot-start">${T("Make a new key", "Yeni anahtar oluştur")}</button>
       <div id="rot-confirm" class="confirm" hidden>
-        <p>Eski anahtar hemen çalışmaz olur ve diğer tarayıcılardaki oturumlar kapanır. Yeni anahtarı telefonda Freeband'de <strong>Ayarlar → Web erişimi → API anahtarını gir</strong> alanına yapıştırana kadar uygulama veri gönderemez.</p>
-        <div class="row"><button type="button" id="rot-go">Yeni anahtarı oluştur</button><button type="button" class="ghost" id="rot-cancel">Vazgeç</button></div>
+        ${lang === "en" ? html`<p>The old key stops working right away and sessions in other browsers end. The app can't send data until you paste the new key into <strong>Settings → Web access → Enter API key</strong> in Freeband on your phone.</p>` : html`<p>Eski anahtar hemen çalışmaz olur ve diğer tarayıcılardaki oturumlar kapanır. Yeni anahtarı telefonda Freeband'de <strong>Ayarlar → Web erişimi → API anahtarını gir</strong> alanına yapıştırana kadar uygulama veri gönderemez.</p>`}
+        <div class="row"><button type="button" id="rot-go">${T("Make the new key", "Yeni anahtarı oluştur")}</button><button type="button" class="ghost" id="rot-cancel">${T("Cancel", "Vazgeç")}</button></div>
         <p id="rot-out" class="small" role="status"></p>
       </div>
       <div id="rot-result" hidden>
-        <p>Yeni anahtarın bu. Şimdi kopyala; bir daha gösterilmeyecek. Telefonda Freeband'i aç ve <strong>Ayarlar → Web erişimi → API anahtarını gir</strong> alanına yapıştır (İngilizce arayüzde Settings → Web access → Enter API key).</p>
+        ${lang === "en" ? html`<p>This is your new key. Copy it now; it won't be shown again. Open Freeband on your phone and paste it into <strong>Settings → Web access → Enter API key</strong> (in Turkish: Ayarlar → Web erişimi → API anahtarını gir).</p>` : html`<p>Yeni anahtarın bu. Şimdi kopyala; bir daha gösterilmeyecek. Telefonda Freeband'i aç ve <strong>Ayarlar → Web erişimi → API anahtarını gir</strong> alanına yapıştır (İngilizce arayüzde Settings → Web access → Enter API key).</p>`}
         <code id="rot-token" class="secret"></code>
-        <button type="button" id="rot-copy">Kopyala</button>
+        <button type="button" id="rot-copy">${T("Copy", "Kopyala")}</button>
       </div>
     </div>
     <div>
-      <h3>Hesabı sil</h3>
-      <p class="muted">Hesabın ve bu sunucudaki tüm örneklerin, dakika, uyku ve skor kayıtların, bant kayıtların, webhook'ların ve oturumların kalıcı olarak silinir. Telefondaki veriye dokunulmaz.</p>
-      <button type="button" class="ghost danger" id="del-start">Hesabı sil</button>
+      <h3>${T("Delete account", "Hesabı sil")}</h3>
+      <p class="muted">${T("Your account and all your samples, minute, sleep and score records, band records, webhooks and sessions on this server are deleted for good. The data on your phone isn't touched.", "Hesabın ve bu sunucudaki tüm örneklerin, dakika, uyku ve skor kayıtların, bant kayıtların, webhook'ların ve oturumların kalıcı olarak silinir. Telefondaki veriye dokunulmaz.")}</p>
+      <button type="button" class="ghost danger" id="del-start">${T("Delete account", "Hesabı sil")}</button>
       <div id="del-confirm" class="confirm" hidden>
-        <label for="del-input">Onaylamak için <strong>sil</strong> yaz</label>
+        ${lang === "en" ? html`<label for="del-input">Type <strong>delete</strong> to confirm</label>` : html`<label for="del-input">Onaylamak için <strong>sil</strong> yaz</label>`}
         <input id="del-input" class="wide" type="text" autocomplete="off" spellcheck="false">
-        <div class="row"><button type="button" class="danger" id="del-go" disabled>Hesabı kalıcı olarak sil</button><button type="button" class="ghost" id="del-cancel">Vazgeç</button></div>
+        <div class="row"><button type="button" class="danger" id="del-go" disabled>${T("Delete the account for good", "Hesabı kalıcı olarak sil")}</button><button type="button" class="ghost" id="del-cancel">${T("Cancel", "Vazgeç")}</button></div>
         <p id="del-out" class="small" role="status"></p>
       </div>
     </div>
@@ -455,15 +486,20 @@ ${deviceSwitcher}
 `;
 
   return render(c, "Panel", body, {
+    lang,
+    alternates: alternates("/app"),
     script: APP_JS,
     signedIn: true,
-    actions: html`<a class="navlink" href="/docs">API belgesi</a><button type="button" class="ghost sm" id="signout">Çıkış yap</button>`,
+    actions: html`<a class="navlink" href="${localPath(lang, "/docs")}">${T("API docs", "API belgesi")}</a><button type="button" class="ghost sm" id="signout">${T("Sign out", "Çıkış yap")}</button>`,
   });
 });
+}
 
 // ---------------------------------------------------------------------------
 
-pages.get("/docs", async (c) => {
-  const signedIn = (await pageSession(c)) !== null;
-  return render(c, "API belgesi", docsBody(new URL(c.req.url).origin), { signedIn });
-});
+for (const lang of ["en", "tr"] as const) {
+  pages.get(localPath(lang, "/docs"), async (c) => {
+    const signedIn = (await pageSession(c)) !== null;
+    return render(c, DOCS_TITLE[lang], docsBody(new URL(c.req.url).origin, lang), { signedIn, lang, alternates: alternates("/docs") });
+  });
+}
