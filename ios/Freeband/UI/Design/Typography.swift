@@ -139,3 +139,10 @@ enum FBAppearance {
         bar.largeTitleTextAttributes = [.font: FBTextStyle.title.uiFont(), .foregroundColor: FBUIColor.textPrimary]
     }
 }
+
+extension Int {
+    /// A whole-number percentage in the locale's own form: "82%" in English, "%82" in Turkish.
+    func percentText(locale: Locale = .current) -> String {
+        (Double(self) / 100).formatted(.percent.precision(.fractionLength(0)).locale(locale))
+    }
+}

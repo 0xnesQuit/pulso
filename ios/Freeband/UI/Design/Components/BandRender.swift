@@ -104,7 +104,7 @@ struct BandRender: View {
                     Image(systemName: state.charging ? "bolt.fill" : batterySymbol(battery))
                         .font(.system(size: s * 0.11, weight: .medium))
                         .foregroundStyle(state.charging ? Color(hex: FBTokenTable.Colors.good.dark) : dim)
-                    Text("\(battery)%")
+                    Text(verbatim: battery.percentText(locale: locale))
                         .font(FBTextStyle.figureS.fixedFont(size: s * 0.13))
                         .foregroundStyle(dim)
                 }

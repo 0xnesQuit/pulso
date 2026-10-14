@@ -123,7 +123,7 @@ struct StatusLine: View {
 
     /// The words of the line, without the separators. Public so screens and tests can reuse it.
     static func parts(name: String, battery: Int?, state: State, lastSync: Date?, now: Date, locale: Locale = .current) -> Parts {
-        let percent = battery.map { "\($0)%" }
+        let percent = battery.map { $0.percentText(locale: locale) }
         switch state {
         case .bluetoothOff:
             return Parts(name: String(localized: "Bluetooth is off"), rest: [])

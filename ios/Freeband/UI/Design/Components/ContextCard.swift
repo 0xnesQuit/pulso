@@ -107,7 +107,7 @@ extension ContextCard {
     /// "64% · Charging · full in about 40 min".
     static func charging(battery: Int, minutesToFull: Int?) -> ContextCard {
         let status = minutesToFull.map { String(localized: "Charging · full in about \($0) min") } ?? String(localized: "Charging")
-        return ContextCard(kind: .charging, value: "\(battery)%", status: status)
+        return ContextCard(kind: .charging, value: battery.percentText(), status: status)
     }
 
     /// "Band is vibrating · Stop".
