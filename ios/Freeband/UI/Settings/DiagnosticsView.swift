@@ -151,7 +151,7 @@ struct AboutView: View {
                     }
                     .buttonStyle(.fbRow)
                 }
-                Footnote(String(localized: "Freeband is an independent project, not affiliated with Xiaomi. Xiaomi, Mi Band and Mi Fitness are trademarks of Xiaomi Inc."))
+                Footnote(String(localized: "Pulso is an independent project, not affiliated with Xiaomi. Xiaomi, Mi Band and Mi Fitness are trademarks of Xiaomi Inc."))
             }
             .padding(.horizontal, FBSpace.gutter)
             .padding(.bottom, FBSpace.xl)

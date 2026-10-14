@@ -21,7 +21,7 @@ struct FindBandIntent: AppIntent {
     @MainActor
     func perform() async throws -> some IntentResult & ProvidesDialog {
         guard let model = AppModel.shared, let band = model.selectedBand() else {
-            return .result(dialog: "There's no band in Freeband yet.")
+            return .result(dialog: "There's no band in Pulso yet.")
         }
         model.findBand(band, start: true)
         return .result(dialog: "\(band.shortName) is vibrating.")
@@ -30,7 +30,7 @@ struct FindBandIntent: AppIntent {
 
 struct SendToBandIntent: AppIntent {
     static var title: LocalizedStringResource = "Send a notification to the band"
-    static var description = IntentDescription("Shows a notification from Freeband on the band.")
+    static var description = IntentDescription("Shows a notification from Pulso on the band.")
     static var openAppWhenRun = true
 
     @Parameter(title: "Message")
@@ -39,9 +39,9 @@ struct SendToBandIntent: AppIntent {
     @MainActor
     func perform() async throws -> some IntentResult & ProvidesDialog {
         guard let model = AppModel.shared, let band = model.selectedBand() else {
-            return .result(dialog: "There's no band in Freeband yet.")
+            return .result(dialog: "There's no band in Pulso yet.")
         }
-        model.notify(band, title: "Freeband", body: message)
+        model.notify(band, title: "Pulso", body: message)
         return .result(dialog: "Sending the notification to your band.")
     }
 }
@@ -54,7 +54,7 @@ struct SyncBandIntent: AppIntent {
     @MainActor
     func perform() async throws -> some IntentResult & ProvidesDialog {
         guard let model = AppModel.shared, let band = model.selectedBand() else {
-            return .result(dialog: "There's no band in Freeband yet.")
+            return .result(dialog: "There's no band in Pulso yet.")
         }
         model.start(band, .sync)
         return .result(dialog: "Syncing.")

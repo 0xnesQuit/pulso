@@ -90,7 +90,7 @@ final class BandLink: NSObject, ObservableObject {
             case .timeout: return String(localized: "The band didn't answer. Close Mi Fitness and try again.")
             case .disconnected: return String(localized: "The connection dropped. Bring the band closer and try again.")
             case .connectFailed: return String(localized: "Couldn't connect to the band. Turn Bluetooth off and on, then try again.")
-            case .channelUnavailable: return String(localized: "This band doesn't offer the Bluetooth channel Freeband uses.")
+            case .channelUnavailable: return String(localized: "This band doesn't offer the Bluetooth channel Pulso uses.")
             case .channelRefused: return String(localized: "The band didn't open its data channel. Try again.")
             case .notRead: return String(localized: "Couldn't read the band.")
             }
@@ -393,7 +393,7 @@ final class BandLink: NSObject, ObservableObject {
             guard let target, keyIndex < target.keys.count else { return }
             guard let result = MiAuth.confirmCommand(authKey: target.keys[keyIndex], phoneNonce: phoneNonce,
                                                      watchNonce: watchNonce, watchHmac: watchHmac,
-                                                     deviceName: "Freeband") else {
+                                                     deviceName: "Pulso") else {
                 if keyIndex + 1 < target.keys.count {
                     retryWithNextKey()
                 } else {
@@ -708,7 +708,7 @@ final class BandLink: NSObject, ObservableObject {
     static func message(for state: CBManagerState) -> String {
         switch state {
         case .poweredOff: return String(localized: "Bluetooth is off. Turn it on in Control Centre.")
-        case .unauthorized: return String(localized: "Freeband can't use Bluetooth. Allow it in Settings › Freeband.")
+        case .unauthorized: return String(localized: "Pulso can't use Bluetooth. Allow it in Settings › Pulso.")
         case .unsupported: return String(localized: "This device doesn't support Bluetooth LE.")
         default: return String(localized: "Bluetooth isn't ready. Try again in a moment.")
         }

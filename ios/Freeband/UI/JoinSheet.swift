@@ -17,11 +17,11 @@ struct JoinSheet: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: FBSpace.m) {
                     if joined {
-                        paragraph(String(localized: "After every sync your data also goes to \(host). Open your panel in a browser; your API key is in Band › Freeband settings › Web access."))
+                        paragraph(String(localized: "After every sync your data also goes to \(host). Open your panel in a browser; your API key is in Band › Pulso settings › Web access."))
                     } else if model.hubEnabled {
-                        paragraph(String(localized: "Web access is already on (\(model.hubURL.host ?? "")). To switch servers, turn it off first in Band › Freeband settings › Web access."))
+                        paragraph(String(localized: "Web access is already on (\(model.hubURL.host ?? "")). To switch servers, turn it off first in Band › Pulso settings › Web access."))
                     } else {
-                        paragraph(String(localized: "When you join, Freeband also sends your data to this server. You can see your panel in a browser and reach your data through the API. Turn it off any time to delete your data there."))
+                        paragraph(String(localized: "When you join, Pulso also sends your data to this server. You can see your panel in a browser and reach your data through the API. Turn it off any time to delete your data there."))
                         Card {
                             VStack(alignment: .leading, spacing: FBSpace.xxs) {
                                 Text(verbatim: host)
@@ -33,7 +33,7 @@ struct JoinSheet: View {
                             }
                         }
                         if !invite.isDefaultHub {
-                            ContextCard.alert(String(localized: "This isn't Freeband's default server. Your health data will go there; join only if the invite came from someone you trust."))
+                            ContextCard.alert(String(localized: "This isn't Pulso's default server. Your health data will go there; join only if the invite came from someone you trust."))
                         }
                         if tried, let status = model.hubStatus {
                             ContextCard.alert(status)

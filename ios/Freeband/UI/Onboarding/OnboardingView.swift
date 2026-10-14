@@ -75,11 +75,11 @@ private struct WelcomeStep: View {
                     .padding(.vertical, FBSpace.m)
                     .accessibilityHidden(true)
                 StepTitle(text: String(localized: "Your band, only yours."))
-                Text("Freeband talks to your Xiaomi Smart Band 10 or 10 Pro directly. No account: your data stays on this phone and only leaves it if you turn that on.")
+                Text("Pulso talks to your Xiaomi Smart Band 10 or 10 Pro directly. No account: your data stays on this phone and only leaves it if you turn that on.")
                     .textStyle(.body)
                     .foregroundStyle(.textBody)
                     .fixedSize(horizontal: false, vertical: true)
-                Text("Keep Mi Fitness. Freeband reads the band's key from it, and the band still needs it for updates now and then.")
+                Text("Keep Mi Fitness. Pulso reads the band's key from it, and the band still needs it for updates now and then.")
                     .textStyle(.body)
                     .foregroundStyle(.textSecondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -88,7 +88,7 @@ private struct WelcomeStep: View {
                         Image(systemName: "exclamationmark.triangle.fill")
                             .foregroundStyle(.low)
                             .accessibilityHidden(true)
-                        Text("Don't reset the band or remove it from Mi Fitness. Its key would change and Freeband couldn't connect.")
+                        Text("Don't reset the band or remove it from Mi Fitness. Its key would change and Pulso couldn't connect.")
                             .textStyle(.body)
                             .foregroundStyle(.textPrimary)
                             .fixedSize(horizontal: false, vertical: true)
@@ -127,7 +127,7 @@ struct KeyImportStep: View {
             VStack(alignment: .leading, spacing: FBSpace.m) {
                 StepTitle(text: title)
                     .padding(.top, FBSpace.m)
-                Text("The band only talks to an app that knows its key. Mi Fitness keeps it in its folder on this phone; Freeband reads it from there and stores it only in this phone's keychain.")
+                Text("The band only talks to an app that knows its key. Mi Fitness keeps it in its folder on this phone; Pulso reads it from there and stores it only in this phone's keychain.")
                     .textStyle(.body)
                     .foregroundStyle(.textBody)
                     .fixedSize(horizontal: false, vertical: true)
@@ -211,7 +211,7 @@ struct KeyImportStep: View {
                     .accessibilityHidden(true)
                 ListRow(title: Band.displayName(name: BandKey.bestName(group), mac: lead.mac),
                         subtitle: group.count == 1 ? String(localized: "Key \(lead.masked)")
-                                                   : String(localized: "\(group.count) keys found; Freeband picks the one that works"),
+                                                   : String(localized: "\(group.count) keys found; Pulso picks the one that works"),
                         accessory: .none, showsDivider: false)
             }
             .padding(.leading, FBSpace.s)

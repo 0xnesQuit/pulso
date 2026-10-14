@@ -100,7 +100,7 @@ struct SettingsView: View {
                         }
                         .buttonStyle(.fbRow)
                     }
-                    Footnote(String(localized: "Freeband follows the language you choose for it in iOS Settings."))
+                    Footnote(String(localized: "Pulso follows the language you choose for it in iOS Settings."))
                 }
 
                 ListCard {
@@ -112,7 +112,7 @@ struct SettingsView: View {
             .padding(.bottom, FBSpace.xl)
         }
         .fbScreen()
-        .navigationTitle(String(localized: "Freeband settings"))
+        .navigationTitle(String(localized: "Pulso settings"))
         .navigationBarTitleDisplayMode(.inline)
         .sheet(item: $share) { ActivitySheet(items: $0.urls) }
     }

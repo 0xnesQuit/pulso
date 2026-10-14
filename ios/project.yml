@@ -1,12 +1,12 @@
 name: Freeband
 options:
-  bundleIdPrefix: dev.cobanov
+  bundleIdPrefix: app.pulsoband
   developmentLanguage: en
   deploymentTarget:
     iOS: "17.0"
 settings:
   base:
-    DEVELOPMENT_TEAM: 6U58AKY6F8
+    DEVELOPMENT_TEAM: 3LRW22P5ZL
     CODE_SIGN_STYLE: Automatic
     SWIFT_VERSION: "5.0"
     LOCALIZATION_PREFERS_STRING_CATALOGS: YES
@@ -24,13 +24,13 @@ targets:
     info:
       path: Freeband/Info.plist
       properties:
-        CFBundleDisplayName: Freeband
+        CFBundleDisplayName: Pulso
         UIAppFonts: [OpenSauceSans-Regular.otf, OpenSauceSans-Medium.otf, OpenSauceSans-SemiBold.otf]
         CFBundleDevelopmentRegion: en
         CFBundleLocalizations: [en, tr]
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
-        NSBluetoothAlwaysUsageDescription: Freeband uses Bluetooth to talk directly to the band on your wrist.
+        NSBluetoothAlwaysUsageDescription: Pulso uses Bluetooth to talk directly to the band on your wrist.
         ITSAppUsesNonExemptEncryption: false
         LSApplicationCategoryType: public.app-category.healthcare-fitness
         UILaunchScreen: {}
@@ -39,11 +39,11 @@ targets:
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
         UIRequiredDeviceCapabilities: [bluetooth-le]
         CFBundleURLTypes:
-          - CFBundleURLName: dev.cobanov.freeband
+          - CFBundleURLName: app.pulsoband.ios
             CFBundleURLSchemes: [freeband]
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: dev.cobanov.freeband
+        PRODUCT_BUNDLE_IDENTIFIER: app.pulsoband.ios
         PRODUCT_NAME: Freeband
         TARGETED_DEVICE_FAMILY: "1"
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon

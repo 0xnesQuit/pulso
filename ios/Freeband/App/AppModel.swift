@@ -109,7 +109,7 @@ final class AppModel: ObservableObject {
     /// Shows a notification on the band.
     func notify(_ band: Band, title: String, body: String) {
         notificationID &+= 1
-        start(band, .send([MiAuth.notificationCommand(id: notificationID, appName: "Freeband", title: title, body: body)]))
+        start(band, .send([MiAuth.notificationCommand(id: notificationID, appName: "Pulso", title: title, body: body)]))
     }
 
     /// Starts or stops the band vibrating so it can be found.
@@ -569,7 +569,7 @@ final class AppModel: ObservableObject {
     func ping(_ hook: Webhook) async {
         guard let url = URL(string: hook.url) else { return }
         let bands = (try? context.fetch(FetchDescriptor<Band>())) ?? []
-        let device = bands.first.map { Payload.Device($0) } ?? Payload.Device(id: UUID(), name: "Freeband", model: "band10")
+        let device = bands.first.map { Payload.Device($0) } ?? Payload.Device(id: UUID(), name: "Pulso", model: "band10")
         let body = Payload.body(event: "ping", device: device, samples: [])
         hook.lastStatus = await WebhookSender.deliver(body, event: "ping", to: url, secret: hook.secret)
         hook.lastAt = Date()
@@ -601,7 +601,7 @@ final class AppModel: ObservableObject {
         guard !isDemo else { hubStatus = String(localized: "Not available with demo data."); return }
         hubBusy = true
         defer { hubBusy = false }
-        let name = ((try? context.fetch(FetchDescriptor<Band>())) ?? []).first?.name ?? "Freeband"
+        let name = ((try? context.fetch(FetchDescriptor<Band>())) ?? []).first?.name ?? "Pulso"
         do {
             let account = try await HubClient(baseURL: hubURL).createAccount(deviceName: name, invite: invite)
             Vault.hubToken = account.token

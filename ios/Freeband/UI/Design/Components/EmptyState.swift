@@ -60,7 +60,7 @@ private struct FBEmptyStateButtonStyle: ButtonStyle {
         EmptyState(systemImage: "moon", title: "No sleep yet",
                    message: "Wear the band tonight. Your first night shows here after the morning sync.")
         EmptyState(systemImage: "applewatch.radiowaves.left.and.right", title: "Add your band",
-                   message: "Freeband reads the band directly. No account, nothing leaves this phone.",
+                   message: "Pulso reads the band directly. No account, nothing leaves this phone.",
                    actionTitle: "Add band") {}
     }
 }

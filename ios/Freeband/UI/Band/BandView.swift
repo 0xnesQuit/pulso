@@ -36,7 +36,7 @@ struct BandView: View {
     private var settingsCard: some View {
         ListCard {
             NavigationLink(value: Route.settings) {
-                ListRow(title: String(localized: "Freeband settings"), systemImage: "gearshape", showsDivider: false)
+                ListRow(title: String(localized: "Pulso settings"), systemImage: "gearshape", showsDivider: false)
             }
             .buttonStyle(.fbRow)
         }
@@ -115,7 +115,7 @@ private struct BandPage: View {
 
                 ListCard {
                     NavigationLink(value: Route.settings) {
-                        ListRow(title: String(localized: "Freeband settings"), systemImage: "gearshape", showsDivider: false)
+                        ListRow(title: String(localized: "Pulso settings"), systemImage: "gearshape", showsDivider: false)
                     }
                     .buttonStyle(.fbRow)
                 }
@@ -175,7 +175,7 @@ struct NotifySheet: View {
     @EnvironmentObject private var model: AppModel
     @EnvironmentObject private var link: BandLink
     @Environment(\.dismiss) private var dismiss
-    @State private var title = "Freeband"
+    @State private var title = "Pulso"
     @State private var message = String(localized: "Hello wrist, it's your phone.")
     @State private var sent = false
 
@@ -203,7 +203,7 @@ struct NotifySheet: View {
                             .textStyle(.subhead)
                             .foregroundStyle(isFailure ? Color.textPrimary : Color.textSecondary)
                     }
-                    Footnote(String(localized: "Close Mi Fitness first. Freeband connects to the band for a moment and then lets go."))
+                    Footnote(String(localized: "Close Mi Fitness first. Pulso connects to the band for a moment and then lets go."))
                 }
                 .padding(.horizontal, FBSpace.gutter)
                 .padding(.top, FBSpace.xs)
@@ -267,7 +267,7 @@ struct AboutBandView: View {
                             model.remove(band)
                             dismiss()
                         }
-                        Footnote(String(localized: "Removing only deletes the band from Freeband. Its pairing in Mi Fitness stays."))
+                        Footnote(String(localized: "Removing only deletes the band from Pulso. Its pairing in Mi Fitness stays."))
                     }
                 }
                 .padding(.horizontal, FBSpace.gutter)

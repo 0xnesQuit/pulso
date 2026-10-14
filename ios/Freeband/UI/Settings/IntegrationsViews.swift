@@ -16,7 +16,7 @@ struct WebAccessView: View {
     var body: some View {
         Form {
             Section {
-                Text("With web access on, Freeband also sends your data to the server below after every sync. You can open your panel in a browser, reach your data through the API and set up server-side webhooks. Turning it off deletes everything on the server.")
+                Text("With web access on, Pulso also sends your data to the server below after every sync. You can open your panel in a browser, reach your data through the API and set up server-side webhooks. Turning it off deletes everything on the server.")
                     .textStyle(.subhead)
                     .foregroundStyle(.textSecondary)
             }
@@ -109,7 +109,7 @@ struct WebhooksView: View {
     var body: some View {
         Form {
             Section {
-                Text("After every sync Freeband sends that sync's data to these addresses as JSON. Requests are signed; check them with the secret on the receiving side.")
+                Text("After every sync Pulso sends that sync's data to these addresses as JSON. Requests are signed; check them with the secret on the receiving side.")
                     .textStyle(.subhead)
                     .foregroundStyle(.textSecondary)
             }
@@ -171,14 +171,14 @@ struct ShortcutsView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: FBSpace.l) {
                 ListCard {
-                    ListRow(title: String(localized: "Find band"), subtitle: String(localized: "“Find my band with Freeband”"),
+                    ListRow(title: String(localized: "Find band"), subtitle: String(localized: "“Find my band with Pulso”"),
                             systemImage: "dot.radiowaves.left.and.right", accessory: .none)
-                    ListRow(title: String(localized: "Send to band"), subtitle: String(localized: "“Send a message to my band with Freeband”"),
+                    ListRow(title: String(localized: "Send to band"), subtitle: String(localized: "“Send a message to my band with Pulso”"),
                             systemImage: "text.bubble", accessory: .none)
-                    ListRow(title: String(localized: "Sync band"), subtitle: String(localized: "“Sync my band with Freeband”"),
+                    ListRow(title: String(localized: "Sync band"), subtitle: String(localized: "“Sync my band with Pulso”"),
                             systemImage: "arrow.triangle.2.circlepath", accessory: .none, showsDivider: false)
                 }
-                Footnote(String(localized: "Shortcuts open Freeband for a moment: the band only talks to the app while it runs."))
+                Footnote(String(localized: "Shortcuts open Pulso for a moment: the band only talks to the app while it runs."))
                 ShortcutsLink()
                     .shortcutsLinkStyle(.automaticOutline)
                     .frame(maxWidth: .infinity)

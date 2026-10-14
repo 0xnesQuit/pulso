@@ -120,7 +120,7 @@ private struct GalleryContent: View {
 
     private var header: some View {
         VStack(alignment: .leading, spacing: FBSpace.xs) {
-            Text("Freeband v3")
+            Text("Pulso v3")
                 .textStyle(.title)
                 .foregroundStyle(.textPrimary)
             Text("Tesla language: one focal object, two weights, blue only to commit.")
@@ -410,7 +410,7 @@ private struct GalleryContent: View {
     private var empty: some View {
         VStack(alignment: .leading, spacing: FBSpace.m) {
             EmptyState(systemImage: "antenna.radiowaves.left.and.right", title: "Add your band",
-                       message: "Freeband reads the band directly. No account, nothing leaves this phone.",
+                       message: "Pulso reads the band directly. No account, nothing leaves this phone.",
                        actionTitle: "Add band") {}
             EmptyState(systemImage: "moon", title: "No sleep yet",
                        message: "Wear the band tonight. Your first night shows here after the morning sync.")

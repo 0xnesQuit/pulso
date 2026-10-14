@@ -245,12 +245,12 @@
         }
       }
     },
-    "%lld keys found; Freeband picks the one that works": {
+    "%lld keys found; Pulso picks the one that works": {
       "localizations": {
         "tr": {
           "stringUnit": {
             "state": "translated",
-            "value": "%lld anahtar bulundu; çalışanı Freeband seçer"
+            "value": "%lld anahtar bulundu; çalışanı Pulso seçer"
           }
         }
       }
@@ -622,22 +622,22 @@
         }
       }
     },
-    "After every sync Freeband sends that sync's data to these addresses as JSON. Requests are signed; check them with the secret on the receiving side.": {
+    "After every sync Pulso sends that sync's data to these addresses as JSON. Requests are signed; check them with the secret on the receiving side.": {
       "localizations": {
         "tr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Freeband her senkrondan sonra o senkronda okunan veriyi bu adreslere JSON olarak gönderir. İstekler imzalıdır; alıcı tarafta gizli anahtarla doğrulayabilirsin."
+            "value": "Pulso her senkrondan sonra o senkronda okunan veriyi bu adreslere JSON olarak gönderir. İstekler imzalıdır; alıcı tarafta gizli anahtarla doğrulayabilirsin."
           }
         }
       }
     },
-    "After every sync your data also goes to %@. Open your panel in a browser; your API key is in Band › Freeband settings › Web access.": {
+    "After every sync your data also goes to %@. Open your panel in a browser; your API key is in Band › Pulso settings › Web access.": {
       "localizations": {
         "tr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Verilerin her senkrondan sonra %@ adresine de gider. Panelini tarayıcıda açabilirsin; API anahtarın Bant › Freeband ayarları › Web erişimi'nde."
+            "value": "Verilerin her senkrondan sonra %@ adresine de gider. Panelini tarayıcıda açabilirsin; API anahtarın Bant › Pulso ayarları › Web erişimi'nde."
           }
         }
       }
@@ -1074,12 +1074,12 @@
         }
       }
     },
-    "Close Mi Fitness first. Freeband connects to the band for a moment and then lets go.": {
+    "Close Mi Fitness first. Pulso connects to the band for a moment and then lets go.": {
       "localizations": {
         "tr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Önce Mi Fitness'ı kapat. Freeband banda kısa bir süre bağlanır, sonra bırakır."
+            "value": "Önce Mi Fitness'ı kapat. Pulso banda kısa bir süre bağlanır, sonra bırakır."
           }
         }
       }
@@ -1388,12 +1388,12 @@
         }
       }
     },
-    "Don't reset the band or remove it from Mi Fitness. Its key would change and Freeband couldn't connect.": {
+    "Don't reset the band or remove it from Mi Fitness. Its key would change and Pulso couldn't connect.": {
       "localizations": {
         "tr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Bandı sıfırlama ve Mi Fitness'tan kaldırma. Anahtarı değişir ve Freeband bağlanamaz."
+            "value": "Bandı sıfırlama ve Mi Fitness'tan kaldırma. Anahtarı değişir ve Pulso bağlanamaz."
           }
         }
       }
@@ -1609,62 +1609,62 @@
         }
       }
     },
-    "Freeband can't use Bluetooth. Allow it in Settings › Freeband.": {
+    "Pulso can't use Bluetooth. Allow it in Settings › Pulso.": {
       "localizations": {
         "tr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Freeband Bluetooth'u kullanamıyor. Ayarlar › Freeband'den izin ver."
+            "value": "Pulso Bluetooth'u kullanamıyor. Ayarlar › Pulso'dan izin ver."
           }
         }
       }
     },
-    "Freeband follows the language you choose for it in iOS Settings.": {
+    "Pulso follows the language you choose for it in iOS Settings.": {
       "localizations": {
         "tr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Freeband, iOS Ayarları'nda kendisi için seçtiğin dili kullanır."
+            "value": "Pulso, iOS Ayarları'nda kendisi için seçtiğin dili kullanır."
           }
         }
       }
     },
-    "Freeband is an independent project, not affiliated with Xiaomi. Xiaomi, Mi Band and Mi Fitness are trademarks of Xiaomi Inc.": {
+    "Pulso is an independent project, not affiliated with Xiaomi. Xiaomi, Mi Band and Mi Fitness are trademarks of Xiaomi Inc.": {
       "localizations": {
         "tr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Freeband bağımsız bir projedir ve Xiaomi ile bağlantılı değildir. Xiaomi, Mi Band ve Mi Fitness, Xiaomi Inc.'in markalarıdır."
+            "value": "Pulso bağımsız bir projedir ve Xiaomi ile bağlantılı değildir. Xiaomi, Mi Band ve Mi Fitness, Xiaomi Inc.'in markalarıdır."
           }
         }
       }
     },
-    "Freeband settings": {
+    "Pulso settings": {
       "localizations": {
         "tr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Freeband ayarları"
+            "value": "Pulso ayarları"
           }
         }
       }
     },
-    "Freeband talks to your Xiaomi Smart Band 10 or 10 Pro directly. No account: your data stays on this phone and only leaves it if you turn that on.": {
+    "Pulso talks to your Xiaomi Smart Band 10 or 10 Pro directly. No account: your data stays on this phone and only leaves it if you turn that on.": {
       "localizations": {
         "tr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Freeband, Xiaomi Smart Band 10 ya da 10 Pro ile doğrudan konuşur. Hesap gerekmez: verilerin bu telefonda kalır ve sen açmadıkça hiçbir yere gitmez."
+            "value": "Pulso, Xiaomi Smart Band 10 ya da 10 Pro ile doğrudan konuşur. Hesap gerekmez: verilerin bu telefonda kalır ve sen açmadıkça hiçbir yere gitmez."
           }
         }
       }
     },
-    "Freeband v3": {
+    "Pulso v3": {
       "localizations": {
         "tr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Freeband v3"
+            "value": "Pulso v3"
           }
         }
       }
@@ -2091,12 +2091,12 @@
         }
       }
     },
-    "Keep Mi Fitness. Freeband reads the band's key from it, and the band still needs it for updates now and then.": {
+    "Keep Mi Fitness. Pulso reads the band's key from it, and the band still needs it for updates now and then.": {
       "localizations": {
         "tr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Mi Fitness'ı silme. Freeband bandın anahtarını ondan okur; bant da güncellemeler için arada bir ona ihtiyaç duyar."
+            "value": "Mi Fitness'ı silme. Pulso bandın anahtarını ondan okur; bant da güncellemeler için arada bir ona ihtiyaç duyar."
           }
         }
       }
@@ -3169,12 +3169,12 @@
         }
       }
     },
-    "Removing only deletes the band from Freeband. Its pairing in Mi Fitness stays.": {
+    "Removing only deletes the band from Pulso. Its pairing in Mi Fitness stays.": {
       "localizations": {
         "tr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Kaldırmak bandı yalnızca Freeband'den siler. Mi Fitness'taki eşleşmesi kalır."
+            "value": "Kaldırmak bandı yalnızca Pulso'dan siler. Mi Fitness'taki eşleşmesi kalır."
           }
         }
       }
@@ -3500,12 +3500,12 @@
         }
       }
     },
-    "Shortcuts open Freeband for a moment: the band only talks to the app while it runs.": {
+    "Shortcuts open Pulso for a moment: the band only talks to the app while it runs.": {
       "localizations": {
         "tr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Kestirmeler Freeband'i kısa bir süre açar: bant yalnızca uygulama çalışırken onunla konuşur."
+            "value": "Kestirmeler Pulso'yu kısa bir süre açar: bant yalnızca uygulama çalışırken onunla konuşur."
           }
         }
       }
@@ -3530,12 +3530,12 @@
         }
       }
     },
-    "Shows a notification from Freeband on the band.": {
+    "Shows a notification from Pulso on the band.": {
       "localizations": {
         "tr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Bantta Freeband'den bir bildirim gösterir."
+            "value": "Bantta Pulso'dan bir bildirim gösterir."
           }
         }
       }
@@ -3968,12 +3968,12 @@
         }
       }
     },
-    "The band only talks to an app that knows its key. Mi Fitness keeps it in its folder on this phone; Freeband reads it from there and stores it only in this phone's keychain.": {
+    "The band only talks to an app that knows its key. Mi Fitness keeps it in its folder on this phone; Pulso reads it from there and stores it only in this phone's keychain.": {
       "localizations": {
         "tr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Bant yalnızca anahtarını bilen uygulamayla konuşur. Mi Fitness bu anahtarı telefondaki klasöründe tutar; Freeband onu oradan okur ve yalnızca bu telefonun anahtar zincirinde saklar."
+            "value": "Bant yalnızca anahtarını bilen uygulamayla konuşur. Mi Fitness bu anahtarı telefondaki klasöründe tutar; Pulso onu oradan okur ve yalnızca bu telefonun anahtar zincirinde saklar."
           }
         }
       }
@@ -4138,22 +4138,22 @@
         }
       }
     },
-    "There's no band in Freeband yet.": {
+    "There's no band in Pulso yet.": {
       "localizations": {
         "tr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Freeband'de henüz bant yok."
+            "value": "Pulso'da henüz bant yok."
           }
         }
       }
     },
-    "This band doesn't offer the Bluetooth channel Freeband uses.": {
+    "This band doesn't offer the Bluetooth channel Pulso uses.": {
       "localizations": {
         "tr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Bu bant, Freeband'in kullandığı Bluetooth kanalını sunmuyor."
+            "value": "Bu bant, Pulso'nun kullandığı Bluetooth kanalını sunmuyor."
           }
         }
       }
@@ -4188,12 +4188,12 @@
         }
       }
     },
-    "This isn't Freeband's default server. Your health data will go there; join only if the invite came from someone you trust.": {
+    "This isn't Pulso's default server. Your health data will go there; join only if the invite came from someone you trust.": {
       "localizations": {
         "tr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Bu, Freeband'in varsayılan sunucusu değil. Sağlık verin oraya gidecek; yalnızca davet güvendiğin birinden geldiyse katıl."
+            "value": "Bu, Pulso'nun varsayılan sunucusu değil. Sağlık verin oraya gidecek; yalnızca davet güvendiğin birinden geldiyse katıl."
           }
         }
       }
@@ -4409,12 +4409,12 @@
         }
       }
     },
-    "Web access is already on (%@). To switch servers, turn it off first in Band › Freeband settings › Web access.": {
+    "Web access is already on (%@). To switch servers, turn it off first in Band › Pulso settings › Web access.": {
       "localizations": {
         "tr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Web erişimin zaten açık (%@). Başka bir sunucuya geçmek için önce Bant › Freeband ayarları › Web erişimi'nden kapat."
+            "value": "Web erişimin zaten açık (%@). Başka bir sunucuya geçmek için önce Bant › Pulso ayarları › Web erişimi'nden kapat."
           }
         }
       }
@@ -4479,12 +4479,12 @@
         }
       }
     },
-    "When you join, Freeband also sends your data to this server. You can see your panel in a browser and reach your data through the API. Turn it off any time to delete your data there.": {
+    "When you join, Pulso also sends your data to this server. You can see your panel in a browser and reach your data through the API. Turn it off any time to delete your data there.": {
       "localizations": {
         "tr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Katılınca Freeband verilerini bu sunucuya da gönderir. Panelini tarayıcıdan görebilir, verine API ile ulaşabilirsin. İstediğin an kapatıp oradaki verini silebilirsin."
+            "value": "Katılınca Pulso verilerini bu sunucuya da gönderir. Panelini tarayıcıdan görebilir, verine API ile ulaşabilirsin. İstediğin an kapatıp oradaki verini silebilirsin."
           }
         }
       }
@@ -4509,12 +4509,12 @@
         }
       }
     },
-    "With web access on, Freeband also sends your data to the server below after every sync. You can open your panel in a browser, reach your data through the API and set up server-side webhooks. Turning it off deletes everything on the server.": {
+    "With web access on, Pulso also sends your data to the server below after every sync. You can open your panel in a browser, reach your data through the API and set up server-side webhooks. Turning it off deletes everything on the server.": {
       "localizations": {
         "tr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Web erişimi açıkken Freeband her senkrondan sonra verilerini aşağıdaki sunucuya da gönderir. Panelini tarayıcıdan açabilir, verine API ile ulaşabilir, sunucu tarafında webhook kurabilirsin. Kapatınca sunucudaki her şey silinir."
+            "value": "Web erişimi açıkken Pulso her senkrondan sonra verilerini aşağıdaki sunucuya da gönderir. Panelini tarayıcıdan açabilir, verine API ile ulaşabilir, sunucu tarafında webhook kurabilirsin. Kapatınca sunucudaki her şey silinir."
           }
         }
       }
@@ -5099,32 +5099,32 @@
         }
       }
     },
-    "“Find my band with Freeband”": {
+    "“Find my band with Pulso”": {
       "localizations": {
         "tr": {
           "stringUnit": {
             "state": "translated",
-            "value": "“Freeband ile bandımı bul”"
+            "value": "“Pulso ile bandımı bul”"
           }
         }
       }
     },
-    "“Send a message to my band with Freeband”": {
+    "“Send a message to my band with Pulso”": {
       "localizations": {
         "tr": {
           "stringUnit": {
             "state": "translated",
-            "value": "“Freeband ile bandıma mesaj gönder”"
+            "value": "“Pulso ile bandıma mesaj gönder”"
           }
         }
       }
     },
-    "“Sync my band with Freeband”": {
+    "“Sync my band with Pulso”": {
       "localizations": {
         "tr": {
           "stringUnit": {
             "state": "translated",
-            "value": "“Freeband ile bandımı senkronize et”"
+            "value": "“Pulso ile bandımı senkronize et”"
           }
         }
       }

@@ -8,13 +8,13 @@
         "en": {
           "stringUnit": {
             "state": "new",
-            "value": "Freeband"
+            "value": "Pulso"
           }
         },
         "tr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Freeband"
+            "value": "Pulso"
           }
         }
       }
@@ -26,13 +26,13 @@
         "en": {
           "stringUnit": {
             "state": "new",
-            "value": "Freeband"
+            "value": "Pulso"
           }
         },
         "tr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Freeband"
+            "value": "Pulso"
           }
         }
       }
@@ -44,13 +44,13 @@
         "en": {
           "stringUnit": {
             "state": "new",
-            "value": "Freeband uses Bluetooth to talk directly to the band on your wrist."
+            "value": "Pulso uses Bluetooth to talk directly to the band on your wrist."
           }
         },
         "tr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Freeband, bileğindeki bantla doğrudan konuşmak için Bluetooth kullanır."
+            "value": "Pulso, bileğindeki bantla doğrudan konuşmak için Bluetooth kullanır."
           }
         }
       }
