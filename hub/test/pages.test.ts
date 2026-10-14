@@ -87,6 +87,9 @@ describe("pages", () => {
     expect(home).toContain('<a class="navlink" href="/tr" hreflang="tr" lang="tr">Türkçe</a>');
     expect(home).toContain("is not affiliated with Xiaomi");
 
+    const slash = await call("/tr/", { redirect: "manual" });
+    expect(slash.status).toBe(301);
+    expect(slash.headers.get("location")).toBe("/tr");
     const tr = await (await call("/tr")).text();
     expect(tr).toContain('<html lang="tr">');
     for (const img of ["today", "score-recovery", "sleep", "band"]) expect(tr).toContain(`src="/img/${img}-tr.webp"`);

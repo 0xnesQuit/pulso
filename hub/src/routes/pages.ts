@@ -58,6 +58,7 @@ function og(c: Context<AppEnv>, path: string, image: string, imageAlt: string): 
 }
 
 // Public pages in English (root) and Turkish (/tr).
+pages.get("/tr/", (c) => c.redirect("/tr", 301));
 for (const lang of ["en", "tr"] as const) {
   const suffix = lang === "en" ? "" : `-${lang}`;
 
