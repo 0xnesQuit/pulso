@@ -37,8 +37,7 @@ final class BandLink: NSObject, ObservableObject {
         }
     }
 
-    /// Why a session failed. `message` keeps the existing user-facing sentences (localization
-    /// comes with the redesign).
+    /// Why a session failed. `message` is one localized sentence for the UI.
     enum LinkError: Error, Equatable {
         /// The band answered but refused the session: Mi Fitness holds the channel.
         case bandHeldByMiFitness
@@ -81,19 +80,19 @@ final class BandLink: NSObject, ObservableObject {
 
         var message: String {
             switch self {
-            case .bandHeldByMiFitness: return "Bant kimlik doğrulamayı reddetti. Mi Fitness'ı kapatıp tekrar dene."
+            case .bandHeldByMiFitness: return String(localized: "The band refused the connection. Close Mi Fitness and try again.")
             case .bluetoothOff: return BandLink.message(for: .poweredOff)
             case .unauthorized: return BandLink.message(for: .unauthorized)
             case .bluetoothUnsupported: return BandLink.message(for: .unsupported)
             case .bluetoothNotReady: return BandLink.message(for: .unknown)
-            case .wrongKey: return "Anahtar bu bantla eşleşmiyor. Bandı Mi Fitness'ta senkronize edip anahtarı yeniden oku."
-            case .notFound: return "Bant bulunamadı. Bileğinde, yakında ve şarjlı olduğundan emin ol."
-            case .timeout: return "Bant cevap vermedi. Mi Fitness'ı kapatıp tekrar dene."
-            case .disconnected: return "Bağlantı koptu. Bandı yakına getirip tekrar dene."
-            case .connectFailed: return "Banda bağlanılamadı. Bluetooth'u kapatıp açıp tekrar dene."
-            case .channelUnavailable: return "Bu bant Freeband'in kullandığı BLE kanalını açmıyor."
-            case .channelRefused: return "Bant veri kanalını açmadı. Tekrar dene."
-            case .notRead: return "Bant okunamadı."
+            case .wrongKey: return String(localized: "The key doesn't match this band. Sync the band in Mi Fitness, then read the key again.")
+            case .notFound: return String(localized: "Band not found. Make sure it's on your wrist, nearby and charged.")
+            case .timeout: return String(localized: "The band didn't answer. Close Mi Fitness and try again.")
+            case .disconnected: return String(localized: "The connection dropped. Bring the band closer and try again.")
+            case .connectFailed: return String(localized: "Couldn't connect to the band. Turn Bluetooth off and on, then try again.")
+            case .channelUnavailable: return String(localized: "This band doesn't offer the Bluetooth channel Freeband uses.")
+            case .channelRefused: return String(localized: "The band didn't open its data channel. Try again.")
+            case .notRead: return String(localized: "Couldn't read the band.")
             }
         }
 
@@ -123,12 +122,12 @@ final class BandLink: NSObject, ObservableObject {
         var label: String {
             switch self {
             case .idle: return ""
-            case .searching: return "Bant aranıyor…"
-            case .connecting: return "Bağlanılıyor…"
-            case .authenticating: return "Kimlik doğrulanıyor…"
-            case .reading: return "Veri okunuyor…"
-            case .live: return "Canlı"
-            case .done: return "Senkronize edildi"
+            case .searching: return String(localized: "Searching…")
+            case .connecting: return String(localized: "Connecting…")
+            case .authenticating: return String(localized: "Verifying…")
+            case .reading: return String(localized: "Reading…")
+            case .live: return String(localized: "Live")
+            case .done: return String(localized: "Synced")
             case .partial(let reason): return reason
             case .failed(let message): return message
             }
@@ -244,7 +243,7 @@ final class BandLink: NSObject, ObservableObject {
         filesReceived = 0
         fileListMissing = false
         active = true
-        note("başlat: \(target.name), \(target.keys.count) anahtar")
+        note("start: \(target.name), \(target.keys.count) key(s)")
 
         after(25, thisRun) { [weak self] in
             guard let self, self.active, !self.authed else { return }
@@ -265,7 +264,7 @@ final class BandLink: NSObject, ObservableObject {
     /// Ends live or sync early; what was read so far is kept.
     func stop() {
         guard active else { return }
-        note("kullanıcı durdurdu")
+        note("stopped by user")
         finish()
     }
 
@@ -289,11 +288,11 @@ final class BandLink: NSObject, ObservableObject {
         phase = .searching
         let connected = central.retrieveConnectedPeripherals(withServices: [Self.fe95])
         if let match = connected.first(where: { nameMatches($0.name) }) {
-            note("iOS'ta bağlı: \(match.name ?? "?")")
+            note("connected in iOS: \(match.name ?? "?")")
             connect(match)
             return
         }
-        note("iOS'ta bağlı değil, yayın aranıyor")
+        note("not connected in iOS, scanning for adverts")
         central.scanForPeripherals(withServices: nil, options: nil)
         after(12, thisRun) { [weak self] in
             guard let self, self.phase == .searching else { return }
@@ -348,25 +347,25 @@ final class BandLink: NSObject, ObservableObject {
         sendCommand(MiAuth.systemGet(78), encrypted: true)
         if case .send(let commands) = purpose {
             phase = .reading
-            note("auth tamam → \(commands.count) komut gönderiliyor")
+            note("auth ok → sending \(commands.count) command(s)")
             for command in commands { sendCommand(command, encrypted: true) }
             let thisRun = run
             after(2.0, thisRun) { [weak self] in self?.finish() }
             return
         }
         phase = purpose == .live ? .live : .reading
-        note("auth tamam → pil + canlı istatistik")
+        note("auth ok → battery + live stats")
         sendCommand(MiAuth.batteryCommand(), encrypted: true)
         sendCommand(MiAuth.realtimeCommand(start: true), encrypted: true)
         realtimeOn = true
         if purpose == .sync {
             fileStage = .listingToday
-            note("→ bugünün dosya listesi")
+            note("→ today's file list")
             sendCommand(MiAuth.activityListCommand(today: true), encrypted: true)
             let listRun = run
             after(10, listRun) { [weak self] in
                 guard let self, self.fileStage == .listingToday || self.fileStage == .listingPast else { return }
-                self.note("dosya listesi gelmedi, dosyasız devam")
+                self.note("no file list, continuing without files")
                 self.fileListMissing = true
                 self.fileStage = .done
                 self.finishSyncIfDone()
@@ -376,7 +375,7 @@ final class BandLink: NSObject, ObservableObject {
         let window = purpose == .live ? Self.liveLimit : (purpose == .sync ? Self.fileSyncLimit : Self.syncWindow)
         after(window, thisRun) { [weak self] in
             guard let self, self.active else { return }
-            self.note("süre doldu (\(Int(window)) sn)")
+            self.note("time limit reached (\(Int(window)) s)")
             self.finish()
         }
     }
@@ -427,7 +426,7 @@ final class BandLink: NSObject, ObservableObject {
 
         case (8, 1) where fileStage == .listingToday:
             todayIDs = ActivityFileID.list(MiAuth.activityFileIDBytes(command))
-            note("← bugün \(todayIDs.count) dosya; → geçmiş listesi")
+            note("← today \(todayIDs.count) file(s); → past list")
             fileStage = .listingPast
             sendCommand(MiAuth.activityListCommand(today: false), encrypted: true)
 
@@ -439,7 +438,7 @@ final class BandLink: NSObject, ObservableObject {
                 return !has(id, file.hex)
             }
             fileQueue = Array(Set(todayIDs + wanted)).sorted()
-            note("← geçmiş \(past.count) dosya, \(wanted.count) yeni; toplam \(fileQueue.count) istenecek")
+            note("← past \(past.count) file(s), \(wanted.count) new; \(fileQueue.count) to request")
             fileProgress = (0, fileQueue.count)
             fileStage = .fetching
             fetchNextFile()
@@ -449,7 +448,7 @@ final class BandLink: NSObject, ObservableObject {
 
         case (2, 2):
             if let info = MiAuth.deviceInfo(command), let id = target?.id {
-                note("← cihaz: \(info.model), firmware \(info.firmware)")
+                note("← device: \(info.model), firmware \(info.firmware)")
                 onDeviceInfo?(id, info)
             }
 
@@ -457,10 +456,10 @@ final class BandLink: NSObject, ObservableObject {
             if let state = MiAuth.deviceState(command) { deviceState = state }
 
         case (2, 3):
-            note("← saat ayarlandı (durum \(command.varints[100] ?? 0))")
+            note("← clock set (status \(command.varints[100] ?? 0))")
 
         default:
-            note("← \(type)/\(subtype) işlenmedi")
+            note("← \(type)/\(subtype) not handled")
         }
     }
 
@@ -471,7 +470,7 @@ final class BandLink: NSObject, ObservableObject {
         guard !fileQueue.isEmpty else {
             fileStage = .done
             currentFile = nil
-            note("dosyalar tamam")
+            note("files done")
             finishSyncIfDone()
             return
         }
@@ -496,10 +495,10 @@ final class BandLink: NSObject, ObservableObject {
             guard let self, self.fileToken == token, self.fileStage == .fetching, let file = self.currentFile else { return }
             if !self.currentRetried {
                 self.currentRetried = true
-                self.note("dosya \(file.hex) cevap vermedi, tekrar")
+                self.note("file \(file.hex) did not answer, retrying")
                 self.requestCurrentFile()
             } else {
-                self.note("dosya \(file.hex) atlandı")
+                self.note("file \(file.hex) skipped")
                 self.advanceFileProgress()
                 self.fetchNextFile()
             }
@@ -519,7 +518,7 @@ final class BandLink: NSObject, ObservableObject {
             fetchNextFile()
         case .failed(let reason):
             fileToken += 1
-            note("dosya \(file.hex) bozuk: \(reason)")
+            note("file \(file.hex) corrupt: \(reason)")
             advanceFileProgress()
             fetchNextFile()
         }
@@ -552,7 +551,7 @@ final class BandLink: NSObject, ObservableObject {
     /// The band rejected this key: drop the session and start again with the next candidate.
     private func retryWithNextKey() {
         keyIndex += 1
-        note("anahtar tutmadı, \(keyIndex + 1). anahtar deneniyor")
+        note("key did not match, trying key \(keyIndex + 1)")
         if let p = peripheral {
             if let rx, rx.isNotifying { p.setNotifyValue(false, for: rx) }
             central.cancelPeripheralConnection(p)
@@ -584,7 +583,7 @@ final class BandLink: NSObject, ObservableObject {
             case .partial(let reason): self.phase = .partial(reason)
             case .failed(let error): self.phase = .failed(error.message)
             }
-            self.note("sonuç: \(outcome.label)")
+            self.note("result: \(outcome.label)")
             self.lastOutcome = outcome
             if let id = self.target?.id { self.onFinish?(id, outcome) }
         }
@@ -595,18 +594,18 @@ final class BandLink: NSObject, ObservableObject {
     private func completion() -> Outcome {
         guard purpose == .sync else { return .complete }
         if fileListMissing || fileStage == .idle || fileStage == .listingToday || fileStage == .listingPast {
-            return .partial("Dosya listesi alınamadı; kayıtlar sonraki senkronda.")
+            return .partial(String(localized: "Couldn't get the file list. Records come with the next sync.", comment: "Partial sync"))
         }
         let total = fileProgress?.total ?? 0
         if filesReceived < total {
-            return .partial("\(total) dosyadan \(filesReceived) tanesi alındı; kalanı sonraki senkronda.")
+            return .partial(String(localized: "\(filesReceived) of \(total) files received. The rest come with the next sync.", comment: "Partial sync"))
         }
         return .complete
     }
 
     private func fail(_ error: LinkError) {
         guard active else { return }
-        note("hata: \(error.code): \(error.message)")
+        note("error: \(error.code)")
         release()
         phase = .failed(error.message)
         lastOutcome = .failed(error)
@@ -623,7 +622,7 @@ final class BandLink: NSObject, ObservableObject {
             if let rx, rx.isNotifying { p.setNotifyValue(false, for: rx) }
             central.cancelPeripheralConnection(p)
         }
-        note("kanal bırakıldı")
+        note("channel released")
     }
 
     // MARK: frames
@@ -688,7 +687,7 @@ final class BandLink: NSObject, ObservableObject {
         guard channel == 1, let command = PBMessage(body) else { return }
         if command.varints[1] == 2, command.varints[2] == 110 {
             // Unknown everywhere (docs/CAPABILITIES.md §16); keep the bytes for decoding later.
-            note("← 2/110 \(body.count) bayt: \(body.map { String(format: "%02x", $0) }.joined())")
+            note("← 2/110 \(body.count) bytes: \(body.map { String(format: "%02x", $0) }.joined())")
         }
         handle(command)
     }
@@ -708,10 +707,10 @@ final class BandLink: NSObject, ObservableObject {
 
     static func message(for state: CBManagerState) -> String {
         switch state {
-        case .poweredOff: return "Bluetooth kapalı. Denetim Merkezi'nden aç."
-        case .unauthorized: return "Freeband'in Bluetooth izni yok. Ayarlar > Freeband'den izin ver."
-        case .unsupported: return "Bu cihaz Bluetooth LE desteklemiyor."
-        default: return "Bluetooth hazır değil. Biraz sonra tekrar dene."
+        case .poweredOff: return String(localized: "Bluetooth is off. Turn it on in Control Centre.")
+        case .unauthorized: return String(localized: "Freeband can't use Bluetooth. Allow it in Settings › Freeband.")
+        case .unsupported: return String(localized: "This device doesn't support Bluetooth LE.")
+        default: return String(localized: "Bluetooth isn't ready. Try again in a moment.")
         }
     }
 }
@@ -738,13 +737,13 @@ extension BandLink: CBCentralManagerDelegate {
             match = mac == wanted
         }
         guard match else { return }
-        note("yayında bulundu (\(RSSI) dBm)")
+        note("found advertising (\(RSSI) dBm)")
         connect(peripheral)
     }
 
     func centralManager(_ central: CBCentralManager, didConnect peripheral: CBPeripheral) {
         guard active, peripheral == self.peripheral else { return }
-        note("bağlandı")
+        note("connected")
         peripheral.discoverServices([Self.fe95])
     }
 

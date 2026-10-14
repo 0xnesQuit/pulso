@@ -112,6 +112,16 @@ final class AppModel: ObservableObject {
         start(band, .send([MiAuth.findBandCommand(start: vibrating)]))
     }
 
+    /// Plan section 4 ("daily open"): when the app comes to the front, sync if the last sync is
+    /// more than 15 minutes old, Bluetooth is on, no session is running and onboarding is done.
+    func autoSyncIfNeeded(_ band: Band?, onboarded: Bool, now: Date = Date()) {
+        guard onboarded, let band, link.bluetooth == .poweredOn, !link.phase.isBusy else { return }
+        if let last = band.lastSyncAt, now.timeIntervalSince(last) < Self.autoSyncAfter { return }
+        start(band, .sync)
+    }
+
+    static let autoSyncAfter: TimeInterval = 15 * 60
+
     /// For pull to refresh: starts a sync and returns when the session has ended.
     func syncAndWait(_ band: Band) async {
         guard !link.phase.isBusy else { return }
@@ -588,7 +598,7 @@ final class AppModel: ObservableObject {
             let account = try await HubClient(baseURL: hubURL).createAccount(deviceName: name, invite: invite)
             Vault.hubToken = account.token
             hubEnabled = true
-            hubStatus = "Web erişimi açık."
+            hubStatus = String(localized: "Web access is on.")
             await pushToHub()
         } catch {
             hubStatus = error.localizedDescription
@@ -611,7 +621,7 @@ final class AppModel: ObservableObject {
         let all = (try? context.fetch(FetchDescriptor<Sample>())) ?? []
         all.forEach { $0.pushedToHub = false }
         try? context.save()
-        hubStatus = "Web erişimi kapatıldı, sunucudaki verin silindi."
+        hubStatus = String(localized: "Web access is off and your data on the server is deleted.")
     }
 
     /// Uses a key the user already has (rotated on the web panel, or from another phone): the
@@ -625,10 +635,10 @@ final class AppModel: ObservableObject {
             try await HubClient(baseURL: hubURL, token: key).verify()
             Vault.hubToken = key
             hubEnabled = true
-            hubStatus = "API anahtarı kaydedildi."
+            hubStatus = String(localized: "API key saved.")
             await pushToHub()
         } catch HubClient.Failure.status(401, _) {
-            hubStatus = "Sunucu bu anahtarı tanımadı. Paneldeki en son anahtarı kopyaladığından emin ol."
+            hubStatus = String(localized: "The server didn't recognise this key. Make sure you copied the latest key from the web panel.")
         } catch {
             hubStatus = error.localizedDescription
         }
@@ -639,7 +649,7 @@ final class AppModel: ObservableObject {
         defer { hubBusy = false }
         do {
             Vault.hubToken = try await hub.rotate()
-            hubStatus = "Yeni API anahtarı oluşturuldu; eskisi artık çalışmıyor."
+            hubStatus = String(localized: "New API key created. The old one no longer works.")
         } catch {
             hubStatus = error.localizedDescription
         }
@@ -682,6 +692,6 @@ final class AppModel: ObservableObject {
             }
         }
         try? context.save()
-        if sent > 0 { hubStatus = "\(sent) kayıt sunucuya gönderildi." }
+        if sent > 0 { hubStatus = String(localized: "Sent \(sent) records to the server.") }
     }
 }

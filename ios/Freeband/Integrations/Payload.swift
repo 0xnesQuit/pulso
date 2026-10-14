@@ -266,11 +266,11 @@ struct HubClient {
 
         var errorDescription: String? {
             switch self {
-            case .status(401, _): return "Sunucu API anahtarını tanımadı. Panelde anahtarı yenilediysen Web erişimi > API anahtarını gir'e yeni anahtarı yapıştır."
-            case .status(403, _): return "Davet kodu geçersiz. Kodu sunucu yöneticisinden iste."
-            case .status(429, _): return "Sunucu çok fazla istek aldı. Biraz sonra tekrar dene."
-            case .status(let code, let text): return "Sunucu \(code) döndü: \(text.prefix(120))"
-            case .malformed: return "Sunucunun cevabı anlaşılamadı."
+            case .status(401, _): return String(localized: "The server didn't recognise the API key. If you renewed it on the web panel, paste the new key in Web access › Enter API key.")
+            case .status(403, _): return String(localized: "The invite code isn't valid. Ask the server's owner for a code.")
+            case .status(429, _): return String(localized: "The server is busy. Try again in a moment.")
+            case .status(let code, let text): return String(localized: "The server answered \(code): \(String(text.prefix(120)))")
+            case .malformed: return String(localized: "Couldn't understand the server's answer.")
             }
         }
     }

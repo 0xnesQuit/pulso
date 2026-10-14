@@ -29,9 +29,9 @@ enum KeyLoader {
 
         var errorDescription: String? {
             switch self {
-            case .noManifest: return "Seçilen yerde VirtualDevice_registerList/manifest.sqlite bulunamadı."
-            case .unreadable(let why): return "manifest.sqlite okunamadı: \(why)"
-            case .noKeys(let diagnostics): return "encryptKey bulunamadı. Teşhis: \(diagnostics)"
+            case .noManifest: return String(localized: "No VirtualDevice_registerList/manifest.sqlite in the chosen folder.")
+            case .unreadable(let why): return String(localized: "Couldn't read manifest.sqlite: \(why)")
+            case .noKeys(let diagnostics): return String(localized: "No encryptKey found. Details: \(diagnostics)")
             }
         }
     }
@@ -120,7 +120,7 @@ enum KeyLoader {
         let entries = try rows("select key, inline_data, filename from manifest where key like 'registerList%'")
         guard !entries.isEmpty else {
             let names = try rows("select key from manifest limit 15").compactMap { $0[0] as? String }
-            return ([], "registerList kaydı yok; kayıtlar: \(names)")
+            return ([], "no registerList entry; entries: \(names)")
         }
 
         var keys: [BandKey] = []
@@ -132,7 +132,7 @@ enum KeyLoader {
             if blob.isEmpty, let file = entry[2] as? String, !file.isEmpty {
                 let path = manifest.deletingLastPathComponent().appendingPathComponent("data").appendingPathComponent(file)
                 blob = (try? Data(contentsOf: path)) ?? Data()
-                source = "data/ dosyası \(blob.count)B"
+                source = "data/ file \(blob.count)B"
             }
             let found = parseRegisterList(blob)
             keys += found

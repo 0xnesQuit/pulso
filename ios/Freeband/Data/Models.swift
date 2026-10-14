@@ -113,19 +113,19 @@ final class ActivityBlob {
         fetchedFromToday = false
     }
 
-    /// "günlük detay v4" style label for diagnostics.
+    /// "Daily details v4" style label for diagnostics.
     var kindLabel: String {
         let kind: String
         switch (type, subtype, detailType) {
-        case (0, 0, 0): kind = "günlük detay"
-        case (0, 0, 1): kind = "günlük özet"
-        case (0, 3, _): kind = "uyku evreleri"
-        case (0, 6, _): kind = "elle ölçüm"
-        case (0, 8, _): kind = "uyku"
-        case (1, _, 1): kind = "antrenman özeti"
-        case (1, _, 2): kind = "antrenman GPS"
-        case (1, _, _): kind = "antrenman"
-        default: kind = "bilinmeyen \(type)/\(subtype)/\(detailType)"
+        case (0, 0, 0): kind = String(localized: "Daily details", comment: "Activity file kind")
+        case (0, 0, 1): kind = String(localized: "Daily summary", comment: "Activity file kind")
+        case (0, 3, _): kind = String(localized: "Sleep stages", comment: "Activity file kind")
+        case (0, 6, _): kind = String(localized: "Manual reading", comment: "Activity file kind")
+        case (0, 8, _): kind = String(localized: "Sleep", comment: "Activity file kind")
+        case (1, _, 1): kind = String(localized: "Workout summary", comment: "Activity file kind")
+        case (1, _, 2): kind = String(localized: "Workout GPS", comment: "Activity file kind")
+        case (1, _, _): kind = String(localized: "Workout", comment: "Activity file kind")
+        default: kind = String(localized: "Unknown \(type)/\(subtype)/\(detailType)", comment: "Activity file kind")
         }
         return "\(kind) v\(version)"
     }
