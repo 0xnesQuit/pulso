@@ -14,10 +14,8 @@ enum BandPresentation {
     }
 
     static func statusState(_ link: BandLink, _ band: Band) -> StatusLine.State {
-        #if DEBUG
-        // Demo data on the simulator (no Bluetooth LE): show the band as it looks on a phone.
-        if DemoData.isActive, link.bluetooth == .unsupported { return .nearby }
-        #endif
+        // Demo data: show the band as it looks on a phone, whatever Bluetooth is doing.
+        if DemoData.isActive, link.bluetooth != .poweredOn { return .nearby }
         switch link.bluetooth {
         case .poweredOff: return .bluetoothOff
         case .unauthorized: return .bluetoothUnauthorized
@@ -99,7 +97,7 @@ struct BandContextCard: View {
                 ContextCard.finding { router.stopFinding(band, model: model) }
             } else if BandPresentation.isCharging(link, band), let battery = BandPresentation.battery(link, band) {
                 ContextCard.charging(battery: battery, minutesToFull: nil)
-            } else if link.bluetooth == .poweredOff || link.bluetooth == .unauthorized {
+            } else if !DemoData.isActive, link.bluetooth == .poweredOff || link.bluetooth == .unauthorized {
                 ContextCard.alert(BandLink.message(for: link.bluetooth),
                                   actionTitle: BandPresentation.Fix.openSettings.title) {
                     BandPresentation.openSystemSettings()

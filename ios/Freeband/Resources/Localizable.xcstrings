@@ -5128,6 +5128,56 @@
           }
         }
       }
+    },
+    "Try with demo data": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Demo veriyle dene"
+          }
+        }
+      }
+    },
+    "No band at hand? See every screen with 30 days of made-up data. Your real data isn't touched.": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bant yanında değil mi? Uydurma 30 günlük veriyle bütün ekranları gör. Gerçek verine dokunulmaz."
+          }
+        }
+      }
+    },
+    "Demo data. Nothing here comes from a band.": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Demo veri. Buradakilerin hiçbiri banttan gelmiyor."
+          }
+        }
+      }
+    },
+    "Exit demo": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Demodan çık"
+          }
+        }
+      }
+    },
+    "Not available with demo data.": {
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Demo veriyle kullanılamaz."
+          }
+        }
+      }
     }
   },
   "version": "1.0"

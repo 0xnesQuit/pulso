@@ -1,4 +1,3 @@
-#if DEBUG
 import Foundation
 import SwiftData
 
@@ -19,7 +18,8 @@ enum DemoData {
         case full, empty, calibrating
     }
 
-    static var isActive: Bool { variant(ProcessInfo.processInfo.arguments) != nil }
+    /// Demo data is showing: demo mode (DemoMode.swift) or the DEBUG launch argument.
+    static var isActive: Bool { DemoMode.isOn || variant(ProcessInfo.processInfo.arguments) != nil }
 
     static func variant(_ arguments: [String]) -> Variant? {
         guard let i = arguments.firstIndex(of: "-freeband-demo") else { return nil }
@@ -34,7 +34,7 @@ enum DemoData {
         ActivityIngest.deleteDerived(context: context, bandID: nil, includingScores: true)
         try? context.delete(model: Band.self)
 
-        let band = Band(name: "Xiaomi Smart Band 10 Pro", mac: "20:25:CC:78:D9:B9")
+        let band = Band(name: "Xiaomi Smart Band 10 Pro", mac: "AA:BB:CC:DD:0D:E0")
         band.firmware = "3.1.42"
         band.hardwareModel = "Xiaomi Smart Band 10 Pro"
         context.insert(band)
@@ -340,4 +340,15 @@ enum DemoData {
 private extension Int {
     func clamped(_ lo: Int, _ hi: Int) -> Int { Swift.min(Swift.max(self, lo), hi) }
 }
-#endif
+
+/// "Try with demo data": a separate, in-memory store seeded with 30 days of demo data, so people
+/// without a band (and App Review) can see every screen. The real store, the band keys and the
+/// hub account are never touched while it is on.
+enum DemoMode {
+    static let storageKey = "demoMode"
+
+    static var isOn: Bool {
+        get { UserDefaults.standard.bool(forKey: storageKey) }
+        set { UserDefaults.standard.set(newValue, forKey: storageKey) }
+    }
+}

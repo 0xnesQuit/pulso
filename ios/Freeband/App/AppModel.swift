@@ -60,8 +60,13 @@ final class AppModel: ObservableObject {
     /// The one model, for App Intents (Siri, Shortcuts).
     static weak var shared: AppModel?
 
-    init(context: ModelContext) {
+    /// Demo mode (DemoMode.swift): an in-memory store with demo data. Band sessions can't start
+    /// (the demo band has no key) and nothing reaches the hub or webhooks.
+    let isDemo: Bool
+
+    init(context: ModelContext, isDemo: Bool = false) {
         self.context = context
+        self.isDemo = isDemo
         ingest = ActivityIngest(context: context)
         link.onSample = { [weak self] id, draft in self?.record(id, draft) }
         link.onFinish = { [weak self] id, outcome in self?.sessionEnded(id, outcome) }
@@ -78,7 +83,7 @@ final class AppModel: ObservableObject {
         mergeDuplicateBands()
         observeDayChanges()
         AppModel.shared = self
-        Task { await self.launchMaintenance() }
+        if !isDemo { Task { await self.launchMaintenance() } }
     }
 
     // MARK: band sessions
@@ -422,6 +427,7 @@ final class AppModel: ObservableObject {
     /// Keys that worked before stay first; new ones are tried after them.
     @discardableResult
     func add(keys: [BandKey]) -> [Band] {
+        guard !isDemo else { return [] }
         var bands = (try? context.fetch(FetchDescriptor<Band>())) ?? []
         var result: [Band] = []
         for group in BandKey.groupedByBand(keys) {
@@ -546,6 +552,7 @@ final class AppModel: ObservableObject {
     }
 
     private func deliverWebhooks(event: String, device: Payload.Device, drafts: [SampleDraft], records: [[String: Any]]) async {
+        guard !isDemo else { return }
         let hooks = ((try? context.fetch(FetchDescriptor<Webhook>())) ?? []).filter(\.enabled)
         guard !hooks.isEmpty else { return }
         let bodies = Payload.bodies(event: event, device: device, samples: drafts, records: records)
@@ -591,6 +598,7 @@ final class AppModel: ObservableObject {
     // MARK: hub (web access)
 
     func enableWebAccess(invite: String) async {
+        guard !isDemo else { hubStatus = String(localized: "Not available with demo data."); return }
         hubBusy = true
         defer { hubBusy = false }
         let name = ((try? context.fetch(FetchDescriptor<Band>())) ?? []).first?.name ?? "Freeband"
@@ -606,6 +614,7 @@ final class AppModel: ObservableObject {
     }
 
     func disableWebAccess() async {
+        guard !isDemo else { hubStatus = String(localized: "Not available with demo data."); return }
         hubBusy = true
         defer { hubBusy = false }
         do {
@@ -627,6 +636,7 @@ final class AppModel: ObservableObject {
     /// Uses a key the user already has (rotated on the web panel, or from another phone): the
     /// key is kept only once the hub accepts it.
     func enterAPIKey(_ key: String) async {
+        guard !isDemo else { hubStatus = String(localized: "Not available with demo data."); return }
         let key = key.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !key.isEmpty else { return }
         hubBusy = true
@@ -645,6 +655,7 @@ final class AppModel: ObservableObject {
     }
 
     func rotateToken() async {
+        guard !isDemo else { hubStatus = String(localized: "Not available with demo data."); return }
         hubBusy = true
         defer { hubBusy = false }
         do {
@@ -658,6 +669,7 @@ final class AppModel: ObservableObject {
     /// Sends every sample not yet on the hub, one request per band, up to 4000 at a time. Health
     /// records follow only once the hub accepts them (hubAcceptsHealthTypes).
     func pushToHub() async {
+        guard !isDemo else { return }
         guard Vault.hubToken != nil else { return }
         let bands = (try? context.fetch(FetchDescriptor<Band>())) ?? []
         var sent = 0

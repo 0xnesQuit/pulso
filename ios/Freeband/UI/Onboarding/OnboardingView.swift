@@ -6,6 +6,7 @@ import UniformTypeIdentifiers
 /// connect. Progress is three hairline segments, read as "Step 1 of 3".
 struct OnboardingView: View {
     @AppStorage("onboarded") private var onboarded = false
+    @EnvironmentObject private var session: AppSession
     @State private var step = 1
     @State private var added: [Band] = []
 
@@ -16,7 +17,7 @@ struct OnboardingView: View {
                 .padding(.top, FBSpace.s)
             Group {
                 switch step {
-                case 1: WelcomeStep { step = 2 }
+                case 1: WelcomeStep(next: { step = 2 }, demo: { session.setDemo(true) })
                 case 2: KeyImportStep { bands in added = bands; step = 3 }
                 default: ConnectStep(bands: added) { onboarded = true }
                 }
@@ -62,6 +63,7 @@ private struct StepTitle: View {
 
 private struct WelcomeStep: View {
     let next: () -> Void
+    let demo: () -> Void
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     var body: some View {
@@ -92,6 +94,14 @@ private struct WelcomeStep: View {
                             .fixedSize(horizontal: false, vertical: true)
                     }
                     .accessibilityElement(children: .combine)
+                }
+                VStack(alignment: .leading, spacing: FBSpace.xxs) {
+                    Button(String(localized: "Try with demo data"), action: demo)
+                        .buttonStyle(.fbTertiary)
+                    Text("No band at hand? See every screen with 30 days of made-up data. Your real data isn't touched.")
+                        .textStyle(.subhead)
+                        .foregroundStyle(.textSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
             }
             .padding(.horizontal, FBSpace.gutter)

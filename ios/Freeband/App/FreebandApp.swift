@@ -4,25 +4,9 @@ import SwiftUI
 
 @main
 struct FreebandApp: App {
-    private let container: ModelContainer
-    @StateObject private var model: AppModel
+    @StateObject private var session = AppSession()
 
     init() {
-        let container: ModelContainer
-        do {
-            // New models and the two new ActivityBlob attributes all have defaults, so an existing
-            // store migrates lightweight (no VersionedSchema needed for this step).
-            container = try ModelContainer(for: Band.self, Sample.self, Webhook.self, ActivityBlob.self,
-                                           MinuteDay.self, DaySummary.self, SleepRecord.self, SleepRR.self,
-                                           ManualReading.self, DailyScore.self)
-        } catch {
-            fatalError("Couldn't open the data store: \(error)")
-        }
-        self.container = container
-        #if DEBUG
-        if let variant = DemoData.variant(ProcessInfo.processInfo.arguments) { DemoData.seed(container.mainContext, variant) }
-        #endif
-        _model = StateObject(wrappedValue: AppModel(context: container.mainContext))
         FBAppearance.configureNavigationBars()
     }
 
@@ -34,13 +18,15 @@ struct FreebandApp: App {
             app
             #endif
         }
-        .modelContainer(container)
     }
 
     private var app: some View {
         RootView()
-            .environmentObject(model)
-            .environmentObject(model.link)
+            .environmentObject(session)
+            .environmentObject(session.model)
+            .environmentObject(session.model.link)
+            .modelContainer(session.container)
+            .id(session.generation)
     }
 }
 
@@ -50,6 +36,7 @@ struct RootView: View {
     @AppStorage("selectedBand") private var selectedBand = ""
     @EnvironmentObject private var model: AppModel
     @EnvironmentObject private var link: BandLink
+    @EnvironmentObject private var session: AppSession
     @StateObject private var router = AppRouter()
     @Environment(\.scenePhase) private var scenePhase
     @Query(sort: \Band.addedAt) private var bands: [Band]
@@ -59,20 +46,23 @@ struct RootView: View {
 
     var body: some View {
         Group {
-            if onboarded && !showsOnboarding {
-                TabView(selection: $router.tab) {
-                    TodayView()
-                        .tabItem { Label("Today", systemImage: "circle.dashed") }
-                        .tag(AppTab.today)
-                    SleepView()
-                        .tabItem { Label("Sleep", systemImage: "moon") }
-                        .tag(AppTab.sleep)
-                    TrendsView()
-                        .tabItem { Label("Trends", systemImage: "chart.xyaxis.line") }
-                        .tag(AppTab.trends)
-                    BandView()
-                        .tabItem { Label("Band", systemImage: "rectangle.portrait") }
-                        .tag(AppTab.band)
+            if (onboarded || session.isDemo) && !showsOnboarding {
+                VStack(spacing: 0) {
+                    if session.isDemo { DemoBanner() }
+                    TabView(selection: $router.tab) {
+                        TodayView()
+                            .tabItem { Label("Today", systemImage: "circle.dashed") }
+                            .tag(AppTab.today)
+                        SleepView()
+                            .tabItem { Label("Sleep", systemImage: "moon") }
+                            .tag(AppTab.sleep)
+                        TrendsView()
+                            .tabItem { Label("Trends", systemImage: "chart.xyaxis.line") }
+                            .tag(AppTab.trends)
+                        BandView()
+                            .tabItem { Label("Band", systemImage: "rectangle.portrait") }
+                            .tag(AppTab.band)
+                    }
                 }
                 .sheet(item: $model.pendingInvite) { JoinSheet(invite: $0) }
                 .sheet(isPresented: $router.showsLive) {
@@ -118,6 +108,7 @@ struct RootView: View {
         #if DEBUG
         if DemoData.variant(ProcessInfo.processInfo.arguments) != nil { return }
         #endif
+        guard !session.isDemo else { return }
         model.autoSyncIfNeeded(band, onboarded: onboarded)
     }
 
