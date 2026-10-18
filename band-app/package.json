@@ -9,9 +9,13 @@
     "release": "aiot release --enable-jsc"
   },
   "devDependencies": {
-    "aiot-toolkit": "^2.0.4"
+    "aiot-toolkit": "^2.0.4",
+    "hap-toolkit": "^2.1.1"
   },
   "dependencies": {
     "@aiot-toolkit/jsc": "^1.0.7"
-  }
+  },
+  "browserslist": [
+    "chrome 65"
+  ]
 }
