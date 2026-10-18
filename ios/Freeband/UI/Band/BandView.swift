@@ -1,5 +1,6 @@
 import SwiftData
 import SwiftUI
+import UIKit
 
 /// The band as Tesla shows the car: the render with its live screen, one status line, context
 /// while it is true, quick actions and the band's rows. Freeband settings live here too.
@@ -239,6 +240,7 @@ struct AboutBandView: View {
     @Environment(\.dismiss) private var dismiss
     @Query private var matches: [Band]
     @State private var rereading = false
+    @State private var keyCopied = false
 
     init(bandID: UUID) {
         self.bandID = bandID
@@ -257,10 +259,17 @@ struct AboutBandView: View {
                     }
                     ListCard {
                         Button { rereading = true } label: {
-                            ListRow(title: String(localized: "Read the key again"), systemImage: "key", showsDivider: false)
+                            ListRow(title: String(localized: "Read the key again"), systemImage: "key")
                         }
                         .buttonStyle(.fbRow)
+                        Button { copyKey(band) } label: {
+                            ListRow(title: keyCopied ? String(localized: "Key copied") : String(localized: "Copy the key"),
+                                    systemImage: keyCopied ? "checkmark" : "doc.on.doc", accessory: .none, showsDivider: false)
+                        }
+                        .buttonStyle(.fbRow)
+                        .disabled(Vault.bandKey(band.id) == nil)
                     }
+                    Footnote(String(localized: "For other companion apps such as AstroBox. Anyone with the key can connect to the band: paste it only into apps you trust. It stays on the clipboard for 2 minutes."))
                     VStack(alignment: .leading, spacing: FBSpace.xs) {
                         FBDestructiveButton(title: String(localized: "Remove band"),
                                             message: String(localized: "This band's records, raw files, scores and key are deleted from this phone.")) {
@@ -280,6 +289,15 @@ struct AboutBandView: View {
         .sheet(isPresented: $rereading) {
             KeyImportSheet(title: String(localized: "Read the key again")) { _ in rereading = false }
         }
+    }
+
+    /// The 16-byte key as 32 hex characters, on this device's clipboard only, for 2 minutes.
+    private func copyKey(_ band: Band) {
+        guard let hex = Vault.bandKey(band.id) else { return }
+        let key = BandKey(hex: hex).data.map { String(format: "%02x", $0) }.joined()
+        UIPasteboard.general.setItems([["public.utf8-plain-text": key]],
+                                      options: [.localOnly: true, .expirationDate: Date().addingTimeInterval(120)])
+        keyCopied = true
     }
 
     private func facts(_ band: Band) -> [(String, String)] {
