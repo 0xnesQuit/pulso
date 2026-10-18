@@ -1,7 +1,7 @@
 <!--
   Claude usage on the band. Two pages in a vertical swiper:
     1. limits: 5-hour session (arc), weekly, Fable weekly
-    2. API credit: estimated balance, today's and this month's spend
+    2. plan credit: the plan's monthly dollar allowance, left and used
 
   Pulso sends one JSON message over interconnect (all fields optional):
     {
@@ -9,7 +9,6 @@
       "h5":  { "p": 3,  "r": 1792033200 },     // 5-hour: percent used, resets at (Unix s)
       "wk":  { "p": 13, "r": 1792450000 },     // weekly, all models
       "fb":  { "p": 20, "r": 1792450000 },     // Fable weekly
-      "api": { "bal": 42.1, "day": 1.2, "mon": 12.4 },  // USD
       "cr":  { "used": 0.78, "lim": 250, "r": 1793865540 }  // plan's monthly $ credit
     }
   The last message is kept in storage so the app shows it right away when opened.
@@ -47,28 +46,19 @@
         <text class="age">{{age}}</text>
       </div>
 
-      <!-- Page 2: API credit -->
+      <!-- Page 2: plan credit -->
       <div class="screen">
         <text class="clock">{{clock}}</text>
-        <text class="brand">API kredisi</text>
-        <text class="money">{{api.balance}}</text>
-        <text class="small">tahmini kalan</text>
+        <text class="brand">Plan kredisi</text>
+        <text class="money">{{cr.left}}</text>
+        <text class="small">kalan</text>
 
-        <div class="card">
-          <text class="cardName">Bugün</text>
-          <text class="cardValue">{{api.day}}</text>
-        </div>
-        <div class="card">
-          <text class="cardName">Bu ay</text>
-          <text class="cardValue">{{api.month}}</text>
-        </div>
-
-        <div class="row" if="{{cr.known}}">
-          <text class="rowName">Plan kredisi</text>
+        <div class="row">
+          <text class="rowName">Kullanılan</text>
           <text class="rowValue" style="color: {{cr.color}};">{{cr.label}}</text>
         </div>
-        <progress class="bar" if="{{cr.known}}" percent="{{cr.p}}" style="color: {{cr.color}};"></progress>
-        <text class="hint" if="{{cr.known}}">{{cr.reset}}</text>
+        <progress class="bar" percent="{{cr.p}}" style="color: {{cr.color}};"></progress>
+        <text class="hint">{{cr.reset}}</text>
 
         <text class="age">{{age}}</text>
       </div>
@@ -122,20 +112,7 @@
 
   .age { position: absolute; bottom: 20px; font-size: 13px; color: #595959; }
 
-  .money { margin-top: 40px; font-size: 46px; color: #ffffff; font-weight: bold; }
-  .card {
-    margin-top: 16px;
-    width: 180px;
-    height: 64px;
-    padding: 0 14px;
-    border-radius: 16px;
-    background-color: #1a1a1a;
-    flex-direction: row;
-    justify-content: space-between;
-    align-items: center;
-  }
-  .cardName { font-size: 17px; color: #bfbfbf; }
-  .cardValue { font-size: 20px; color: #ffffff; font-weight: bold; }
+  .money { margin-top: 48px; font-size: 44px; color: #ffffff; font-weight: bold; }
 </style>
 
 <script>
@@ -186,8 +163,7 @@ export default {
     h5: { known: false, p: 0, label: '–', color: '#595959', reset: '' },
     wk: { known: false, p: 0, label: '–', color: '#595959', reset: '' },
     fb: { known: false, p: 0, label: '–', color: '#595959', reset: '' },
-    api: { balance: '–', day: '–', month: '–' },
-    cr: { known: false, p: 0, label: '', color: '#595959', reset: '' },
+    cr: { left: '–', p: 0, label: '–', color: '#595959', reset: '' },
     data: null,
     timer: null,
     conn: null
@@ -246,20 +222,18 @@ export default {
     if (this.h5.reset) this.h5.reset = 'Sıfırlanma ' + this.h5.reset
     this.wk = window_(data.wk, now)
     this.fb = window_(data.fb, now)
-    const api = data.api || {}
-    this.api = { balance: usd(api.bal), day: usd(api.day), month: usd(api.mon) }
     const cr = data.cr
     if (cr && typeof cr.lim === 'number' && cr.lim > 0) {
       const p = Math.max(0, Math.min(100, Math.round((cr.used / cr.lim) * 100)))
       this.cr = {
-        known: true,
+        left: usd(Math.max(0, cr.lim - cr.used)),
         p: p,
         label: usd(cr.used) + ' / $' + Math.round(cr.lim),
         color: colorFor(p),
         reset: cr.r ? 'Yenilenme ' + untilText(cr.r, now) : ''
       }
     } else {
-      this.cr = { known: false, p: 0, label: '', color: '#595959', reset: '' }
+      this.cr = { left: '–', p: 0, label: '–', color: '#595959', reset: '' }
     }
     if (data.t) {
       const mins = Math.max(0, Math.round((now - data.t) / 60))
