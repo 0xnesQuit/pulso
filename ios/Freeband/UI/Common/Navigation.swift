@@ -24,6 +24,7 @@ enum Route: Hashable {
     case webAccess
     case webhooks
     case shortcuts
+    case claudeBand
     case diagnostics
     case about
 }
@@ -114,6 +115,7 @@ private struct RouteView: View {
         case .webAccess: WebAccessView()
         case .webhooks: WebhooksView()
         case .shortcuts: ShortcutsView()
+        case .claudeBand: ClaudeBandView()
         case .diagnostics: DiagnosticsView()
         case .about: AboutView()
         case .aboutBand(let id): AboutBandView(bandID: id)

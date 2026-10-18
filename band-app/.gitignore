@@ -1,0 +1,7 @@
+node_modules/
+build/
+dist/
+sign/
+package-lock.json
+pc/config.json
+__pycache__/

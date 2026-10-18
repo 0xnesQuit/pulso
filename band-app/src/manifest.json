@@ -1,0 +1,27 @@
+{
+  "package": "app.pulsoband.claude",
+  "name": "Claude",
+  "versionName": "1.0",
+  "versionCode": 1,
+  "minPlatformVersion": 1100,
+  "icon": "/common/logo.png",
+  "deviceTypeList": ["watch"],
+  "features": [
+    { "name": "system.router" },
+    { "name": "system.storage" },
+    { "name": "system.interconnect" }
+  ],
+  "config": {
+    "logLevel": "log",
+    "designWidth": 212
+  },
+  "router": {
+    "entry": "pages/index",
+    "pages": {
+      "pages/index": { "component": "index", "launchMode": "singleTask" }
+    }
+  },
+  "display": {
+    "backgroundColor": "#000000"
+  }
+}

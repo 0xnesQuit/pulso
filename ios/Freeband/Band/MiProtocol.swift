@@ -131,10 +131,12 @@ struct PBWriter {
     }
 }
 
-/// Minimal proto2 reader: keeps the last varint and the last length-delimited value per field.
+/// Minimal proto2 reader: keeps the last varint and the last length-delimited value per field,
+/// and every length-delimited value in order for repeated fields.
 struct PBMessage {
     private(set) var varints: [Int: UInt64] = [:]
     private(set) var blobs: [Int: Data] = [:]
+    private(set) var repeatedBlobs: [Int: [Data]] = [:]
     private(set) var fieldNumbers: [Int] = []
 
     init?(_ data: Data) {
@@ -164,7 +166,9 @@ struct PBMessage {
                 i += 8
             case 2:
                 guard let n = readVarint(), n <= UInt64(b.count - i) else { return nil }
-                blobs[field] = Data(b[i..<(i + Int(n))])
+                let value = Data(b[i..<(i + Int(n))])
+                blobs[field] = value
+                repeatedBlobs[field, default: []].append(value)
                 i += Int(n)
             case 5:
                 guard b.count - i >= 4 else { return nil }
@@ -178,6 +182,99 @@ struct PBMessage {
 
     func message(_ field: Int) -> PBMessage? {
         blobs[field].flatMap(PBMessage.init)
+    }
+
+    func messages(_ field: Int) -> [PBMessage] {
+        (repeatedBlobs[field] ?? []).compactMap(PBMessage.init)
+    }
+}
+
+/// Third-party quick apps on the band (Vela .rpk) and the interconnect channel to them.
+/// `Command{type 20, subtype, thirdpartyApp 22}`; layout from AstroBox-NG
+/// `protos/xiaomi/wear_thirdparty_app.proto` and Gadgetbridge `XiaomiRpkService`.
+enum MiQuickApp {
+    static let commandType: UInt64 = 20
+    static let subtypeList: UInt64 = 0
+    static let subtypeLaunch: UInt64 = 4
+    static let subtypeRequestStatus: UInt64 = 6
+    static let subtypeSyncStatus: UInt64 = 7
+    static let subtypePhoneMessage: UInt64 = 8
+    static let subtypeWearMessage: UInt64 = 9
+
+    struct App: Equatable {
+        let package: String
+        let fingerprint: Data
+        let name: String
+    }
+
+    /// `Command{20, 0}`: the band answers with `thirdpartyApp.appItemList(1).list(1)[]`.
+    static func listCommand() -> Data {
+        var c = PBWriter()
+        c.varint(1, commandType)
+        c.varint(2, subtypeList)
+        return c.data
+    }
+
+    /// AppItem{package 1, fingerprint 2, versionCode 3, canRemove 4, name 5}
+    static func apps(_ command: PBMessage) -> [App] {
+        guard let list = command.message(22)?.message(1) else { return [] }
+        return list.messages(1).compactMap { item in
+            guard let pkg = item.blobs[1].flatMap({ String(data: $0, encoding: .utf8) }),
+                  let fingerprint = item.blobs[2] else { return nil }
+            return App(package: pkg, fingerprint: fingerprint,
+                       name: item.blobs[5].flatMap { String(data: $0, encoding: .utf8) } ?? pkg)
+        }
+    }
+
+    private static func basicInfo(_ app: App) -> PBWriter {
+        var b = PBWriter()
+        b.string(1, app.package)
+        b.bytes(2, app.fingerprint)
+        return b
+    }
+
+    private static func command(_ subtype: UInt64, field: Int, _ body: PBWriter) -> Data {
+        var t = PBWriter()
+        t.message(field, body)
+        var c = PBWriter()
+        c.varint(1, commandType)
+        c.varint(2, subtype)
+        c.message(22, t)
+        return c.data
+    }
+
+    /// `Command{20, 7, appStatus(8){basicInfo 1, status 2 = CONNECTED}}`: the phone side is there.
+    static func connectedCommand(_ app: App) -> Data {
+        var s = PBWriter()
+        s.message(1, basicInfo(app))
+        s.varint(2, 1)
+        return command(subtypeSyncStatus, field: 8, s)
+    }
+
+    /// `Command{20, 8, messageContent(9){basicInfo 1, content 2}}`: delivered to the app's
+    /// `interconnect.onmessage` as `data`.
+    static func messageCommand(_ app: App, content: Data) -> Data {
+        var m = PBWriter()
+        m.message(1, basicInfo(app))
+        m.bytes(2, content)
+        return command(subtypePhoneMessage, field: 9, m)
+    }
+
+    /// `Command{20, 4, launchInfo(6){basicInfo 1, uri 2}}`: opens the app on the band.
+    static func launchCommand(_ app: App, page: String = "pages/index") -> Data {
+        var l = PBWriter()
+        l.message(1, basicInfo(app))
+        l.string(2, "hap://app/\(app.package)/\(page)")
+        return command(subtypeLaunch, field: 6, l)
+    }
+
+    /// The package and fingerprint the band put in a status request or a message.
+    static func basicInfo(of command: PBMessage) -> App? {
+        guard let body = command.message(22) else { return nil }
+        let info = body.message(5) ?? body.message(9)?.message(1) ?? body.message(8)?.message(1)
+        guard let info, let pkg = info.blobs[1].flatMap({ String(data: $0, encoding: .utf8) }),
+              let fingerprint = info.blobs[2] else { return nil }
+        return App(package: pkg, fingerprint: fingerprint, name: pkg)
     }
 }
 

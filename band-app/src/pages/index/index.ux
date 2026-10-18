@@ -1,0 +1,248 @@
+<!--
+  Claude usage on the band. Two pages in a vertical swiper:
+    1. limits: 5-hour session (arc), weekly, Fable weekly
+    2. API credit: estimated balance, today's and this month's spend
+
+  Pulso sends one JSON message over interconnect (all fields optional):
+    {
+      "t":   1792016113,                       // when the PC read it (Unix s)
+      "h5":  { "p": 3,  "r": 1792033200 },     // 5-hour: percent used, resets at (Unix s)
+      "wk":  { "p": 13, "r": 1792450000 },     // weekly, all models
+      "fb":  { "p": 20, "r": 1792450000 },     // Fable weekly
+      "api": { "bal": 42.1, "day": 1.2, "mon": 12.4 }  // USD
+    }
+  The last message is kept in storage so the app shows it right away when opened.
+-->
+<template>
+  <div class="page">
+    <swiper class="swiper" vertical="true" loop="false" indicator="true">
+      <!-- Page 1: limits -->
+      <div class="screen">
+        <text class="clock">{{clock}}</text>
+        <text class="brand">Claude</text>
+        <stack class="ring">
+          <progress class="arc" type="arc" percent="{{h5.p}}" style="color: {{h5.color}};"></progress>
+          <div class="ringText">
+            <text class="big">{{h5.label}}</text>
+            <text class="small">5 saat</text>
+          </div>
+        </stack>
+        <text class="reset">{{h5.reset}}</text>
+
+        <div class="row">
+          <text class="rowName">Haftalık</text>
+          <text class="rowValue" style="color: {{wk.color}};">{{wk.label}}</text>
+        </div>
+        <progress class="bar" percent="{{wk.p}}" style="color: {{wk.color}};"></progress>
+        <text class="hint">{{wk.reset}}</text>
+
+        <div class="row" if="{{fb.known}}">
+          <text class="rowName">Fable</text>
+          <text class="rowValue" style="color: {{fb.color}};">{{fb.label}}</text>
+        </div>
+        <progress class="bar" if="{{fb.known}}" percent="{{fb.p}}" style="color: {{fb.color}};"></progress>
+        <text class="hint" if="{{fb.known}}">{{fb.reset}}</text>
+
+        <text class="age">{{age}}</text>
+      </div>
+
+      <!-- Page 2: API credit -->
+      <div class="screen">
+        <text class="clock">{{clock}}</text>
+        <text class="brand">API kredisi</text>
+        <text class="money">{{api.balance}}</text>
+        <text class="small">tahmini kalan</text>
+
+        <div class="card">
+          <text class="cardName">Bugün</text>
+          <text class="cardValue">{{api.day}}</text>
+        </div>
+        <div class="card">
+          <text class="cardName">Bu ay</text>
+          <text class="cardValue">{{api.month}}</text>
+        </div>
+
+        <text class="age">{{age}}</text>
+      </div>
+    </swiper>
+  </div>
+</template>
+
+<style>
+  .page { width: 212px; height: 520px; background-color: #000000; }
+  .swiper { width: 212px; height: 520px; }
+  .screen {
+    width: 212px;
+    height: 520px;
+    flex-direction: column;
+    align-items: center;
+    padding: 0 16px;
+  }
+  .clock { margin-top: 26px; font-size: 26px; color: #ffffff; font-weight: bold; }
+  .brand { margin-top: 2px; font-size: 18px; color: #d97757; }
+
+  .ring { margin-top: 18px; width: 140px; height: 140px; }
+  .arc {
+    width: 140px;
+    height: 140px;
+    stroke-width: 10px;
+    layer-color: #262626;
+    start-angle: 0deg;
+    total-angle: 360deg;
+  }
+  .ringText {
+    width: 140px;
+    height: 140px;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+  }
+  .big { font-size: 44px; color: #ffffff; font-weight: bold; }
+  .small { font-size: 16px; color: #8c8c8c; }
+  .reset { margin-top: 12px; font-size: 15px; color: #bfbfbf; }
+
+  .row {
+    margin-top: 18px;
+    width: 180px;
+    flex-direction: row;
+    justify-content: space-between;
+  }
+  .rowName { font-size: 18px; color: #ffffff; }
+  .rowValue { font-size: 18px; font-weight: bold; }
+  .bar { margin-top: 6px; width: 180px; stroke-width: 6px; layer-color: #262626; }
+  .hint { margin-top: 4px; width: 180px; font-size: 13px; color: #8c8c8c; }
+
+  .age { position: absolute; bottom: 20px; font-size: 13px; color: #595959; }
+
+  .money { margin-top: 40px; font-size: 46px; color: #ffffff; font-weight: bold; }
+  .card {
+    margin-top: 16px;
+    width: 180px;
+    height: 64px;
+    padding: 0 14px;
+    border-radius: 16px;
+    background-color: #1a1a1a;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .cardName { font-size: 17px; color: #bfbfbf; }
+  .cardValue { font-size: 20px; color: #ffffff; font-weight: bold; }
+</style>
+
+<script>
+import interconnect from '@system.interconnect'
+import storage from '@system.storage'
+
+const STORE_KEY = 'claude_usage'
+const ORANGE = '#d97757'
+const AMBER = '#f2b33d'
+const RED = '#e5483b'
+
+function pad(n) { return n < 10 ? '0' + n : '' + n }
+
+function colorFor(p) {
+  if (p >= 90) return RED
+  if (p >= 70) return AMBER
+  return ORANGE
+}
+
+// "4s 45dk sonra", "5g 7s sonra"
+function untilText(resetAt, now) {
+  if (!resetAt) return ''
+  let s = resetAt - now
+  if (s <= 0) return 'sıfırlandı'
+  const d = Math.floor(s / 86400); s -= d * 86400
+  const h = Math.floor(s / 3600); s -= h * 3600
+  const m = Math.floor(s / 60)
+  if (d > 0) return d + 'g ' + h + 's sonra'
+  if (h > 0) return h + 's ' + m + 'dk sonra'
+  return m + 'dk sonra'
+}
+
+function window_(w, now) {
+  if (!w || typeof w.p !== 'number') return { known: false, p: 0, label: '–', color: '#595959', reset: '' }
+  const p = Math.max(0, Math.min(100, Math.round(w.p)))
+  return { known: true, p: p, label: '%' + p, color: colorFor(p), reset: untilText(w.r, now) }
+}
+
+function usd(v) {
+  if (typeof v !== 'number') return '–'
+  return '$' + v.toFixed(2)
+}
+
+export default {
+  private: {
+    clock: '',
+    age: 'Pulso bekleniyor',
+    h5: { known: false, p: 0, label: '–', color: '#595959', reset: '' },
+    wk: { known: false, p: 0, label: '–', color: '#595959', reset: '' },
+    fb: { known: false, p: 0, label: '–', color: '#595959', reset: '' },
+    api: { balance: '–', day: '–', month: '–' },
+    data: null,
+    timer: null,
+    conn: null
+  },
+
+  onInit() {
+    this.tick()
+    storage.get({
+      key: STORE_KEY,
+      success: (value) => {
+        if (value) {
+          try { this.apply(JSON.parse(value)) } catch (e) {}
+        }
+      }
+    })
+    this.conn = interconnect.instance()
+    this.conn.onmessage = ({ data }) => {
+      try {
+        const parsed = typeof data === 'string' ? JSON.parse(data) : data
+        this.apply(parsed)
+        storage.set({ key: STORE_KEY, value: JSON.stringify(parsed) })
+      } catch (e) {}
+    }
+    this.conn.onopen = () => {
+      // Ask Pulso for fresh numbers when the link comes up.
+      this.conn.send({ data: { want: 'usage' } })
+    }
+  },
+
+  onShow() {
+    this.timer = setInterval(() => this.tick(), 30000)
+  },
+
+  onHide() {
+    if (this.timer) { clearInterval(this.timer); this.timer = null }
+  },
+
+  onDestroy() {
+    if (this.timer) { clearInterval(this.timer); this.timer = null }
+  },
+
+  tick() {
+    const d = new Date()
+    this.clock = pad(d.getHours()) + ':' + pad(d.getMinutes())
+    if (this.data) this.render(this.data)
+  },
+
+  apply(data) {
+    this.data = data
+    this.render(data)
+  },
+
+  render(data) {
+    const now = Math.floor(Date.now() / 1000)
+    this.h5 = window_(data.h5, now)
+    if (this.h5.reset) this.h5.reset = 'Sıfırlanma ' + this.h5.reset
+    this.wk = window_(data.wk, now)
+    this.fb = window_(data.fb, now)
+    const api = data.api || {}
+    this.api = { balance: usd(api.bal), day: usd(api.day), month: usd(api.mon) }
+    if (data.t) {
+      const mins = Math.max(0, Math.round((now - data.t) / 60))
+      this.age = mins < 1 ? 'az önce · Pulso' : mins + ' dk önce · Pulso'
+    }
+  }
+}
+</script>

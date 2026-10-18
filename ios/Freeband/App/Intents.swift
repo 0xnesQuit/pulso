@@ -4,7 +4,7 @@ import SwiftData
 // Siri and Shortcuts: the same actions as the Band tab. They open the app because
 // CoreBluetooth needs it running (there is no background Bluetooth mode yet).
 
-private extension AppModel {
+extension AppModel {
     @MainActor
     func selectedBand() -> Band? {
         let bands = ((try? context.fetch(FetchDescriptor<Band>())) ?? []).sorted { $0.addedAt < $1.addedAt }
@@ -61,6 +61,26 @@ struct SyncBandIntent: AppIntent {
     }
 }
 
+struct ShowClaudeUsageIntent: AppIntent {
+    static var title: LocalizedStringResource = "Show Claude usage on the band"
+    static var description = IntentDescription("Reads the latest Claude limits from the PC script and shows them in the Claude app on the band.")
+    static var openAppWhenRun = true
+
+    @Parameter(title: "Open the app on the band", default: true)
+    var launch: Bool
+
+    @MainActor
+    func perform() async throws -> some IntentResult & ProvidesDialog {
+        guard let model = AppModel.shared, let band = model.selectedBand() else {
+            return .result(dialog: "There's no band in Pulso yet.")
+        }
+        if let problem = await model.sendClaudeUsage(to: band, launch: launch) {
+            return .result(dialog: "\(problem)")
+        }
+        return .result(dialog: "Sending Claude usage to your band.")
+    }
+}
+
 struct FreebandShortcuts: AppShortcutsProvider {
     static var appShortcuts: [AppShortcut] {
         AppShortcut(intent: FindBandIntent(),
@@ -72,5 +92,8 @@ struct FreebandShortcuts: AppShortcutsProvider {
         AppShortcut(intent: SyncBandIntent(),
                     phrases: ["Sync my band with \(.applicationName)"],
                     shortTitle: "Sync band", systemImageName: "arrow.triangle.2.circlepath")
+        AppShortcut(intent: ShowClaudeUsageIntent(),
+                    phrases: ["Show Claude usage on my band with \(.applicationName)"],
+                    shortTitle: "Claude on band", systemImageName: "sparkle")
     }
 }

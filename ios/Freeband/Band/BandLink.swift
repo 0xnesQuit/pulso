@@ -17,7 +17,9 @@ struct BandTarget {
 /// Mi Fitness keeps working. Protocol details: findings.md, sections 4–6.
 final class BandLink: NSObject, ObservableObject {
     /// `send` authenticates, sends the given protobuf commands encrypted, then lets go.
-    enum Purpose: Equatable { case check, sync, live, send([Data]) }
+    /// `quickApp` looks up a quick app installed on the band, optionally opens it, and hands it
+    /// `content` over the interconnect channel.
+    enum Purpose: Equatable { case check, sync, live, send([Data]), quickApp(package: String, content: Data, launch: Bool) }
 
     /// How a session ended. A sync is complete only when every listed file arrived; anything
     /// less is partial (what arrived is kept) and does not count as a successful sync.
@@ -141,6 +143,9 @@ final class BandLink: NSObject, ObservableObject {
     static let syncWindow: TimeInterval = 12
     /// Upper bound for a sync that also fetches activity files.
     static let fileSyncLimit: TimeInterval = 120
+    /// How long a quick-app session may take, and how long it stays up after the message.
+    static let quickAppLimit: TimeInterval = 15
+    static let quickAppHold: TimeInterval = 4
 
     @Published private(set) var phase: Phase = .idle
     @Published private(set) var bandID: UUID?
@@ -204,6 +209,8 @@ final class BandLink: NSObject, ObservableObject {
     private var filesReceived = 0
     /// The file list did not arrive in time; the sync went on without files.
     private var fileListMissing = false
+    /// Set when a quick-app session could not deliver (app not installed, no list).
+    private var quickAppProblem: String?
 
     override init() {
         super.init()
@@ -242,6 +249,8 @@ final class BandLink: NSObject, ObservableObject {
         fileProgress = nil
         filesReceived = 0
         fileListMissing = false
+        quickAppProblem = nil
+        quickAppDelivered = false
         active = true
         note("start: \(target.name), \(target.keys.count) key(s)")
 
@@ -353,6 +362,20 @@ final class BandLink: NSObject, ObservableObject {
             after(2.0, thisRun) { [weak self] in self?.finish() }
             return
         }
+        if case .quickApp(let package, _, _) = purpose {
+            phase = .reading
+            note("auth ok → quick app list, looking for \(package)")
+            sendCommand(MiQuickApp.listCommand(), encrypted: true)
+            let thisRun = run
+            after(Self.quickAppLimit, thisRun) { [weak self] in
+                guard let self, self.active else { return }
+                if self.quickAppProblem == nil, !self.quickAppDelivered {
+                    self.quickAppProblem = String(localized: "The band didn't list its apps. Try again.", comment: "Quick app")
+                }
+                self.finish()
+            }
+            return
+        }
         phase = purpose == .live ? .live : .reading
         note("auth ok → battery + live stats")
         sendCommand(MiAuth.batteryCommand(), encrypted: true)
@@ -457,6 +480,36 @@ final class BandLink: NSObject, ObservableObject {
 
         case (2, 3):
             note("← clock set (status \(command.varints[100] ?? 0))")
+
+        case (MiQuickApp.commandType, MiQuickApp.subtypeList):
+            let apps = MiQuickApp.apps(command)
+            note("← \(apps.count) quick app(s): \(apps.map(\.package).joined(separator: ", "))")
+            guard case .quickApp(let package, let content, let launch) = purpose else { return }
+            guard let app = apps.first(where: { $0.package == package }) else {
+                quickAppProblem = String(localized: "The app isn't installed on the band.", comment: "Quick app")
+                finish()
+                return
+            }
+            deliver(content, to: app, launch: launch)
+
+        case (MiQuickApp.commandType, MiQuickApp.subtypeRequestStatus):
+            // The band asks whether the phone side of an app is there (the app opened its
+            // interconnect). Answer for any app so it doesn't treat the phone as gone.
+            guard let app = MiQuickApp.basicInfo(of: command) else { return }
+            note("← \(app.package) asks for the phone; → connected")
+            sendCommand(MiQuickApp.connectedCommand(app), encrypted: true)
+
+        case (MiQuickApp.commandType, MiQuickApp.subtypeWearMessage):
+            let content = command.message(22)?.message(9)?.blobs[2] ?? Data()
+            note("← quick app message, \(content.count) bytes")
+            if case .quickApp(let package, let payload, _) = purpose, let app = MiQuickApp.basicInfo(of: command),
+               app.package == package {
+                // The app asked for fresh numbers: send them again.
+                sendCommand(MiQuickApp.messageCommand(app, content: payload), encrypted: true)
+            }
+
+        case (MiQuickApp.commandType, _):
+            note("← quick app \(subtype) (status \(command.varints[100] ?? 0))")
 
         default:
             note("← \(type)/\(subtype) not handled")
@@ -568,6 +621,29 @@ final class BandLink: NSObject, ObservableObject {
         after(1.0, thisRun) { [weak self] in self?.locate(thisRun) }
     }
 
+    private var quickAppDelivered = false
+
+    /// Tells the band the phone side is there, opens the app if asked, then sends the message.
+    /// The session stays up a few seconds so the app can ask again once it is running.
+    private func deliver(_ content: Data, to app: MiQuickApp.App, launch: Bool) {
+        quickAppDelivered = true
+        sendCommand(MiQuickApp.connectedCommand(app), encrypted: true)
+        let thisRun = run
+        let send = { [weak self] in
+            guard let self, self.active else { return }
+            self.note("→ \(app.package): \(content.count) bytes")
+            self.sendCommand(MiQuickApp.messageCommand(app, content: content), encrypted: true)
+            self.after(Self.quickAppHold, thisRun) { [weak self] in self?.finish() }
+        }
+        if launch {
+            note("→ open \(app.package)")
+            sendCommand(MiQuickApp.launchCommand(app), encrypted: true)
+            after(1.5, thisRun, send)
+        } else {
+            send()
+        }
+    }
+
     /// Stops the live stream, then releases the channel.
     private func finish() {
         guard active, !finishing else { return }
@@ -590,8 +666,10 @@ final class BandLink: NSObject, ObservableObject {
     }
 
     /// An authenticated session: complete unless it was a sync whose file list never came or
-    /// whose files did not all arrive (skipped, corrupt, or cut off by the time limit or a stop).
+    /// whose files did not all arrive (skipped, corrupt, or cut off by the time limit or a stop),
+    /// or a quick-app message that couldn't be delivered.
     private func completion() -> Outcome {
+        if let quickAppProblem { return .partial(quickAppProblem) }
         guard purpose == .sync else { return .complete }
         if fileListMissing || fileStage == .idle || fileStage == .listingToday || fileStage == .listingPast {
             return .partial(String(localized: "Couldn't get the file list. Records come with the next sync.", comment: "Partial sync"))

@@ -191,3 +191,69 @@ struct ShortcutsView: View {
         .navigationBarTitleDisplayMode(.inline)
     }
 }
+
+/// Claude usage on the band: where the PC script publishes it, and a button to send it now.
+struct ClaudeBandView: View {
+    @EnvironmentObject private var model: AppModel
+    @State private var gistID = ClaudeBand.gistID
+    @State private var problem: String?
+    @State private var sending = false
+
+    var body: some View {
+        Form {
+            Section {
+                Text("The Claude app on the band shows your 5-hour, weekly and Fable limits and your API credit. A script on your PC publishes them to a secret gist; Pulso reads the gist and sends it to the band.")
+                    .textStyle(.subhead)
+                    .foregroundStyle(.textSecondary)
+            }
+            .fbFormRow()
+
+            Section {
+                TextField(String(localized: "Gist ID"), text: $gistID)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                    .onSubmit { ClaudeBand.gistID = gistID }
+            } footer: {
+                Text("Printed by claude_usage.py --setup.")
+            }
+            .fbFormRow()
+
+            Section {
+                Button(sending ? String(localized: "Sending…") : String(localized: "Show on the band now")) { send(launch: true) }
+                    .disabled(sending || gistID.isEmpty)
+                Button(String(localized: "Update without opening the app")) { send(launch: false) }
+                    .disabled(sending || gistID.isEmpty)
+            } footer: {
+                ClaudeBandStatus(link: model.link, problem: problem)
+            }
+            .fbFormRow()
+        }
+        .fbFormStyle()
+        .navigationTitle(String(localized: "Claude on the band"))
+        .navigationBarTitleDisplayMode(.inline)
+        .onDisappear { ClaudeBand.gistID = gistID }
+    }
+
+    private func send(launch: Bool) {
+        ClaudeBand.gistID = gistID
+        guard let band = model.selectedBand() else {
+            problem = String(localized: "There's no band in Pulso yet.")
+            return
+        }
+        sending = true
+        Task {
+            problem = await model.sendClaudeUsage(to: band, launch: launch)
+            sending = false
+        }
+    }
+}
+
+/// The running session's state, or why sending couldn't start.
+private struct ClaudeBandStatus: View {
+    @ObservedObject var link: BandLink
+    let problem: String?
+
+    var body: some View {
+        Text(problem ?? link.phase.label)
+    }
+}

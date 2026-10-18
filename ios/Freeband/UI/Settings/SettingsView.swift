@@ -54,7 +54,10 @@ struct SettingsView: View {
                              value: model.hubEnabled ? String(localized: "On · \(model.hubURL.host ?? "")") : String(localized: "Off"),
                              icon: "globe")
                         link(.webhooks, String(localized: "Webhooks"), value: webhookSummary, icon: "arrow.up.forward.app")
-                        link(.shortcuts, String(localized: "Shortcuts & Siri"), icon: "square.2.layers.3d", last: true)
+                        link(.shortcuts, String(localized: "Shortcuts & Siri"), icon: "square.2.layers.3d")
+                        link(.claudeBand, String(localized: "Claude on the band"),
+                             value: ClaudeBand.gistID.isEmpty ? String(localized: "Off") : String(localized: "On"),
+                             icon: "sparkle", last: true)
                     }
                 }
 
