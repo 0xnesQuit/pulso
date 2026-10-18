@@ -9,7 +9,8 @@
       "h5":  { "p": 3,  "r": 1792033200 },     // 5-hour: percent used, resets at (Unix s)
       "wk":  { "p": 13, "r": 1792450000 },     // weekly, all models
       "fb":  { "p": 20, "r": 1792450000 },     // Fable weekly
-      "api": { "bal": 42.1, "day": 1.2, "mon": 12.4 }  // USD
+      "api": { "bal": 42.1, "day": 1.2, "mon": 12.4 },  // USD
+      "cr":  { "used": 0.78, "lim": 250, "r": 1793865540 }  // plan's monthly $ credit
     }
   The last message is kept in storage so the app shows it right away when opened.
 -->
@@ -61,6 +62,13 @@
           <text class="cardName">Bu ay</text>
           <text class="cardValue">{{api.month}}</text>
         </div>
+
+        <div class="row" if="{{cr.known}}">
+          <text class="rowName">Plan kredisi</text>
+          <text class="rowValue" style="color: {{cr.color}};">{{cr.label}}</text>
+        </div>
+        <progress class="bar" if="{{cr.known}}" percent="{{cr.p}}" style="color: {{cr.color}};"></progress>
+        <text class="hint" if="{{cr.known}}">{{cr.reset}}</text>
 
         <text class="age">{{age}}</text>
       </div>
@@ -179,6 +187,7 @@ export default {
     wk: { known: false, p: 0, label: '–', color: '#595959', reset: '' },
     fb: { known: false, p: 0, label: '–', color: '#595959', reset: '' },
     api: { balance: '–', day: '–', month: '–' },
+    cr: { known: false, p: 0, label: '', color: '#595959', reset: '' },
     data: null,
     timer: null,
     conn: null
@@ -239,6 +248,19 @@ export default {
     this.fb = window_(data.fb, now)
     const api = data.api || {}
     this.api = { balance: usd(api.bal), day: usd(api.day), month: usd(api.mon) }
+    const cr = data.cr
+    if (cr && typeof cr.lim === 'number' && cr.lim > 0) {
+      const p = Math.max(0, Math.min(100, Math.round((cr.used / cr.lim) * 100)))
+      this.cr = {
+        known: true,
+        p: p,
+        label: usd(cr.used) + ' / $' + Math.round(cr.lim),
+        color: colorFor(p),
+        reset: cr.r ? 'Yenilenme ' + untilText(cr.r, now) : ''
+      }
+    } else {
+      this.cr = { known: false, p: 0, label: '', color: '#595959', reset: '' }
+    }
     if (data.t) {
       const mins = Math.max(0, Math.round((now - data.t) / 60))
       this.age = mins < 1 ? 'az önce · Pulso' : mins + ' dk önce · Pulso'

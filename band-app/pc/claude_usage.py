@@ -156,12 +156,50 @@ def limits(usage):
         out["h5"] = w
     if w := window(usage.get("seven_day")):
         out["wk"] = w
-    # The Fable window's key isn't documented; take the first weekly key naming Fable.
+    # Model-scoped weekly limit (Fable): `limits[]` entry of kind "weekly_scoped", whose percent
+    # is its own allowance (used_percent_of_weekly / allowance_percent_of_weekly). A key naming
+    # Fable wins if one ever appears.
+    for item in usage.get("limits") or []:
+        if isinstance(item, dict) and item.get("kind") == "weekly_scoped" and item.get("percent") is not None:
+            out["fb"] = {"p": round(float(item["percent"]), 1), "r": epoch(item.get("resets_at"))}
+            break
     for key, value in usage.items():
         if "fable" in key.lower() and (w := window(value)):
             out["fb"] = w
             break
+    # A dollar allowance window (e.g. the monthly $250 credit, codenamed in the response).
+    for key, value in usage.items():
+        if isinstance(value, dict) and value.get("limit_dollars"):
+            out["cr"] = {"used": round(float(value.get("used_dollars") or 0), 2),
+                         "lim": round(float(value["limit_dollars"]), 2),
+                         "r": epoch(value.get("resets_at"))}
+            break
     return out
+
+
+LABEL_KEYS = {"name", "label", "title", "model", "model_name", "display_name", "scope", "kind", "type", "id"}
+
+
+def windows_report(usage):
+    """Every window with a percentage (when it resets, in local time), and the labels inside
+    the `limits` / `weekly_scoped_shares` lists. Numbers and names only."""
+    def when(value):
+        ts = epoch(value)
+        return dt.datetime.fromtimestamp(ts).strftime("%a %d %b %H:%M") if ts else "-"
+
+    for key, value in usage.items():
+        if isinstance(value, dict) and value.get("utilization") is not None:
+            dollars = ""
+            if value.get("limit_dollars") is not None:
+                dollars = f"  (${value.get('used_dollars')} / ${value.get('limit_dollars')})"
+            print(f"{key:22} %{value['utilization']:<6} resets {when(value.get('resets_at'))}{dollars}")
+    for list_key in ("limits", "weekly_scoped_shares"):
+        for i, item in enumerate(usage.get(list_key) or []):
+            if not isinstance(item, dict):
+                continue
+            labels = {k: v for k, v in item.items() if k in LABEL_KEYS | {"scope", "group"}}
+            numbers = {k: v for k, v in item.items() if isinstance(v, (int, float)) and k not in labels}
+            print(f"{list_key}[{i}] {labels} {numbers} keys={sorted(item)}")
 
 
 def key_tree(obj, prefix=""):
@@ -276,12 +314,19 @@ def main():
     group.add_argument("--loop", action="store_true")
     group.add_argument("--show-keys", action="store_true")
     group.add_argument("--statusline", action="store_true", help="status line command for Claude Code")
+    group.add_argument("--show-windows", action="store_true", help="every limit window, numbers and labels only")
     args = parser.parse_args()
 
     if args.setup:
         return setup()
     if args.statusline:
         return statusline()
+    if args.show_windows:
+        try:
+            windows_report(fetch_usage())
+        except LoginProblem as e:
+            sys.exit(str(e))
+        return
     if args.show_keys:
         try:
             usage = fetch_usage()
