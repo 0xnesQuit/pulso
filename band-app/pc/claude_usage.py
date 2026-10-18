@@ -279,6 +279,13 @@ def collect(cfg):
     try:
         if (api := api_credit(cfg)) is not None:
             payload["api"] = api
+    except urllib.error.HTTPError as e:
+        # Anthropic's error body says why (missing permission, wrong key type); never the key.
+        try:
+            detail = json.loads(e.read().decode()).get("error", {}).get("message", "")
+        except ValueError:
+            detail = ""
+        print(f"api spend: HTTP {e.code} {detail}", file=sys.stderr)
     except (urllib.error.URLError, KeyError, ValueError) as e:
         print(f"api spend: {e}", file=sys.stderr)
     return payload
