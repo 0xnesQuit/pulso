@@ -250,8 +250,18 @@ def api_credit(cfg):
 
 # ---------- publishing ----------
 
+_GH_TOKEN = None
+
+
 def gh_token():
-    return subprocess.run(["gh", "auth", "token"], capture_output=True, text=True, check=True).stdout.strip()
+    """`gh auth token`, asked once per run. CREATE_NO_WINDOW keeps Windows from flashing a
+    console window when this runs under pythonw."""
+    global _GH_TOKEN
+    if _GH_TOKEN is None:
+        flags = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
+        _GH_TOKEN = subprocess.run(["gh", "auth", "token"], capture_output=True, text=True,
+                                   check=True, creationflags=flags).stdout.strip()
+    return _GH_TOKEN
 
 
 def gist_headers():
