@@ -17,6 +17,7 @@ Usage (PowerShell, from band-app\\pc):
   python claude_usage.py --once                  # read and publish once
   python claude_usage.py --loop                  # every 2 minutes until Ctrl+C
   python claude_usage.py --show-keys             # print the usage endpoint's field names only
+  python claude_usage.py --statusline            # Claude Code status line command (official fallback)
 """
 
 import argparse
@@ -69,17 +70,74 @@ def epoch(value):
 
 # ---------- subscription limits (undocumented endpoint) ----------
 
+class LoginProblem(Exception):
+    pass
+
+
+RELOGIN_HINT = ("Terminalde `claude` acip bir mesaj gonder (oturum yenilenir), sonra tekrar dene. "
+                "Olmazsa `claude` icinde /login yap.")
+
+
 def oauth_token():
-    creds = json.loads(CREDENTIALS.read_text(encoding="utf-8"))
-    return creds["claudeAiOauth"]["accessToken"]
+    if not CREDENTIALS.exists():
+        raise LoginProblem(f"{CREDENTIALS} yok: bu bilgisayarda terminal Claude Code'a giris yapilmamis. " + RELOGIN_HINT)
+    oauth = json.loads(CREDENTIALS.read_text(encoding="utf-8")).get("claudeAiOauth") or {}
+    if not oauth.get("accessToken"):
+        raise LoginProblem("Claude Code oturumunda Pro/Max girisi yok. " + RELOGIN_HINT)
+    expires = oauth.get("expiresAt")
+    if expires and expires / 1000 < time.time():
+        ago = int((time.time() - expires / 1000) / 60)
+        raise LoginProblem(f"Claude oturum anahtarinin suresi {ago} dk once dolmus. " + RELOGIN_HINT)
+    return oauth["accessToken"]
 
 
 def fetch_usage():
-    return http_json("GET", USAGE_URL, {
-        "Authorization": f"Bearer {oauth_token()}",
-        "anthropic-beta": "oauth-2025-04-20",
-        "Content-Type": "application/json",
-    })
+    try:
+        return http_json("GET", USAGE_URL, {
+            "Authorization": f"Bearer {oauth_token()}",
+            "anthropic-beta": "oauth-2025-04-20",
+            "Content-Type": "application/json",
+        })
+    except urllib.error.HTTPError as e:
+        if e.code in (401, 403):
+            raise LoginProblem(f"Claude kullanim adresi {e.code} dondu (oturum gecersiz). " + RELOGIN_HINT) from None
+        raise
+
+
+# ---------- official fallback: the Claude Code status line ----------
+# Claude Code passes `rate_limits.five_hour` / `seven_day` (used_percentage, resets_at) to the
+# status line command. `--statusline` caches them here; collect() uses the cache when the
+# usage endpoint fails. It has no Fable window.
+
+STATUS_CACHE = HERE / "statusline_cache.json"
+
+
+def statusline():
+    try:
+        data = json.load(sys.stdin)
+    except ValueError:
+        data = {}
+    rate = data.get("rate_limits") or {}
+    out = {}
+    if w := window(rate.get("five_hour")):
+        out["h5"] = w
+    if w := window(rate.get("seven_day")):
+        out["wk"] = w
+    if out:
+        out["at"] = int(time.time())
+        STATUS_CACHE.write_text(json.dumps(out), encoding="utf-8")
+    parts = [f"5s %{round(out['h5']['p'])}" if "h5" in out else None,
+             f"hafta %{round(out['wk']['p'])}" if "wk" in out else None]
+    print(" | ".join(p for p in parts if p) or "Claude")
+
+
+def cached_limits(max_age=6 * 3600):
+    if not STATUS_CACHE.exists():
+        return {}
+    cache = json.loads(STATUS_CACHE.read_text(encoding="utf-8"))
+    if time.time() - cache.pop("at", 0) > max_age:
+        return {}
+    return cache
 
 
 def window(entry):
@@ -175,8 +233,11 @@ def collect(cfg):
     payload = {"t": int(time.time())}
     try:
         payload.update(limits(fetch_usage()))
-    except (urllib.error.URLError, KeyError, OSError, ValueError) as e:
+    except (LoginProblem, urllib.error.URLError, KeyError, OSError, ValueError) as e:
         print(f"limits: {e}", file=sys.stderr)
+        if cached := cached_limits():
+            print("limits: status line cache used (no Fable)", file=sys.stderr)
+            payload.update(cached)
     try:
         if (api := api_credit(cfg)) is not None:
             payload["api"] = api
@@ -214,12 +275,19 @@ def main():
     group.add_argument("--once", action="store_true")
     group.add_argument("--loop", action="store_true")
     group.add_argument("--show-keys", action="store_true")
+    group.add_argument("--statusline", action="store_true", help="status line command for Claude Code")
     args = parser.parse_args()
 
     if args.setup:
         return setup()
+    if args.statusline:
+        return statusline()
     if args.show_keys:
-        for line in key_tree(fetch_usage()):
+        try:
+            usage = fetch_usage()
+        except LoginProblem as e:
+            sys.exit(str(e))
+        for line in key_tree(usage):
             print(line)
         return
 
