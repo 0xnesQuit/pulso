@@ -692,3 +692,69 @@ enum MiWidgets {
         set { UserDefaults.standard.set(newValue, forKey: backupKey) }
     }
 }
+
+/// Cards, newer layout (Mi Fitness `WidgetGroupManager.setWidgetV3`): `Command{2, 84}` with
+/// `system(4).widgetV3(53){builtinWidgets 1[]{id 1, name 2}}`; `Command{2, 85}` answers
+/// `system(4).widgetV3SupportedList(54){groups 1[]{id 1, name 2, builtinWidgets 3[]{id, name}}}`.
+enum MiWidgetsV3 {
+    static let subtypeSet: UInt64 = 84
+    static let subtypeSupported: UInt64 = 85
+
+    struct Card: Equatable {
+        let id: UInt64
+        let name: String
+    }
+
+    static func supportedCommand() -> Data { MiAuth.systemGet(subtypeSupported) }
+
+    /// Every card the band offers, in the order it lists them.
+    static func supported(_ command: PBMessage) -> [Card] {
+        guard let list = command.message(4)?.message(54) else { return [] }
+        return list.messages(1).flatMap { group in
+            group.messages(3).compactMap { card in
+                guard let id = card.varints[1] else { return nil }
+                return Card(id: id, name: card.blobs[2].flatMap { String(data: $0, encoding: .utf8) } ?? "")
+            }
+        }
+    }
+
+    /// The V3 cards matching the titles of the cards now shown (from a 2/51 answer).
+    static func current(groups: [Data], supported: [Card]) -> [Card] {
+        groups.compactMap { group -> Card? in
+            guard let widget = PBMessage(group)?.messages(3).first,
+                  let title = widget.blobs[4].flatMap({ String(data: $0, encoding: .utf8) }) else { return nil }
+            return supported.first { $0.name == title }
+        }
+    }
+
+    /// The V3 cards before Pulso first wrote any, for "restore".
+    static var backup: [Card]? {
+        get {
+            guard let raw = UserDefaults.standard.array(forKey: "widgetV3Backup") as? [[String: Any]] else { return nil }
+            return raw.compactMap { item in
+                guard let id = (item["id"] as? NSNumber)?.uint64Value, let name = item["name"] as? String else { return nil }
+                return Card(id: id, name: name)
+            }
+        }
+        set {
+            UserDefaults.standard.set(newValue?.map { ["id": NSNumber(value: $0.id), "name": $0.name] }, forKey: "widgetV3Backup")
+        }
+    }
+
+    static func setCommand(_ cards: [Card]) -> Data {
+        var v3 = PBWriter()
+        for card in cards {
+            var item = PBWriter()
+            item.varint(1, card.id)
+            item.string(2, card.name)
+            v3.message(1, item)
+        }
+        var system = PBWriter()
+        system.message(53, v3)
+        var command = PBWriter()
+        command.varint(1, 2)
+        command.varint(2, subtypeSet)
+        command.message(4, system)
+        return command.data
+    }
+}

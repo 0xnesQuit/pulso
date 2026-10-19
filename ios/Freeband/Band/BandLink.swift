@@ -255,6 +255,8 @@ final class BandLink: NSObject, ObservableObject {
         quickAppDelivered = false
         cardAttempts = []
         cardAttempt = 0
+        cardGroups = nil
+        v3Supported = nil
         active = true
         note("start: \(target.name), \(target.keys.count) key(s)")
 
@@ -368,13 +370,18 @@ final class BandLink: NSObject, ObservableObject {
         }
         if case .widgets(let package, _) = purpose {
             phase = .reading
-            if package == nil, let backup = MiWidgets.backup {
+            if package == nil, let backup = MiWidgetsV3.backup {
+                note("auth ok → restoring \(backup.count) V3 card(s)")
+                sendCommand(MiWidgetsV3.setCommand(backup), encrypted: true)
+            } else if package == nil, let backup = MiWidgets.backup {
                 note("auth ok → restoring \(backup.count) card group(s)")
                 sendCommand(MiWidgets.setCommand(backup), encrypted: true)
             } else if package == nil {
                 note("no card backup on this phone, nothing to restore")
             } else {
-                note("auth ok → reading the card list")
+                note("auth ok → reading the card list and the cards the band offers")
+                v3Supported = nil
+                sendCommand(MiWidgetsV3.supportedCommand(), encrypted: true)
                 sendCommand(MiWidgets.getCommand(), encrypted: true)
             }
             let thisRun = run
@@ -520,18 +527,28 @@ final class BandLink: NSObject, ObservableObject {
                 note("\(package) is already in the card list")
                 return
             }
-            // Variants, tried in order until the band accepts one (status 0). The first writes the
-            // list back unchanged, to check that writing works at all.
-            let next = groups.count + 1
-            let raw = MiWidgets.rawList(command) ?? Data()
-            cardAttempts = [
-                ("exact echo of the band's list", MiWidgets.setCommand(rawList: raw)),
-                ("unchanged groups, no full flag", MiWidgets.setCommand(groups, full: false)),
-                ("unchanged list", MiWidgets.setCommand(groups)),
-                ("untitled part 16/1", MiWidgets.setCommand(groups + [MiWidgets.appGroup(sequency: next, subType: 1, package: nil, name: name)])),
-                ("untitled part 16/2", MiWidgets.setCommand(groups + [MiWidgets.appGroup(sequency: next, subType: 2, package: nil, name: name)])),
-                ("part 16/1 + \(package)", MiWidgets.setCommand(groups + [MiWidgets.appGroup(sequency: next, subType: 1, package: package, name: name)])),
-            ]
+            // V2 writes (2/52) are refused on the Band 10 even as an exact echo, so try the
+            // newer V3 write (2/84): first the cards as they are now, then with an app slot.
+            cardGroups = groups
+            startV3AttemptsIfReady(name: name)
+            return
+
+        case (2, MiWidgetsV3.subtypeSupported):
+            guard case .widgets(_?, let name) = purpose else {
+                note("← 2/85 raw \(lastBody.map { String(format: "%02x", $0) }.joined())")
+                return
+            }
+            v3Supported = MiWidgetsV3.supported(command)
+            note("← \(v3Supported?.count ?? 0) supported V3 card(s)")
+            startV3AttemptsIfReady(name: name)
+
+        case (2, MiWidgetsV3.subtypeSet):
+            let status = command.varints[100] ?? 0
+            note("← V3 cards set: status \(status)")
+            if status == 0, cardAttempt > 1 {
+                note("band accepted \(cardAttempts[cardAttempt - 1].0); look at the cards on the band")
+                cardAttempts = []
+            }
             sendNextCardAttempt()
 
         case (2, MiWidgets.subtypeSet):
@@ -840,6 +857,26 @@ final class BandLink: NSObject, ObservableObject {
     /// Card-list variants still to try, and how many were sent.
     private var cardAttempts: [(String, Data)] = []
     private var cardAttempt = 0
+
+    private var cardGroups: [Data]?
+    private var v3Supported: [MiWidgetsV3.Card]?
+
+    private func startV3AttemptsIfReady(name: String) {
+        guard let groups = cardGroups, let supported = v3Supported, cardAttempts.isEmpty, cardAttempt == 0 else { return }
+        let current = MiWidgetsV3.current(groups: groups, supported: supported)
+        note("current cards as V3: \(current.map { String(format: "%@ 0x%llx", $0.name, $0.id) }.joined(separator: ", "))")
+        guard current.count == groups.count else {
+            note("couldn't match every card to a V3 id; not writing")
+            return
+        }
+        if MiWidgetsV3.backup == nil { MiWidgetsV3.backup = current }
+        cardAttempts = [
+            ("V3: the current cards unchanged", MiWidgetsV3.setCommand(current)),
+            ("V3: + app slot 16/1", MiWidgetsV3.setCommand(current + [.init(id: 0x10_0001, name: name)])),
+            ("V3: + app slot 16/2", MiWidgetsV3.setCommand(current + [.init(id: 0x10_0002, name: name)])),
+        ]
+        sendNextCardAttempt()
+    }
 
     private func sendNextCardAttempt() {
         guard cardAttempt < cardAttempts.count else {
