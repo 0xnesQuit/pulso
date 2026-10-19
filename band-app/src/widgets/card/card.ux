@@ -1,0 +1,84 @@
+<!--
+  Experimental card for the band's card list ("Araç ekle"). Not documented for Band 10: if the
+  band doesn't list third-party cards, this file is simply unused. It shows the last numbers the
+  app stored (key "claude_usage", see pages/index) and opens the app when tapped.
+-->
+<template>
+  <div class="card" @click="open">
+    <text class="brand">Claude</text>
+    <div class="row">
+      <div class="col">
+        <text class="big" style="color: {{h5Color}};">{{h5}}</text>
+        <text class="small">5 saat</text>
+      </div>
+      <div class="col">
+        <text class="big" style="color: {{wkColor}};">{{wk}}</text>
+        <text class="small">Haftalık</text>
+      </div>
+    </div>
+    <text class="hint">{{fb}}</text>
+  </div>
+</template>
+
+<style>
+  .card {
+    width: 100%;
+    height: 100%;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background-color: #000000;
+  }
+  .brand { font-size: 18px; color: #d97757; }
+  .row { margin-top: 10px; flex-direction: row; justify-content: center; }
+  .col { width: 90px; flex-direction: column; align-items: center; }
+  .big { font-size: 36px; font-weight: bold; }
+  .small { font-size: 14px; color: #8c8c8c; }
+  .hint { margin-top: 10px; font-size: 14px; color: #bfbfbf; }
+</style>
+
+<script>
+import storage from '@system.storage'
+import router from '@system.router'
+
+function colorFor(p) {
+  if (p >= 90) return '#e5483b'
+  if (p >= 70) return '#f2b33d'
+  return '#d97757'
+}
+
+function pct(w) {
+  return w && typeof w.p === 'number' ? Math.round(w.p) : null
+}
+
+export default {
+  private: {
+    h5: '–', wk: '–', fb: 'Pulso bekleniyor',
+    h5Color: '#595959', wkColor: '#595959'
+  },
+
+  onInit() { this.load() },
+  onShow() { this.load() },
+
+  load() {
+    storage.get({
+      key: 'claude_usage',
+      success: (value) => {
+        if (!value) return
+        let data
+        try { data = JSON.parse(value) } catch (e) { return }
+        const h5 = pct(data.h5)
+        const wk = pct(data.wk)
+        const fb = pct(data.fb)
+        if (h5 !== null) { this.h5 = '%' + h5; this.h5Color = colorFor(h5) }
+        if (wk !== null) { this.wk = '%' + wk; this.wkColor = colorFor(wk) }
+        this.fb = fb !== null ? 'Fable %' + fb : ''
+      }
+    })
+  },
+
+  open() {
+    router.push({ uri: 'pages/index' })
+  }
+}
+</script>
