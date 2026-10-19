@@ -545,7 +545,7 @@ final class BandLink: NSObject, ObservableObject {
         case (2, MiWidgetsV3.subtypeSet):
             let status = command.varints[100] ?? 0
             note("← V3 cards set: status \(status)")
-            if status == 0, cardAttempt > 1 {
+            if status == 0 {
                 note("band accepted \(cardAttempts[cardAttempt - 1].0); look at the cards on the band")
                 cardAttempts = []
             }
@@ -862,18 +862,27 @@ final class BandLink: NSObject, ObservableObject {
     private var v3Supported: [MiWidgetsV3.Card]?
 
     private func startV3AttemptsIfReady(name: String) {
-        guard let groups = cardGroups, let supported = v3Supported, cardAttempts.isEmpty, cardAttempt == 0 else { return }
+        guard let groups = cardGroups, let supported = v3Supported, cardAttempts.isEmpty, cardAttempt == 0,
+              case .widgets(let package?, _) = purpose else { return }
         let current = MiWidgetsV3.current(groups: groups, supported: supported)
         note("current cards as V3: \(current.map { String(format: "%@ 0x%llx", $0.name, $0.id) }.joined(separator: ", "))")
-        guard current.count == groups.count else {
-            note("couldn't match every card to a V3 id; not writing")
-            return
+        if MiWidgetsV3.backup == nil {
+            guard current.count == groups.count else {
+                note("couldn't match every card to a V3 id; not writing")
+                return
+            }
+            MiWidgetsV3.backup = current
         }
-        if MiWidgetsV3.backup == nil { MiWidgetsV3.backup = current }
+        // The band shows an app slot (function 16) as an empty grey card. Try names that could
+        // tell it which quick app to load, one card per form, after the original cards.
+        let base = MiWidgetsV3.backup ?? current
+        let slots: [MiWidgetsV3.Card] = [
+            .init(id: 0x10_0001, name: package),
+            .init(id: 0x10_0002, name: "\(package)/widgets/card"),
+        ]
         cardAttempts = [
-            ("V3: the current cards unchanged", MiWidgetsV3.setCommand(current)),
-            ("V3: + app slot 16/1", MiWidgetsV3.setCommand(current + [.init(id: 0x10_0001, name: name)])),
-            ("V3: + app slot 16/2", MiWidgetsV3.setCommand(current + [.init(id: 0x10_0002, name: name)])),
+            ("V3: app slots named by package and widget path", MiWidgetsV3.setCommand(base + slots)),
+            ("V3: app slot named by hap:// uri", MiWidgetsV3.setCommand(base + [.init(id: 0x10_0001, name: "hap://app/\(package)/widgets/card")])),
         ]
         sendNextCardAttempt()
     }
