@@ -656,11 +656,27 @@ enum MiWidgets {
         return group.data
     }
 
+    /// The whole `widgetGroupList` message of a 2/51 answer (groups, full flag, config).
+    static func rawList(_ command: PBMessage) -> Data? {
+        command.message(4)?.blobs[28]
+    }
+
+    /// `Command{2, 52}` with a list message as given (e.g. echoed back exactly as read).
+    static func setCommand(rawList: Data) -> Data {
+        var system = PBWriter()
+        system.bytes(28, rawList)
+        var command = PBWriter()
+        command.varint(1, 2)
+        command.varint(2, subtypeSet)
+        command.message(4, system)
+        return command.data
+    }
+
     /// `Command{2, 52}` replacing the whole carousel with `groups`.
-    static func setCommand(_ groups: [Data]) -> Data {
+    static func setCommand(_ groups: [Data], full: Bool = true) -> Data {
         var list = PBWriter()
         for group in groups { list.bytes(1, group) }
-        list.varint(2, 1)
+        if full { list.varint(2, 1) }
         var system = PBWriter()
         system.message(28, list)
         var command = PBWriter()
