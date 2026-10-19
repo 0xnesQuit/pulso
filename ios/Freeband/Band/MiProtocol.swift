@@ -610,3 +610,65 @@ extension MiAuth {
         return nil
     }
 }
+
+/// The band's card carousel ("Add widget"), as Mi Fitness edits it: `Command{2, 51}` reads and
+/// `Command{2, 52}` writes `system(4).widgetGroupList(28){groups 1[], full 2, config 3}`, each
+/// group `{sequency 1, style 2, widgets 3[]}` and each widget `WidgetV2{style 1, function 2,
+/// subType 3, name 4, appId 6, appName 7}` (AstroBox-NG `wear_system.proto`; Gadgetbridge
+/// `WidgetScreens`). Experimental: a quick-app card uses function 16, which the band lists
+/// without a title among its supported parts (2/53 on a Band 10, firmware 3.2.7).
+enum MiWidgets {
+    static let subtypeGet: UInt64 = 51
+    static let subtypeSet: UInt64 = 52
+    static let backupKey = "widgetGroupsBackup"
+
+    static func getCommand() -> Data { MiAuth.systemGet(subtypeGet) }
+
+    /// The raw groups in a 2/51 answer.
+    static func groups(_ command: PBMessage) -> [Data]? {
+        guard let list = command.message(4)?.message(28) else { return nil }
+        return list.repeatedBlobs[1] ?? []
+    }
+
+    static func hasApp(_ groups: [Data], package: String) -> Bool {
+        groups.contains { group in
+            PBMessage(group)?.messages(3).contains { $0.blobs[6].flatMap { String(data: $0, encoding: .utf8) } == package } ?? false
+        }
+    }
+
+    /// One tall card for a quick app, in a group of its own after the existing ones.
+    static func appGroup(sequency: Int, package: String, name: String) -> Data {
+        var widget = PBWriter()
+        widget.varint(1, 3)
+        widget.varint(2, 16)
+        widget.varint(3, 1)
+        widget.string(4, name)
+        widget.string(6, package)
+        widget.string(7, name)
+        var group = PBWriter()
+        group.varint(1, UInt64(sequency))
+        group.varint(2, 512)
+        group.message(3, widget)
+        return group.data
+    }
+
+    /// `Command{2, 52}` replacing the whole carousel with `groups`.
+    static func setCommand(_ groups: [Data]) -> Data {
+        var list = PBWriter()
+        for group in groups { list.bytes(1, group) }
+        list.varint(2, 1)
+        var system = PBWriter()
+        system.message(28, list)
+        var command = PBWriter()
+        command.varint(1, 2)
+        command.varint(2, subtypeSet)
+        command.message(4, system)
+        return command.data
+    }
+
+    /// The groups as they were before Pulso first changed them, for "restore".
+    static var backup: [Data]? {
+        get { (UserDefaults.standard.array(forKey: backupKey) as? [Data]) }
+        set { UserDefaults.standard.set(newValue, forKey: backupKey) }
+    }
+}

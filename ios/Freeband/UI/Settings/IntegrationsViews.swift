@@ -227,11 +227,32 @@ struct ClaudeBandView: View {
                 ClaudeBandStatus(link: model.link, problem: problem)
             }
             .fbFormRow()
+
+            Section {
+                Button(String(localized: "Add the Claude card to the band")) { editCards(add: true) }
+                    .disabled(sending)
+                Button(String(localized: "Restore the band's original cards")) { editCards(add: false) }
+                    .disabled(sending)
+            } header: {
+                Text("Experimental")
+            } footer: {
+                Text("Writes the band's card list the way Mi Fitness does. The original list is saved first; restore puts it back. Check Diagnostics for the band's answer.")
+            }
+            .fbFormRow()
         }
         .fbFormStyle()
         .navigationTitle(String(localized: "Claude on the band"))
         .navigationBarTitleDisplayMode(.inline)
         .onDisappear { ClaudeBand.gistID = gistID }
+    }
+
+    private func editCards(add: Bool) {
+        guard let band = model.selectedBand() else {
+            problem = String(localized: "There's no band in Pulso yet.")
+            return
+        }
+        problem = nil
+        model.editCards(band, addPackage: add ? ClaudeBand.package : nil, name: "Claude")
     }
 
     private func send(launch: Bool) {

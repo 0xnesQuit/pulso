@@ -19,7 +19,7 @@ final class BandLink: NSObject, ObservableObject {
     /// `send` authenticates, sends the given protobuf commands encrypted, then lets go.
     /// `quickApp` looks up a quick app installed on the band, optionally opens it, and hands it
     /// `content` over the interconnect channel.
-    enum Purpose: Equatable { case check, sync, live, send([Data]), probe([Data]), quickApp(package: String, content: Data, launch: Bool) }
+    enum Purpose: Equatable { case check, sync, live, send([Data]), probe([Data]), widgets(addPackage: String?, name: String), quickApp(package: String, content: Data, launch: Bool) }
 
     /// How a session ended. A sync is complete only when every listed file arrived; anything
     /// less is partial (what arrived is kept) and does not count as a successful sync.
@@ -364,6 +364,21 @@ final class BandLink: NSObject, ObservableObject {
             after(2.0, thisRun) { [weak self] in self?.finish() }
             return
         }
+        if case .widgets(let package, _) = purpose {
+            phase = .reading
+            if package == nil, let backup = MiWidgets.backup {
+                note("auth ok → restoring \(backup.count) card group(s)")
+                sendCommand(MiWidgets.setCommand(backup), encrypted: true)
+            } else if package == nil {
+                note("no card backup on this phone, nothing to restore")
+            } else {
+                note("auth ok → reading the card list")
+                sendCommand(MiWidgets.getCommand(), encrypted: true)
+            }
+            let thisRun = run
+            after(Self.probeHold, thisRun) { [weak self] in self?.finish() }
+            return
+        }
         if case .probe(let commands) = purpose {
             // Read-only requests; every answer is logged in full for the Diagnostics log.
             phase = .reading
@@ -491,6 +506,24 @@ final class BandLink: NSObject, ObservableObject {
 
         case (2, 3):
             note("← clock set (status \(command.varints[100] ?? 0))")
+
+        case (2, MiWidgets.subtypeGet):
+            guard case .widgets(let package?, let name) = purpose, let groups = MiWidgets.groups(command) else {
+                note("← 2/51 raw \(lastBody.map { String(format: "%02x", $0) }.joined())")
+                return
+            }
+            note("← \(groups.count) card group(s)")
+            if MiWidgets.backup == nil { MiWidgets.backup = groups }
+            guard !MiWidgets.hasApp(groups, package: package) else {
+                note("\(package) is already in the card list")
+                return
+            }
+            let updated = groups + [MiWidgets.appGroup(sequency: groups.count + 1, package: package, name: name)]
+            note("→ card list with \(name) (\(updated.count) groups)")
+            sendCommand(MiWidgets.setCommand(updated), encrypted: true)
+
+        case (2, MiWidgets.subtypeSet):
+            note("← card list set: status \(command.varints[100] ?? 0) raw \(lastBody.map { String(format: "%02x", $0) }.joined())")
 
         case (MiQuickApp.commandType, MiQuickApp.subtypeList):
             let apps = MiQuickApp.apps(command)

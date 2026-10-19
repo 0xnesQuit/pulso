@@ -120,6 +120,12 @@ final class AppModel: ObservableObject {
         start(band, .probe([28, 29, 31, 38, 51, 53, 83, 85].map { MiAuth.systemGet($0) }))
     }
 
+    /// Experimental: adds a quick app's card to the band's card carousel (backing up the
+    /// original list first), or with `package == nil` writes the backup back.
+    func editCards(_ band: Band, addPackage package: String?, name: String) {
+        start(band, .widgets(addPackage: package, name: name))
+    }
+
     /// Starts or stops the band vibrating so it can be found.
     func findBand(_ band: Band, start vibrating: Bool) {
         start(band, .send([MiAuth.findBandCommand(start: vibrating)]))
