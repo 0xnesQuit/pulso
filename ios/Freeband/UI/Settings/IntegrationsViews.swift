@@ -233,6 +233,10 @@ struct ClaudeBandView: View {
                     .disabled(sending)
                 Button(String(localized: "Restore the band's original cards")) { editCards(add: false) }
                     .disabled(sending)
+                Button(String(localized: "Put Claude first in the app list")) { editAppOrder(first: true) }
+                    .disabled(sending)
+                Button(String(localized: "Restore the band's app order")) { editAppOrder(first: false) }
+                    .disabled(sending)
             } header: {
                 Text("Experimental")
             } footer: {
@@ -253,6 +257,15 @@ struct ClaudeBandView: View {
         }
         problem = nil
         model.editCards(band, addPackage: add ? ClaudeBand.package : nil, name: "Claude")
+    }
+
+    private func editAppOrder(first: Bool) {
+        guard let band = model.selectedBand() else {
+            problem = String(localized: "There's no band in Pulso yet.")
+            return
+        }
+        problem = nil
+        model.editAppOrder(band, firstPackage: first ? ClaudeBand.package : nil, name: "Claude")
     }
 
     private func send(launch: Bool) {

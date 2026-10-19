@@ -19,7 +19,7 @@ final class BandLink: NSObject, ObservableObject {
     /// `send` authenticates, sends the given protobuf commands encrypted, then lets go.
     /// `quickApp` looks up a quick app installed on the band, optionally opens it, and hands it
     /// `content` over the interconnect channel.
-    enum Purpose: Equatable { case check, sync, live, send([Data]), probe([Data]), widgets(addPackage: String?, name: String), quickApp(package: String, content: Data, launch: Bool) }
+    enum Purpose: Equatable { case check, sync, live, send([Data]), probe([Data]), widgets(addPackage: String?, name: String), appOrder(firstPackage: String?, name: String), quickApp(package: String, content: Data, launch: Bool) }
 
     /// How a session ended. A sync is complete only when every listed file arrived; anything
     /// less is partial (what arrived is kept) and does not count as a successful sync.
@@ -388,6 +388,21 @@ final class BandLink: NSObject, ObservableObject {
             after(Self.probeHold, thisRun) { [weak self] in self?.finish() }
             return
         }
+        if case .appOrder(let package, _) = purpose {
+            phase = .reading
+            if package == nil, let backup = MiAppOrder.backup {
+                note("auth ok → restoring the app order (\(backup.count) apps)")
+                sendCommand(MiAppOrder.setCommand(backup), encrypted: true)
+            } else if package == nil {
+                note("no app order backup on this phone, nothing to restore")
+            } else {
+                note("auth ok → reading the app order")
+                sendCommand(MiAppOrder.getCommand(), encrypted: true)
+            }
+            let thisRun = run
+            after(Self.probeHold, thisRun) { [weak self] in self?.finish() }
+            return
+        }
         if case .probe(let commands) = purpose {
             // Read-only requests; every answer is logged in full for the Diagnostics log.
             phase = .reading
@@ -515,6 +530,29 @@ final class BandLink: NSObject, ObservableObject {
 
         case (2, 3):
             note("← clock set (status \(command.varints[100] ?? 0))")
+
+        case (2, MiAppOrder.subtypeGet):
+            guard case .appOrder(let package?, let name) = purpose, let apps = MiAppOrder.apps(command) else {
+                note("← 2/29 raw \(lastBody.map { String(format: "%02x", $0) }.joined())")
+                return
+            }
+            note("← \(apps.count) app(s) in order, first: \(apps.first.flatMap(MiAppOrder.id) ?? "-")")
+            if MiAppOrder.backup == nil { MiAppOrder.backup = apps }
+            let others = apps.filter { MiAppOrder.id($0) != package }
+            cardAttempts = [
+                ("app order unchanged", MiAppOrder.setCommand(apps)),
+                ("\(name) first", MiAppOrder.setCommand([MiAppOrder.entry(id: package, name: name)] + others)),
+            ]
+            sendNextCardAttempt()
+
+        case (2, MiAppOrder.subtypeSet):
+            let status = command.varints[100] ?? 0
+            note("← app order set: status \(status)")
+            if status == 0, cardAttempt > 1 {
+                note("band accepted \(cardAttempts[cardAttempt - 1].0); open the app list on the band")
+                cardAttempts = []
+            }
+            sendNextCardAttempt()
 
         case (2, MiWidgets.subtypeGet):
             guard case .widgets(let package?, let name) = purpose, let groups = MiWidgets.groups(command) else {

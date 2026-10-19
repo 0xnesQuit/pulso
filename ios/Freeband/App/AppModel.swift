@@ -126,6 +126,12 @@ final class AppModel: ObservableObject {
         start(band, .widgets(addPackage: package, name: name))
     }
 
+    /// Experimental: puts a quick app first in the band's app list (backing up the order), or
+    /// with `package == nil` writes the backup back.
+    func editAppOrder(_ band: Band, firstPackage package: String?, name: String) {
+        start(band, .appOrder(firstPackage: package, name: name))
+    }
+
     /// Starts or stops the band vibrating so it can be found.
     func findBand(_ band: Band, start vibrating: Bool) {
         start(band, .send([MiAuth.findBandCommand(start: vibrating)]))

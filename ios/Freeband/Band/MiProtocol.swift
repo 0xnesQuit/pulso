@@ -758,3 +758,52 @@ enum MiWidgetsV3 {
         return command.data
     }
 }
+
+/// The band's app list order (Mi Fitness "app layout"): `Command{2, 29}` reads and
+/// `Command{2, 30}` writes `system(4).appList(10){apps 1[]{id 1, name 2, hidden 3, persist 4,
+/// canMore 5, inMore 6}}` (AstroBox-NG `wear_system.proto` `App`).
+enum MiAppOrder {
+    static let subtypeGet: UInt64 = 29
+    static let subtypeSet: UInt64 = 30
+    static let backupKey = "appOrderBackup"
+
+    static func getCommand() -> Data { MiAuth.systemGet(subtypeGet) }
+
+    /// The raw app entries of a 2/29 answer, in order.
+    static func apps(_ command: PBMessage) -> [Data]? {
+        guard let list = command.message(4)?.message(10) else { return nil }
+        return list.repeatedBlobs[1] ?? []
+    }
+
+    static func id(_ app: Data) -> String? {
+        PBMessage(app)?.blobs[1].flatMap { String(data: $0, encoding: .utf8) }
+    }
+
+    static func entry(id: String, name: String) -> Data {
+        var app = PBWriter()
+        app.string(1, id)
+        app.string(2, name)
+        app.bool(3, false)
+        app.bool(4, false)
+        app.bool(5, true)
+        app.bool(6, false)
+        return app.data
+    }
+
+    static func setCommand(_ apps: [Data]) -> Data {
+        var list = PBWriter()
+        for app in apps { list.bytes(1, app) }
+        var system = PBWriter()
+        system.message(10, list)
+        var command = PBWriter()
+        command.varint(1, 2)
+        command.varint(2, subtypeSet)
+        command.message(4, system)
+        return command.data
+    }
+
+    static var backup: [Data]? {
+        get { UserDefaults.standard.array(forKey: backupKey) as? [Data] }
+        set { UserDefaults.standard.set(newValue, forKey: backupKey) }
+    }
+}
