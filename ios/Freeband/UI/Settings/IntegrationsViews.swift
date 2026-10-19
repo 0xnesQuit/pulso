@@ -233,7 +233,7 @@ struct ClaudeBandView: View {
                     .disabled(sending)
                 Button(String(localized: "Restore the band's original cards")) { editCards(add: false) }
                     .disabled(sending)
-                Button(String(localized: "Put Claude first in the app list")) { editAppOrder(first: true) }
+                Button(String(localized: "Make Claude first in More (move other apps out)")) { editAppOrder(first: true) }
                     .disabled(sending)
                 Button(String(localized: "Restore the band's app order")) { editAppOrder(first: false) }
                     .disabled(sending)

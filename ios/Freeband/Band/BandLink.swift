@@ -538,17 +538,19 @@ final class BandLink: NSObject, ObservableObject {
             }
             note("← \(apps.count) app(s) in order, first: \(apps.first.flatMap(MiAppOrder.id) ?? "-")")
             if MiAppOrder.backup == nil { MiAppOrder.backup = apps }
-            let others = apps.filter { MiAppOrder.id($0) != package }
+            // Quick apps always sit at the end of the band's "More" folder and can't be ordered.
+            // Moving the system apps out of More leaves \(name) alone there, first in line.
+            let inMore = apps.filter(MiAppOrder.isInMore).count
+            note("\(inMore) app(s) in the More folder; moving them to the main list")
             cardAttempts = [
-                ("app order unchanged", MiAppOrder.setCommand(apps)),
-                ("\(name) first", MiAppOrder.setCommand([MiAppOrder.entry(id: package, name: name)] + others)),
+                ("More folder emptied", MiAppOrder.setCommand(apps.map { MiAppOrder.setInMore($0, false) })),
             ]
             sendNextCardAttempt()
 
         case (2, MiAppOrder.subtypeSet):
             let status = command.varints[100] ?? 0
             note("← app order set: status \(status)")
-            if status == 0, cardAttempt > 1 {
+            if status == 0 {
                 note("band accepted \(cardAttempts[cardAttempt - 1].0); open the app list on the band")
                 cardAttempts = []
             }

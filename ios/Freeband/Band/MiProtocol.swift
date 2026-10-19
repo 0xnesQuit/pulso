@@ -779,6 +779,21 @@ enum MiAppOrder {
         PBMessage(app)?.blobs[1].flatMap { String(data: $0, encoding: .utf8) }
     }
 
+    /// The same app entry with "in the More folder" (field 6) set as given.
+    static func setInMore(_ app: Data, _ inMore: Bool) -> Data {
+        guard let m = PBMessage(app) else { return app }
+        var out = PBWriter()
+        if let v = m.blobs[1] { out.bytes(1, v) }
+        if let v = m.blobs[2] { out.bytes(2, v) }
+        out.varint(3, m.varints[3] ?? 0)
+        out.varint(4, m.varints[4] ?? 0)
+        out.varint(5, m.varints[5] ?? 0)
+        out.bool(6, inMore)
+        return out.data
+    }
+
+    static func isInMore(_ app: Data) -> Bool { PBMessage(app)?.varints[6] == 1 }
+
     static func entry(id: String, name: String) -> Data {
         var app = PBWriter()
         app.string(1, id)
