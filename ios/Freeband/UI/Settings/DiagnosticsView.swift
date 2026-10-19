@@ -97,6 +97,10 @@ struct DiagnosticsView: View {
                 Text("No report yet. After a sync, every file and its sanity checks show up here.")
                     .foregroundStyle(.textSecondary)
             }
+            Button(String(localized: "Read the band's card and app settings")) {
+                if let band = model.selectedBand() { model.probeLayout(band) }
+            }
+            .disabled(link.phase.isBusy)
             Button(busy ? String(localized: "Working…") : String(localized: "Parse all files again")) {
                 Task { await model.reparseAll() }
             }

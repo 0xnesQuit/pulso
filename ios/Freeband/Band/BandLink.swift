@@ -19,7 +19,7 @@ final class BandLink: NSObject, ObservableObject {
     /// `send` authenticates, sends the given protobuf commands encrypted, then lets go.
     /// `quickApp` looks up a quick app installed on the band, optionally opens it, and hands it
     /// `content` over the interconnect channel.
-    enum Purpose: Equatable { case check, sync, live, send([Data]), quickApp(package: String, content: Data, launch: Bool) }
+    enum Purpose: Equatable { case check, sync, live, send([Data]), probe([Data]), quickApp(package: String, content: Data, launch: Bool) }
 
     /// How a session ended. A sync is complete only when every listed file arrived; anything
     /// less is partial (what arrived is kept) and does not count as a successful sync.
@@ -146,6 +146,8 @@ final class BandLink: NSObject, ObservableObject {
     /// How long a quick-app session may take, and how long it stays up after the message.
     static let quickAppLimit: TimeInterval = 15
     static let quickAppHold: TimeInterval = 4
+    /// How long a read-only probe waits for answers.
+    static let probeHold: TimeInterval = 6
 
     @Published private(set) var phase: Phase = .idle
     @Published private(set) var bandID: UUID?
@@ -362,6 +364,15 @@ final class BandLink: NSObject, ObservableObject {
             after(2.0, thisRun) { [weak self] in self?.finish() }
             return
         }
+        if case .probe(let commands) = purpose {
+            // Read-only requests; every answer is logged in full for the Diagnostics log.
+            phase = .reading
+            note("auth ok → probing \(commands.count) setting(s)")
+            for command in commands { sendCommand(command, encrypted: true) }
+            let thisRun = run
+            after(Self.probeHold, thisRun) { [weak self] in self?.finish() }
+            return
+        }
         if case .quickApp(let package, _, _) = purpose {
             phase = .reading
             note("auth ok → quick app list, looking for \(package)")
@@ -512,7 +523,11 @@ final class BandLink: NSObject, ObservableObject {
             note("← quick app \(subtype) (status \(command.varints[100] ?? 0))")
 
         default:
-            note("← \(type)/\(subtype) not handled")
+            if case .probe = purpose {
+                note("← \(type)/\(subtype) \(command.varints[100].map { "status \($0) " } ?? "")raw \(lastBody.map { String(format: "%02x", $0) }.joined())")
+            } else {
+                note("← \(type)/\(subtype) not handled")
+            }
         }
     }
 
@@ -767,8 +782,12 @@ final class BandLink: NSObject, ObservableObject {
             // Unknown everywhere (docs/CAPABILITIES.md §16); keep the bytes for decoding later.
             note("← 2/110 \(body.count) bytes: \(body.map { String(format: "%02x", $0) }.joined())")
         }
+        lastBody = body
         handle(command)
     }
+
+    /// The decrypted bytes of the command being handled, for probe logging.
+    private var lastBody = Data()
 
     // MARK: helpers
 

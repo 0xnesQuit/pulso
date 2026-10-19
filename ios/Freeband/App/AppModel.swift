@@ -112,6 +112,14 @@ final class AppModel: ObservableObject {
         start(band, .send([MiAuth.notificationCommand(id: notificationID, appName: "Pulso", title: title, body: body)]))
     }
 
+    /// Read-only: asks the band for its card (widget) and app-list settings and logs the raw
+    /// answers in Diagnostics, so they can be decoded before anything is written back.
+    /// System subtypes: 28 widget list, 29 ordered app list, 31 app layout, 38 shortcuts,
+    /// 51 widget groups (V2), 53 supported widgets (V2), 83 widgets V3, 85 supported V3.
+    func probeLayout(_ band: Band) {
+        start(band, .probe([28, 29, 31, 38, 51, 53, 83, 85].map { MiAuth.systemGet($0) }))
+    }
+
     /// Starts or stops the band vibrating so it can be found.
     func findBand(_ band: Band, start vibrating: Bool) {
         start(band, .send([MiAuth.findBandCommand(start: vibrating)]))
