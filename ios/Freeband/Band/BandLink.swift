@@ -147,7 +147,7 @@ final class BandLink: NSObject, ObservableObject {
     static let quickAppLimit: TimeInterval = 15
     static let quickAppHold: TimeInterval = 4
     /// How long a read-only probe waits for answers.
-    static let probeHold: TimeInterval = 6
+    static let probeHold: TimeInterval = 10
 
     @Published private(set) var phase: Phase = .idle
     @Published private(set) var bandID: UUID?
@@ -253,6 +253,8 @@ final class BandLink: NSObject, ObservableObject {
         fileListMissing = false
         quickAppProblem = nil
         quickAppDelivered = false
+        cardAttempts = []
+        cardAttempt = 0
         active = true
         note("start: \(target.name), \(target.keys.count) key(s)")
 
@@ -518,12 +520,25 @@ final class BandLink: NSObject, ObservableObject {
                 note("\(package) is already in the card list")
                 return
             }
-            let updated = groups + [MiWidgets.appGroup(sequency: groups.count + 1, package: package, name: name)]
-            note("→ card list with \(name) (\(updated.count) groups)")
-            sendCommand(MiWidgets.setCommand(updated), encrypted: true)
+            // Variants, tried in order until the band accepts one (status 0). The first writes the
+            // list back unchanged, to check that writing works at all.
+            let next = groups.count + 1
+            cardAttempts = [
+                ("unchanged list", groups),
+                ("untitled part 16/1", groups + [MiWidgets.appGroup(sequency: next, subType: 1, package: nil, name: name)]),
+                ("untitled part 16/2", groups + [MiWidgets.appGroup(sequency: next, subType: 2, package: nil, name: name)]),
+                ("part 16/1 + \(package)", groups + [MiWidgets.appGroup(sequency: next, subType: 1, package: package, name: name)]),
+            ]
+            sendNextCardAttempt()
 
         case (2, MiWidgets.subtypeSet):
-            note("← card list set: status \(command.varints[100] ?? 0) raw \(lastBody.map { String(format: "%02x", $0) }.joined())")
+            let status = command.varints[100] ?? 0
+            note("← card list set: status \(status)")
+            if status == 0, cardAttempt > 1 {
+                note("band accepted \(cardAttempts[cardAttempt - 1].0); look at the cards on the band")
+                cardAttempts = []
+            }
+            sendNextCardAttempt()
 
         case (MiQuickApp.commandType, MiQuickApp.subtypeList):
             let apps = MiQuickApp.apps(command)
@@ -817,6 +832,23 @@ final class BandLink: NSObject, ObservableObject {
         }
         lastBody = body
         handle(command)
+    }
+
+    /// Card-list variants still to try, and how many were sent.
+    private var cardAttempts: [(String, [Data])] = []
+    private var cardAttempt = 0
+
+    private func sendNextCardAttempt() {
+        guard cardAttempt < cardAttempts.count else {
+            if !cardAttempts.isEmpty { note("no variant accepted") }
+            cardAttempts = []
+            cardAttempt = 0
+            return
+        }
+        let (label, groups) = cardAttempts[cardAttempt]
+        cardAttempt += 1
+        note("→ try \(cardAttempt)/\(cardAttempts.count): \(label) (\(groups.count) groups)")
+        sendCommand(MiWidgets.setCommand(groups), encrypted: true)
     }
 
     /// The decrypted bytes of the command being handled, for probe logging.

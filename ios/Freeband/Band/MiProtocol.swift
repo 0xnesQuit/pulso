@@ -637,14 +637,18 @@ enum MiWidgets {
     }
 
     /// One tall card for a quick app, in a group of its own after the existing ones.
-    static func appGroup(sequency: Int, package: String, name: String) -> Data {
+    /// `subType` 1 or 2 matches the untitled function-16 parts the band lists; `package` nil
+    /// sends the part exactly as listed (no name or app fields).
+    static func appGroup(sequency: Int, subType: UInt64 = 1, package: String?, name: String) -> Data {
         var widget = PBWriter()
         widget.varint(1, 3)
         widget.varint(2, 16)
-        widget.varint(3, 1)
-        widget.string(4, name)
-        widget.string(6, package)
-        widget.string(7, name)
+        widget.varint(3, subType)
+        if let package {
+            widget.string(4, name)
+            widget.string(6, package)
+            widget.string(7, name)
+        }
         var group = PBWriter()
         group.varint(1, UInt64(sequency))
         group.varint(2, 512)
